@@ -92,14 +92,16 @@ del port Linux que requieren `libstdc++`.
 ### Comando:
 
 ```bash
-g++ main.c -o zero-volts-ui \
- -DLV_CONF_INCLUDE_SIMPLE \
- -I/home/zerovolts/git/lv_port_linux/lvgl \
- -I/home/zerovolts/git/lv_port_linux/lvgl/src/drivers/display/fb \
- -I/home/zerovolts/git/lv_port_linux/lvgl/src/drivers/evdev \
- -I/home/zerovolts/git/lv_port_linux/build \
- /home/zerovolts/git/lv_port_linux/build/lvgl/lib/liblvgl.a \
- -lm -lpthread -ldl
+g++ main.c componentes/top_bar.c -o zero-volts-ui \
+  -DLV_CONF_INCLUDE_SIMPLE \
+  -I. \
+  -I./componentes \
+  -I/home/zerovolts/git/lv_port_linux/lvgl \
+  -I/home/zerovolts/git/lv_port_linux/lvgl/src/drivers/display/fb \
+  -I/home/zerovolts/git/lv_port_linux/lvgl/src/drivers/evdev \
+  -I/home/zerovolts/git/lv_port_linux/build \
+  /home/zerovolts/git/lv_port_linux/build/lvgl/lib/liblvgl.a \
+  -lm -lpthread -ldl
 ```
 
 ---
