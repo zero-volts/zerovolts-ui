@@ -3,16 +3,10 @@
 #include <unistd.h>
 #include <stdio.h>
 
-// 1.- [DONE] Rotate screen
-// 2.- [DONE] Create button
-// 3.- [DONE] Setup evdev event
-// 4.- [DONE] Setup calibration
-// 5.- [] Create Top bar (show app name and time)
-// 6.- [] Create button to call HID (bad usb) script
 
 static void btn_event_cb(lv_event_t * e)
 {
-     printf("boton presionado\n");
+     printf("button pressed \n");
 }
 
 int driver_initialization(lv_display_t *display)
