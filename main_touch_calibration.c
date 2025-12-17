@@ -27,41 +27,6 @@ int driver_initialization(lv_display_t *display)
     return 0;
 }
 
-lv_obj_t *create_button(lv_obj_t *parent, const char *text, lv_event_cb_t handler)
-{
-    lv_obj_t *btn = lv_button_create(parent);
-    lv_obj_set_size(btn, 120, 50);
-
-    if (handler)
-        lv_obj_add_event_cb(btn, handler, LV_EVENT_CLICKED, NULL);
-
-    lv_obj_t *label = lv_label_create(btn);
-    lv_label_set_text(label, text);
-    lv_obj_center(label);
-
-    return btn;
-}
-
-#define BG_COLOR            lv_color_hex(0xB2C0C2)
-#define TEXT_COLOR_WHITE    lv_color_hex(0xFFFFFF)
-
-void create_top_bar(lv_obj_t *parent)
-{
-    lv_obj_t *top_bar = lv_obj_create(parent);
-    lv_obj_set_layout(top_bar, LV_LAYOUT_FLEX);
-    lv_obj_set_flex_flow(top_bar, LV_FLEX_FLOW_ROW);
-
-    lv_obj_set_size(top_bar, LV_PCT(100), 48);
-
-    lv_obj_set_style_bg_color(top_bar, BG_COLOR, LV_PART_MAIN);
-    lv_obj_set_style_border_width(top_bar, 0, LV_PART_MAIN);
-    lv_obj_set_style_radius(top_bar, 0, 0);
-
-    lv_obj_t *title = lv_label_create(top_bar);
-    lv_obj_set_style_text_color(title, TEXT_COLOR_WHITE, LV_PART_MAIN);
-    lv_label_set_text(title, "zero volts");
-}
-
 int main(void)
 { 
     lv_init();
@@ -80,13 +45,16 @@ int main(void)
         return -1;
     }
 
-    // root layout
     lv_obj_t *active_screen = lv_screen_active();
-    lv_obj_set_layout(active_screen, LV_LAYOUT_FLEX);
-    lv_obj_set_flex_flow(active_screen, LV_FLEX_FLOW_COLUMN);
 
-    create_top_bar(active_screen);
-    create_button(active_screen, "HID", NULL);
+    lv_obj_t *btn = lv_button_create(active_screen);
+    lv_obj_align(btn, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_set_size(btn, 120, 50);
+    lv_obj_add_event_cb(btn, btn_event_cb, LV_EVENT_CLICKED, NULL);
+
+    lv_obj_t *label = lv_label_create(btn);
+    lv_label_set_text(label, "Button");
+    lv_obj_center(label);
     
      while(1) {
          lv_timer_handler();
