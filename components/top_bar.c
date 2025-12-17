@@ -5,7 +5,7 @@
 #include <time.h>
 #include "ui_theme.h"
 
-#define TOP_BAR_HEIGHT 48
+#define TOP_BAR_HEIGHT 25
 
 typedef struct {
     top_bar_t *bar;
@@ -48,10 +48,6 @@ static void apply_default_styles(top_bar_t *bar)
 
     lv_obj_set_style_text_color(bar->container, ZV_COLOR_TERMINAL, 0);
 }
-
-/* =========================
- * Public API
- * ========================= */
 
 top_bar_t *top_bar_create(lv_obj_t *parent)
 {
@@ -103,8 +99,6 @@ top_bar_t *top_bar_create(lv_obj_t *parent)
 
         /* Mostrar hora inmediatamente (sin esperar 1s) */
         clock_timer_cb(it->timer);
-
-        /* Guardar el internal en user_data del container (para destruir después si quieres) */
         lv_obj_set_user_data(bar->container, it);
     }
 
