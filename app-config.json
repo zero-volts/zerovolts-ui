@@ -1,0 +1,8 @@
+{
+    "version": 1,
+    "hid": {
+        "is_enabled": false,
+        "script_list_path": "/home/zerovolts/hid_scripts",
+        "script_selected_path": ""
+    }
+}
