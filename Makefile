@@ -4,8 +4,12 @@ LVPORT := $(HOME)/git/lv_port_linux
 
 SRC := \
 	main.c \
+	config.c \
 	components/top_bar.c \
-	page/hid.c
+	page/hid.c \
+	utils/file.c \
+	utils/cJSON.c
+
 
 INCLUDES := \
 	-I. \
