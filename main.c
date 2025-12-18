@@ -1,13 +1,18 @@
-#include "lvgl.h"
-#include "lv_linux_fbdev.h"
-#include "lv_evdev.h"
 #include <unistd.h>
 #include <stdio.h>
 #include <time.h>
 #include <stdlib.h>
+#include <limits.h> // PATH_MAX
+
+#include "lvgl.h"
+#include "lv_linux_fbdev.h"
+#include "lv_evdev.h"
+
 #include "components/top_bar.h"
 #include "components/ui_theme.h"
 #include "page/hid.h"
+#include "config.h"
+#include "utils/file.h"
 
 // https://www.youtube.com/@techcifer/videos
 typedef struct {
@@ -164,6 +169,16 @@ int main(void)
     if (driver_initialization(display) != 0)
         return -1;
 
+    char base_path[PATH_MAX];
+    if (get_executable_dir(base_path, sizeof(base_path)) == 0) 
+    {
+        char config_path[PATH_MAX];
+        snprintf(config_path, sizeof(config_path), "%s/app-config.json", base_path);
+
+        initialize_config(config_path);
+        config_load();
+    }
+
     lv_obj_t *scr = lv_screen_active();
     lv_obj_set_style_pad_all(scr, 0, 0);
 
@@ -187,16 +202,11 @@ int main(void)
 
     lv_obj_clear_flag(menu, LV_OBJ_FLAG_SCROLLABLE);
 
-
     /* -------- PAGES -------- */
     lv_obj_t *home_page = lv_menu_page_create(menu, NULL);
 
-    zv_hid_cfg_t hid_cfg = {
-        .scripts_dir = "/home/zerovolts/hid_scripts",
-        .selected_path = "/var/lib/zerovolts/hid-selected.txt"
-    };
-
-    lv_obj_t *hid_page = hid_page_create(menu, &hid_cfg);
+    const zv_config *config = config_get();
+    lv_obj_t *hid_page = hid_page_create(menu, config);
     lv_obj_t *home = create_home_page(home_page);
 
     static nav_ctx_t nav1;

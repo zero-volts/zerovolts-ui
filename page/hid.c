@@ -6,13 +6,13 @@
 #include <stdlib.h>
 #include <errno.h>
 
-// Tu theme
 #include "components/ui_theme.h"
+#include "utils/file.h"
+#include "config.h"
 
 
 #define ZV_HID_DEFAULT_SCRIPTS_DIR  "/opt/zerovolts/hid-scripts"
 #define ZV_HID_DEFAULT_SELECTED_PATH "/var/lib/zerovolts/hid-selected.txt"
-
 
 typedef struct {
     lv_obj_t *page;
@@ -35,56 +35,32 @@ static hid_ui_t g_hid;
 
 static int zv_hid_enable(void)
 {
-    
+    system("sudo /home/zerovolts/git/zerovolts-ui/scripts/zv-hid-enable.sh");
     return 0;
 }
 
 static int zv_hid_disable(void)
 {
     
+    system("sudo /home/zerovolts/git/zerovolts-ui/scripts/zv-hid-disable.sh");
     return 0;
 }
 
 static int zv_hid_start_session(void)
 {
-    // TODO: iniciar watcher/servicio
+    system("sudo systemctl start zv-hid-session.service");
+    printf("iniciando servicio! \n");
     return 0;
 }
 
 static int zv_hid_stop_session(void)
 {
-    // TODO: detener watcher/servicio
+    system("sudo systemctl stop zv-hid-session.service");
+    printf("deteniendo servicio! \n");
     return 0;
 }
 
 /* ===================== PERSISTENCIA ===================== */
-
-static void save_selected(const char *path)
-{
-    if(!path || !path[0]) return;
-    FILE *f = fopen(g_hid.selected_path, "w");
-    if(!f) return;
-    fprintf(f, "%s\n", path);
-    fclose(f);
-}
-
-static void load_selected(char *out, size_t out_sz)
-{
-    if(!out || out_sz == 0) return;
-    out[0] = '\0';
-
-    FILE *f = fopen(g_hid.selected_path, "r");
-    if(!f) return;
-
-    if(fgets(out, (int)out_sz, f)) {
-        size_t n = strlen(out);
-        while(n > 0 && (out[n-1] == '\n' || out[n-1] == '\r')) {
-            out[n-1] = '\0';
-            n--;
-        }
-    }
-    fclose(f);
-}
 
 
 static void set_status(const char *msg, lv_color_t color)
@@ -96,25 +72,17 @@ static void set_status(const char *msg, lv_color_t color)
 
 static void hid_set_selected_label(void)
 {
-    if(!g_hid.selected_lbl) return;
+    if(!g_hid.selected_lbl) 
+        return;
 
-    if(g_hid.selected_script[0]) {
-        
+    if(g_hid.selected_script[0]) 
+    {    
         const char *base = strrchr(g_hid.selected_script, '/');
         base = base ? base + 1 : g_hid.selected_script;
         lv_label_set_text_fmt(g_hid.selected_lbl, "Selected: %s", base);
     } else {
         lv_label_set_text(g_hid.selected_lbl, "Selected: (none)");
     }
-}
-
-static bool hid_is_script_file(const char *name)
-{
-    const char *dot = strrchr(name, '.');
-    if(!dot) return false;
-    if(strcmp(dot, ".py") == 0) return true;
-    if(strcmp(dot, ".sh") == 0) return true;
-    return false;
 }
 
 static void clear_list(void)
@@ -128,10 +96,10 @@ static void clear_list(void)
 static void hid_script_item_clicked(lv_event_t *e)
 {
     const char *path = (const char *)lv_event_get_user_data(e);
-    if(!path) return;
+    if(!path) 
+        return;
 
     snprintf(g_hid.selected_script, sizeof(g_hid.selected_script), "%s", path);
-    save_selected(g_hid.selected_script);
     hid_set_selected_label();
     
     //set_status("Script selected. Enable HID when ready.", ZV_COLOR_TEXT_MAIN);
@@ -144,61 +112,24 @@ static void hid_btn_delete_cb(lv_event_t *e)
     if(ud) free(ud);
 }
 
+static void add_file_to_list(const file_desc *description, void *list)
+{
+    lv_obj_t *btn = lv_list_add_button(g_hid.list, NULL, description->file_name);
+    lv_obj_set_style_bg_color(btn, ZV_COLOR_BG_PANEL, 0);
+
+    lv_obj_set_style_text_color(btn, ZV_COLOR_TEXT_MAIN, 0);
+
+    // path debe vivir más que la función => strdup
+    char *heap_path = strdup(description->file_path);
+    lv_obj_add_event_cb(btn, hid_script_item_clicked, LV_EVENT_CLICKED, heap_path);
+    lv_obj_add_event_cb(btn, hid_btn_delete_cb, LV_EVENT_DELETE, heap_path);
+}
+
+
 static void refresh_list_impl(void)
 {
     clear_list();
-
-    DIR *d = opendir(g_hid.scripts_dir);
-    if(!d) {
-        // set_status("Scripts folder not found.", lv_color_hex(0xFF5A5A));
-
-        lv_obj_t *lbl = lv_label_create(g_hid.list);
-        lv_label_set_text_fmt(lbl, "Missing: %s", g_hid.scripts_dir);
-        lv_obj_set_style_text_color(lbl, ZV_COLOR_TEXT_MAIN, 0);
-        return;
-    }
-
-    struct dirent *de;
-    int count = 0;
-
-    while((de = readdir(d)) != NULL) {
-        if(de->d_name[0] == '.') continue;
-        if(!hid_is_script_file(de->d_name)) continue;
-
-        char full[512];
-        snprintf(full, sizeof(full), "%s/%s", g_hid.scripts_dir, de->d_name);
-
-
-        lv_obj_t *btn = lv_list_add_button(g_hid.list, NULL, de->d_name);
-        lv_obj_set_style_bg_color(btn, ZV_COLOR_BG_PANEL, 0);
-
-        // lv_obj_t *btn = lv_list_add_button(g_hid.list);
-        // lv_obj_set_width(btn, LV_PCT(100));
-        
-        // lv_obj_set_style_border_width(btn, 1, 0);
-        // lv_obj_set_style_border_color(btn, lv_color_hex(0x2A3340), 0);
-        // lv_obj_set_style_radius(btn, 10, 0);
-        // lv_obj_set_style_pad_all(btn, 12, 0);
-
-        // lv_obj_t *t = lv_label_create(btn);
-        // lv_label_set_text(t, de->d_name);
-        lv_obj_set_style_text_color(btn, ZV_COLOR_TEXT_MAIN, 0);
-
-        // path debe vivir más que la función => strdup
-        char *heap_path = strdup(full);
-        lv_obj_add_event_cb(btn, hid_script_item_clicked, LV_EVENT_CLICKED, heap_path);
-        lv_obj_add_event_cb(btn, hid_btn_delete_cb, LV_EVENT_DELETE, heap_path);
-
-        count++;
-    }
-
-    closedir(d);
-
-    // if(count == 0) {
-    //     set_status("No scripts found.", lv_color_hex(0xFFCC66));
-    // } else {
-    //     set_status("Select a script, then enable HID.", ZV_COLOR_TEXT_MAIN);
-    // }
+    get_file_list(g_hid.scripts_dir, add_file_to_list, g_hid.list);
 }
 
 static void hid_refresh_btn_cb(lv_event_t *e)
@@ -212,52 +143,58 @@ static void hid_toggle_cb(lv_event_t *e)
     lv_obj_t *sw = (lv_obj_t *)lv_event_get_target(e);
     bool on = lv_obj_has_state(sw, LV_STATE_CHECKED);
 
-    if(on) {
-        if(!g_hid.selected_script[0]) {
-            lv_obj_clear_state(sw, LV_STATE_CHECKED);
-            set_status("Select a script first.", lv_color_hex(0xFF5A5A));
-            return;
-        }
-
-        if(zv_hid_enable() != 0) {
-            lv_obj_clear_state(sw, LV_STATE_CHECKED);
-           // set_status("Failed to enable HID.", lv_color_hex(0xFF5A5A));
-            return;
-        }
-
-        if(zv_hid_start_session() != 0) {
-            zv_hid_disable();
-            lv_obj_clear_state(sw, LV_STATE_CHECKED);
-            //set_status("Failed to start session.", lv_color_hex(0xFF5A5A));
-            return;
-        }
-
-        g_hid.hid_enabled = true;
-      //  set_status("HID enabled. Waiting host...", lv_color_hex(0x66FF99));
-    } else {
+    if (!on) 
+    {
         zv_hid_stop_session();
         zv_hid_disable();
+
+        config_set_hid_selected_script("");
+        config_set_hid_enabled(false);
+
         g_hid.hid_enabled = false;
-      //  set_status("HID disabled.", ZV_COLOR_TEXT_MAIN);
+        return;
     }
+
+    
+    if(!g_hid.selected_script[0]) {
+        lv_obj_clear_state(sw, LV_STATE_CHECKED);
+        set_status("Select a script first.", lv_color_hex(0xFF5A5A));
+        return;
+    }
+
+    if(zv_hid_enable() != 0) {
+        lv_obj_clear_state(sw, LV_STATE_CHECKED);
+        // set_status("Failed to enable HID.", lv_color_hex(0xFF5A5A));
+        return;
+    }
+
+    if(zv_hid_start_session() != 0) {
+        zv_hid_disable();
+        lv_obj_clear_state(sw, LV_STATE_CHECKED);
+        //set_status("Failed to start session.", lv_color_hex(0xFF5A5A));
+        return;
+    }
+
+    config_set_hid_selected_script(g_hid.selected_script);
+    config_set_hid_enabled(true);
+    g_hid.hid_enabled = true;
 }
 
-
-lv_obj_t *hid_page_create(lv_obj_t *menu, const zv_hid_cfg_t *cfg)
+lv_obj_t *hid_page_create(lv_obj_t *menu, const zv_config *cfg)
 {
     memset(&g_hid, 0, sizeof(g_hid));
 
-    const char *scripts_dir = (cfg && cfg->scripts_dir) ? cfg->scripts_dir : ZV_HID_DEFAULT_SCRIPTS_DIR;
-    const char *selected_path = (cfg && cfg->selected_path) ? cfg->selected_path : ZV_HID_DEFAULT_SELECTED_PATH;
+    const char *scripts_dir =
+        (cfg && cfg->hid.list_path[0]) ? cfg->hid.list_path : ZV_HID_DEFAULT_SCRIPTS_DIR;
+    const char *selected_path =
+        (cfg && strlen(cfg->hid.selected_file) > 0) ? cfg->hid.selected_file : ZV_HID_DEFAULT_SELECTED_PATH;
 
     snprintf(g_hid.scripts_dir, sizeof(g_hid.scripts_dir), "%s", scripts_dir);
     snprintf(g_hid.selected_path, sizeof(g_hid.selected_path), "%s", selected_path);
+    
+    //lv_label_set_text(g_hid.selected_lbl, selected_path);
 
     g_hid.page = lv_menu_page_create(menu, "HID / BadUSB");
-    // lv_obj_t *menu_header = lv_menu_get_main_header(menu);
-    
-    // //menu_header->bac
-    // lv_obj_set_flex_align(menu_header, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_scrollbar_mode(g_hid.page, LV_SCROLLBAR_MODE_OFF); 
 
     g_hid.root = lv_obj_create(g_hid.page);
@@ -275,7 +212,7 @@ lv_obj_t *hid_page_create(lv_obj_t *menu, const zv_hid_cfg_t *cfg)
     // HID enabled container
     lv_obj_t *enable_container = lv_obj_create(g_hid.root);
     lv_obj_set_size(enable_container, LV_PCT(100), 30);
-    lv_obj_set_style_bg_opa(enable_container, LV_OPA_TRANSP, 0); //LV_OPA_TRANSP
+    lv_obj_set_style_bg_opa(enable_container, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(enable_container, 0, 0);
     lv_obj_set_style_pad_all(enable_container, 0, 0);
     lv_obj_set_layout(enable_container, LV_LAYOUT_FLEX);
@@ -335,16 +272,16 @@ lv_obj_t *hid_page_create(lv_obj_t *menu, const zv_hid_cfg_t *cfg)
     lv_obj_clear_flag(g_hid.list, LV_OBJ_FLAG_SCROLL_MOMENTUM);
     
 
-    // Cargar último script seleccionado
-    load_selected(g_hid.selected_script, sizeof(g_hid.selected_script));
+    //g_hid.selected_script = selected_path;
+    
     hid_set_selected_label();
 
     // Refrescar scripts al crear
+    //TODO: deberia llamarse desde afuera, no en el momento de creacion
     refresh_list_impl();
 
-    // Por defecto toggle OFF
-    lv_obj_clear_state(g_hid.toggle, LV_STATE_CHECKED);
-    g_hid.hid_enabled = false;
+    lv_obj_set_state(g_hid.toggle, LV_STATE_CHECKED, cfg->hid.is_enabled);
+    g_hid.hid_enabled = cfg->hid.is_enabled;
 
     return g_hid.page;
 }
