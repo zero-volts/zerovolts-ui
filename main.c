@@ -14,7 +14,6 @@
 #include "config.h"
 #include "utils/file.h"
 
-// https://www.youtube.com/@techcifer/videos
 typedef struct {
     lv_obj_t *menu;
     lv_obj_t *page;
@@ -162,7 +161,7 @@ int main(void)
 
     lv_display_t *display = lv_linux_fbdev_create();
     if (!display) {
-        printf("No puedo crear el display\n");
+        printf("Can't create the display\n");
         return -1;
     }
 
