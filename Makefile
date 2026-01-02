@@ -7,6 +7,7 @@ SRC := \
 	config.c \
 	components/top_bar.c \
 	page/hid.c \
+	page/ir.c \
 	utils/file.c \
 	utils/cJSON.c
 
