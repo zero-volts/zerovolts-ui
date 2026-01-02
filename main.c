@@ -12,6 +12,7 @@
 #include "components/top_bar.h"
 #include "components/ui_theme.h"
 #include "page/hid.h"
+#include "page/ir.h"
 #include "config.h"
 #include "utils/file.h"
 
@@ -45,8 +46,10 @@ int driver_initialization(lv_display_t *display)
 
 static void goto_page_cb(lv_event_t *e)
 {
+    printf("llego el click\n");
     nav_ctx_t *ctx = (nav_ctx_t *)lv_event_get_user_data(e);
-    if (!ctx || !ctx->menu || !ctx->page) return;
+    if (!ctx || !ctx->menu || !ctx->page) 
+        return;
 
     lv_menu_set_page(ctx->menu, ctx->page);
 }
@@ -220,14 +223,22 @@ int main(void)
     lv_obj_t *home_page = lv_menu_page_create(menu, NULL);
 
     
+
     lv_obj_t *hid_page = hid_page_create(menu, config);
+    lv_obj_t *ir_page = ir_page_create(menu, config);
     lv_obj_t *home = create_home_page(home_page);
+
 
     static nav_ctx_t nav1;
     nav1.menu = menu; 
     nav1.page = hid_page;
 
+    static nav_ctx_t nav2;
+    nav2.menu = menu; 
+    nav2.page = ir_page;
+
     create_button(home, "Bad USB", LV_SYMBOL_USB, goto_page_cb, &nav1);
+    create_button(home, "INFRARED", LV_SYMBOL_USB, goto_page_cb, &nav2);
     lv_menu_set_page(menu, home_page);
 
     while (1) {
