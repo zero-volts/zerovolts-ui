@@ -8,7 +8,7 @@ extern "C" {
 #endif
 
 typedef struct {
-    int version;
+    char version[16];
     
     struct {
         bool is_enabled;
@@ -17,7 +17,7 @@ typedef struct {
     } hid;
 } zv_config;
 
-int initialize_config(char *path_config);
+int initialize_config(const char *path_config);
 int config_load();
 int config_save();
 

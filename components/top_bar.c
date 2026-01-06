@@ -10,6 +10,7 @@
 typedef struct {
     top_bar_t *bar;
     lv_timer_t *timer;
+    lv_timer_t *temp_timer;
     bool auto_clock;
 } top_bar_internal_t;
 
@@ -27,8 +28,39 @@ static void clock_timer_cb(lv_timer_t *t)
     localtime_r(&now, &lt);
 
     char buf[16];
-    strftime(buf, sizeof(buf), "%H:%M:%S", &lt);
+    strftime(buf, sizeof(buf), "%H:%M", &lt);
     lv_label_set_text(it->bar->clock, buf);
+}
+
+static double read_cpu_temp(void) {
+    FILE *f = fopen("/sys/class/thermal/thermal_zone0/temp", "r");
+    if (!f) return -1.0;
+
+    int raw;
+    if (fscanf(f, "%d", &raw) != 1) {
+        fclose(f);
+        return -1.0;
+    }
+    fclose(f);
+    return raw / 1000.0;
+} 
+
+static void cpu_temp_timer_cb(lv_timer_t *t)
+{
+    top_bar_internal_t *it = (top_bar_internal_t *)lv_timer_get_user_data(t);
+    if(!it || !it->bar || !it->bar->cpu_temp) 
+        return;
+
+    double temp = read_cpu_temp();
+    char buf[16];
+
+    if(temp < 0) {
+        snprintf(buf, sizeof(buf), "--.-°C");
+    } else {
+        snprintf(buf, sizeof(buf), "%.1f°C", temp);
+    }
+
+    lv_label_set_text(it->bar->cpu_temp, buf);
 }
 
 static void apply_default_styles(top_bar_t *bar)
@@ -58,6 +90,7 @@ top_bar_t *top_bar_create(lv_obj_t *parent)
     bar->container = NULL;
     bar->title = NULL;
     bar->clock = NULL;
+    bar->cpu_temp = NULL;
 
     bar->container = lv_obj_create(parent);
     lv_obj_clear_flag(bar->container, LV_OBJ_FLAG_SCROLLABLE);
@@ -75,7 +108,7 @@ top_bar_t *top_bar_create(lv_obj_t *parent)
     );
 
     bar->title = lv_label_create(bar->container);
-    lv_label_set_text(bar->title, "ZERO VOLTS");
+    lv_label_set_text(bar->title, "v0.1");
     lv_obj_set_style_text_font(bar->title, LV_FONT_DEFAULT, 0);
 
     lv_obj_t *right = lv_obj_create(bar->container);
@@ -85,6 +118,9 @@ top_bar_t *top_bar_create(lv_obj_t *parent)
     lv_obj_set_flex_flow(right, LV_FLEX_FLOW_ROW);
     lv_obj_set_style_pad_column(right, 8, 0);
     lv_obj_clear_flag(right, LV_OBJ_FLAG_SCROLLABLE);
+
+    bar->cpu_temp = lv_label_create(right);
+    lv_label_set_text(bar->cpu_temp, "--.-°C");
 
     bar->clock = lv_label_create(right);
     lv_label_set_text(bar->clock, "--:--:--");
@@ -96,9 +132,11 @@ top_bar_t *top_bar_create(lv_obj_t *parent)
         it->bar = bar;
         it->auto_clock = true;
         it->timer = lv_timer_create(clock_timer_cb, 1000, it);
+        it->temp_timer = lv_timer_create(cpu_temp_timer_cb, 3000, it);
 
         /* Mostrar hora inmediatamente (sin esperar 1s) */
         clock_timer_cb(it->timer);
+        cpu_temp_timer_cb(it->temp_timer);
         lv_obj_set_user_data(bar->container, it);
     }
 

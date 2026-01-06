@@ -3,6 +3,7 @@
 #include <time.h>
 #include <stdlib.h>
 #include <limits.h> // PATH_MAX
+#include <string.h>
 
 #include "lvgl.h"
 #include "lv_linux_fbdev.h"
@@ -171,8 +172,18 @@ int main(void)
     char base_path[PATH_MAX];
     if (get_executable_dir(base_path, sizeof(base_path)) == 0) 
     {
+        static const char config_suffix[] = "/app-config.json";
         char config_path[PATH_MAX];
-        snprintf(config_path, sizeof(config_path), "%s/app-config.json", base_path);
+        size_t base_len = strnlen(base_path, sizeof(base_path));
+        size_t suffix_len = sizeof(config_suffix) - 1;
+
+        if (base_len + suffix_len + 1 > sizeof(config_path)) {
+            fprintf(stderr, "Config path is too long\n");
+            return -1;
+        }
+
+        memcpy(config_path, base_path, base_len);
+        memcpy(config_path + base_len, config_suffix, suffix_len + 1);
 
         initialize_config(config_path);
         config_load();
@@ -186,10 +197,14 @@ int main(void)
     lv_obj_set_flex_flow(scr, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_style_pad_row(scr, 0, 0);
 
+    const zv_config *config = config_get();
     /* -------- TOP BAR -------- */
     
     top_bar_t *top_bar = top_bar_create(scr);
-    top_bar_set_title(top_bar, "ZERO VOLTS");
+
+    char version[3];
+    snprintf(version, sizeof(version) + sizeof(config->version), "v%s", config->version);
+    top_bar_set_title(top_bar, version);
 
     /* -------- MENU (full restante) -------- */
     lv_obj_t *menu = lv_menu_create(scr);
@@ -204,7 +219,7 @@ int main(void)
     /* -------- PAGES -------- */
     lv_obj_t *home_page = lv_menu_page_create(menu, NULL);
 
-    const zv_config *config = config_get();
+    
     lv_obj_t *hid_page = hid_page_create(menu, config);
     lv_obj_t *home = create_home_page(home_page);
 

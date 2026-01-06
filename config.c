@@ -1,26 +1,30 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 
 #include "config.h"
 #include "utils/file.h"
 
-char config_path[512];
+char config_path[PATH_MAX];
 static zv_config _config;
 
 void config_set_defaults(void)
 {
     memset(&_config, 0, sizeof(_config));
 
-    _config.version = 1;
+    snprintf(_config.version, sizeof(_config.version), "%s", "0.1");
     _config.hid.selected_file[0] = '\0';
     _config.hid.is_enabled = false;
 }
 
-
-int initialize_config(char *path_config)
+int initialize_config(const char *path_config)
 {
     if(!path_config || !path_config[0]) 
+        return -1;
+
+    size_t len = strnlen(path_config, sizeof(config_path));
+    if (len >= sizeof(config_path))
         return -1;
 
     snprintf(config_path, sizeof(config_path), "%s", path_config);
@@ -29,7 +33,7 @@ int initialize_config(char *path_config)
     return 0;
 }
 
-static void json_get_string(cJSON *obj, const char *key, char *out, size_t out_sz)
+static void json_get_string(cJSON *obj, const char *key, const char *fallback, char *out, size_t out_sz)
 {
     if(!out || out_sz == 0) 
         return;
@@ -39,16 +43,9 @@ static void json_get_string(cJSON *obj, const char *key, char *out, size_t out_s
     cJSON *v = cJSON_GetObjectItemCaseSensitive(obj, key);
     if(cJSON_IsString(v) && v->valuestring) {
         snprintf(out, out_sz, "%s", v->valuestring);
+    } else if (fallback) {
+        snprintf(out, out_sz, "%s", fallback);
     }
-}
-
-static int json_get_int(cJSON *obj, const char *key, int fallback)
-{
-    cJSON *v = cJSON_GetObjectItemCaseSensitive(obj, key);
-    if(cJSON_IsNumber(v)) 
-        return v->valueint;
-
-    return fallback;
 }
 
 static bool json_get_bool(cJSON *obj, const char *key, bool fallback)
@@ -63,7 +60,7 @@ static bool json_get_bool(cJSON *obj, const char *key, bool fallback)
 static cJSON *cfg_to_json(void)
 {
     cJSON *root = cJSON_CreateObject();
-    cJSON_AddNumberToObject(root, "version", _config.version);
+    cJSON_AddStringToObject(root, "version", _config.version);
 
     cJSON *hid = cJSON_AddObjectToObject(root, "hid");
     cJSON_AddStringToObject(hid, "script_selected_path", _config.hid.selected_file);
@@ -78,15 +75,15 @@ static void json_to_cfg(cJSON *root)
     // Partimos con defaults para compatibilidad hacia atrás
     config_set_defaults();
 
-    _config.version = json_get_int(root, "version", 1);
+    json_get_string(root, "version", _config.version, _config.version, sizeof(_config.version));
 
     cJSON *hid = cJSON_GetObjectItemCaseSensitive(root, "hid");
     if(cJSON_IsObject(hid)) 
     {
-        json_get_string(hid, "script_selected_path", _config.hid.selected_file, 
+        json_get_string(hid, "script_selected_path", _config.hid.selected_file, _config.hid.selected_file, 
             sizeof(_config.hid.selected_file));
 
-        json_get_string(hid, "script_list_path", _config.hid.list_path, 
+        json_get_string(hid, "script_list_path", _config.hid.list_path, _config.hid.list_path, 
             sizeof(_config.hid.list_path));
 
         _config.hid.is_enabled = json_get_bool(hid, "is_enabled", _config.hid.is_enabled);

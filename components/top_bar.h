@@ -11,6 +11,7 @@ typedef struct {
     lv_obj_t *container;
     lv_obj_t *title;
     lv_obj_t *clock;
+    lv_obj_t *cpu_temp;
 } top_bar_t;
 
 top_bar_t *top_bar_create(lv_obj_t *parent);
