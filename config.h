@@ -15,6 +15,10 @@ typedef struct {
         char list_path[512];
         char selected_file[512];
     } hid;
+
+    struct {
+        char remotes_path[512];
+    } ir;
 } zv_config;
 
 int initialize_config(const char *path_config);

@@ -11,16 +11,12 @@
 
 #include "components/top_bar.h"
 #include "components/ui_theme.h"
+#include "components/component_helper.h"
+#include "components/nav.h"
 #include "page/hid.h"
-#include "page/ir.h"
+#include "page/ir/ir.h"
 #include "config.h"
 #include "utils/file.h"
-
-typedef struct {
-    lv_obj_t *menu;
-    lv_obj_t *page;
-} nav_ctx_t; 
-
 
 /* ================= TOUCH ================= */
 
@@ -44,50 +40,6 @@ int driver_initialization(lv_display_t *display)
 
 /* ================= NAV ================= */
 
-static void goto_page_cb(lv_event_t *e)
-{
-    printf("llego el click\n");
-    nav_ctx_t *ctx = (nav_ctx_t *)lv_event_get_user_data(e);
-    if (!ctx || !ctx->menu || !ctx->page) 
-        return;
-
-    lv_menu_set_page(ctx->menu, ctx->page);
-}
-
-/* ================= UI HELPERS ================= */
-
-static lv_obj_t *create_button(lv_obj_t *parent, const char *text, const char *icon, lv_event_cb_t cb, void *user_data)
-{
-    lv_obj_t * btn = lv_btn_create(parent);
-    lv_obj_set_size(btn, LV_PCT(48), 100);
-    lv_obj_set_style_bg_color(btn, ZV_COLOR_BG_PANEL, 0);
-    lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_width(btn, 2, 0);
-    lv_obj_set_style_border_color(btn, ZV_COLOR_BORDER, 0);
-    lv_obj_set_style_radius(btn, 10, 0);
-
-    lv_obj_add_event_cb(btn, cb, LV_EVENT_CLICKED, user_data);
-
-    // estados
-    lv_obj_set_style_bg_color(btn, ZV_COLOR_BG_BUTTON_PRESSED, LV_STATE_PRESSED);
-    lv_obj_set_style_border_color(btn, ZV_COLOR_TERMINAL, LV_STATE_FOCUSED);
-    lv_obj_set_style_border_color(btn, ZV_COLOR_TERMINAL, LV_STATE_CHECKED);
-
-    // layout interno
-    lv_obj_set_flex_flow(btn, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(btn, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_row(btn, 6, 0);
-
-    lv_obj_t *ic = lv_label_create(btn);
-    lv_label_set_text(ic, icon);
-    lv_obj_set_style_text_color(ic, ZV_COLOR_TEXT_MAIN, 0);
-
-    lv_obj_t *lb = lv_label_create(btn);
-    lv_label_set_text(lb, text);
-    lv_obj_set_style_text_color(lb, ZV_COLOR_TEXT_MAIN, 0);
-
-    return btn;
-}
 
 /* Crea un root container full size dentro de una page */
 static lv_obj_t *page_root_full(lv_obj_t *page)
@@ -222,12 +174,9 @@ int main(void)
     /* -------- PAGES -------- */
     lv_obj_t *home_page = lv_menu_page_create(menu, NULL);
 
-    
-
     lv_obj_t *hid_page = hid_page_create(menu, config);
     lv_obj_t *ir_page = ir_page_create(menu, config);
     lv_obj_t *home = create_home_page(home_page);
-
 
     static nav_ctx_t nav1;
     nav1.menu = menu; 
@@ -237,8 +186,10 @@ int main(void)
     nav2.menu = menu; 
     nav2.page = ir_page;
 
-    create_button(home, "Bad USB", LV_SYMBOL_USB, goto_page_cb, &nav1);
-    create_button(home, "INFRARED", LV_SYMBOL_USB, goto_page_cb, &nav2);
+    create_square_main_button(home, "Bad USB", LV_SYMBOL_USB, zv_goto_page_cb, &nav1);
+    lv_obj_t *ir_button = create_square_main_button(home, "Infrared", LV_SYMBOL_WIFI, zv_goto_page_cb, &nav2);
+    rotate_icon_by_tag(ir_button, 90);
+
     lv_menu_set_page(menu, home_page);
 
     while (1) {

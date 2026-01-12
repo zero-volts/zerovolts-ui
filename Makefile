@@ -6,8 +6,14 @@ SRC := \
 	main.c \
 	config.c \
 	components/top_bar.c \
+	components/component_helper.c \
+	components/nav.c \
 	page/hid.c \
-	page/ir.c \
+	page/ir/ir.c \
+	page/ir/learn_button.c \
+	page/ir/new_remote.c \
+	page/ir/remotes.c \
+	page/ir/send_signal.c \
 	utils/file.c \
 	utils/cJSON.c
 

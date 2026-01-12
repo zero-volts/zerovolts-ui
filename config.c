@@ -16,6 +16,7 @@ void config_set_defaults(void)
     snprintf(_config.version, sizeof(_config.version), "%s", "0.1");
     _config.hid.selected_file[0] = '\0';
     _config.hid.is_enabled = false;
+    _config.ir.remotes_path[0] = '\0';
 }
 
 int initialize_config(const char *path_config)
@@ -67,6 +68,9 @@ static cJSON *cfg_to_json(void)
     cJSON_AddStringToObject(hid, "script_list_path", _config.hid.list_path);
     cJSON_AddBoolToObject(hid, "is_enabled", _config.hid.is_enabled);
 
+    cJSON *ir = cJSON_AddObjectToObject(root, "ir");
+    cJSON_AddStringToObject(ir, "remotes_path", _config.ir.remotes_path);
+
     return root;
 }
 
@@ -87,6 +91,13 @@ static void json_to_cfg(cJSON *root)
             sizeof(_config.hid.list_path));
 
         _config.hid.is_enabled = json_get_bool(hid, "is_enabled", _config.hid.is_enabled);
+    }
+
+    cJSON *ir = cJSON_GetObjectItemCaseSensitive(root, "ir");
+    if(cJSON_IsObject(ir)) 
+    {
+        json_get_string(ir, "remotes_path", _config.ir.remotes_path, _config.ir.remotes_path,
+            sizeof(_config.ir.remotes_path));
     }
 }
 

@@ -1,8 +1,11 @@
 {
-	"version": "0.1",
+	"version":	"0.1",
 	"hid":	{
 		"script_selected_path":	"",
 		"script_list_path":	"/home/zerovolts/git/zerovolts-ui/",
 		"is_enabled":	false
+	},
+	"ir": {
+		"remotes_path": "/home/zerovolts/git/zerovolts-ui/remotes_stored"
 	}
 }
