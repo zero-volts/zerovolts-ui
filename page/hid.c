@@ -7,6 +7,7 @@
 #include <errno.h>
 
 #include "components/ui_theme.h"
+#include "components/nav.h"
 #include "utils/file.h"
 #include "config.h"
 
@@ -118,6 +119,7 @@ static void add_file_to_list(const file_desc *description, void *list)
     lv_obj_set_style_bg_color(btn, ZV_COLOR_BG_PANEL, 0);
 
     lv_obj_set_style_text_color(btn, ZV_COLOR_TEXT_MAIN, 0);
+    zv_nav_add(btn);
 
     // path debe vivir más que la función => strdup
     char *heap_path = strdup(description->file_path);
@@ -226,6 +228,7 @@ lv_obj_t *hid_page_create(lv_obj_t *menu, const zv_config *cfg)
 
     g_hid.toggle = lv_switch_create(enable_container);
     lv_obj_add_event_cb(g_hid.toggle, hid_toggle_cb, LV_EVENT_VALUE_CHANGED, NULL);
+    zv_nav_add(g_hid.toggle);
 
     // center_container
     lv_obj_t *center_container = lv_obj_create(g_hid.root);
@@ -249,6 +252,7 @@ lv_obj_t *hid_page_create(lv_obj_t *menu, const zv_config *cfg)
     lv_obj_set_style_radius(refresh_btn, 10, 0);
 
     lv_obj_add_event_cb(refresh_btn, hid_refresh_btn_cb, LV_EVENT_CLICKED, NULL);
+    zv_nav_add(refresh_btn);
     lv_obj_set_flex_flow(refresh_btn, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(refresh_btn, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_row(refresh_btn, 6, 0);

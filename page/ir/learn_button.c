@@ -1,5 +1,6 @@
 #include "page/ir/learn_button.h"
 #include "components/ui_theme.h"
+#include "components/nav.h"
 
 static lv_obj_t *ir_create_section_label(lv_obj_t *parent, const char *text)
 {
@@ -30,6 +31,7 @@ static lv_obj_t *ir_create_input_box(lv_obj_t *parent, const char *placeholder, 
         lv_obj_set_style_text_color(obj, ZV_COLOR_TEXT_MUTED, LV_PART_TEXTAREA_PLACEHOLDER);
     }
 
+    zv_nav_add(obj);
     return obj;
 }
 
@@ -114,6 +116,7 @@ lv_obj_t *ir_learn_button_page_create(lv_obj_t *menu)
     lv_label_set_text(cancel_label, "Cancel");
     lv_obj_set_style_text_color(cancel_label, ZV_COLOR_TEXT_MAIN, 0);
     lv_obj_center(cancel_label);
+    zv_nav_add(cancel_btn);
 
     lv_obj_t *finish_btn = lv_btn_create(footer_row);
     lv_obj_set_size(finish_btn, LV_PCT(45), 40);
@@ -127,6 +130,7 @@ lv_obj_t *ir_learn_button_page_create(lv_obj_t *menu)
     lv_label_set_text(finish_label, "Finish");
     lv_obj_set_style_text_color(finish_label, ZV_COLOR_TEXT_MAIN, 0);
     lv_obj_center(finish_label);
+    zv_nav_add(finish_btn);
 
     return page;
 }

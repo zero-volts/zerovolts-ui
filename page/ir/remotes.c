@@ -1,5 +1,6 @@
 #include "page/ir/remotes.h"
 #include "components/ui_theme.h"
+#include "components/nav.h"
 
 static lv_obj_t *ir_create_remote_card(lv_obj_t *parent, const char *icon, const char *title, const char *subtitle)
 {
@@ -80,6 +81,7 @@ lv_obj_t *ir_remotes_page_create(lv_obj_t *menu)
     lv_label_set_text(learn_label, LV_SYMBOL_GPS "  Learn Button");
     lv_obj_set_style_text_color(learn_label, ZV_COLOR_TEXT_MAIN, 0);
     lv_obj_center(learn_label);
+    zv_nav_add(learn_btn);
 
     return page;
 }

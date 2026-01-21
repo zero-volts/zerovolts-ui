@@ -7,29 +7,6 @@
 #include "page/ir/send_signal.h"
 #include "page/ir/remotes.h"
 
-static lv_obj_t *ir_simple_page_create(lv_obj_t *menu, const char *title, const char *text)
-{
-    lv_obj_t *page = lv_menu_page_create(menu, title);
-    lv_obj_set_scrollbar_mode(page, LV_SCROLLBAR_MODE_OFF);
-
-    lv_obj_t *root = lv_obj_create(page);
-    lv_obj_set_size(root, LV_PCT(100), LV_PCT(100));
-    lv_obj_set_style_bg_opa(root, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(root, 0, 0);
-    lv_obj_set_style_pad_all(root, 0, 0);
-    lv_obj_clear_flag(root, LV_OBJ_FLAG_SCROLLABLE);
-
-    lv_obj_set_layout(root, LV_LAYOUT_FLEX);
-    lv_obj_set_flex_flow(root, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(root, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-
-    lv_obj_t *label = lv_label_create(root);
-    lv_label_set_text(label, text);
-    lv_obj_set_style_text_color(label, ZV_COLOR_TEXT_MAIN, 0);
-
-    return page;
-}
-
 lv_obj_t *ir_page_create(lv_obj_t *menu, const zv_config *cfg)
 {
     lv_obj_t *page = lv_menu_page_create(menu, "Infrared");
