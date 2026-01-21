@@ -1,6 +1,5 @@
 #include "component_helper.h"
 #include "components/ui_theme.h"
-#include "components/nav.h"
 
 #define ICON_IDENTIFYER 100
 
@@ -15,8 +14,7 @@ lv_obj_t *create_square_main_button(lv_obj_t *parent, const char *text, const ch
     lv_obj_set_style_radius(btn, 10, 0);
 
     lv_obj_add_event_cb(btn, cb, LV_EVENT_CLICKED, user_data);
-    zv_nav_add(btn);
-
+    
     // estados
     lv_obj_set_style_bg_color(btn, ZV_COLOR_BG_BUTTON_PRESSED, LV_STATE_PRESSED);
     lv_obj_set_style_border_color(btn, ZV_COLOR_TERMINAL, LV_STATE_FOCUSED);

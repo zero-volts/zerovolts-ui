@@ -1,6 +1,5 @@
 #include "page/ir/send_signal.h"
 #include "components/ui_theme.h"
-#include "components/nav.h"
 
 static lv_obj_t *ir_create_section_label(lv_obj_t *parent, const char *text)
 {
@@ -23,7 +22,7 @@ static lv_obj_t *ir_create_dropdown_box(lv_obj_t *parent, const char *text)
     lv_obj_set_style_text_color(obj, ZV_COLOR_TEXT_MAIN, 0);
     lv_obj_set_style_pad_left(obj, 10, 0);
     lv_dropdown_set_text(obj, text);
-    zv_nav_add(obj);
+    
 
     return obj;
 }
@@ -45,7 +44,6 @@ static lv_obj_t *ir_create_key_button(lv_obj_t *parent, const char *text)
     lv_label_set_long_mode(label, LV_LABEL_LONG_WRAP);
     lv_obj_set_width(label, LV_PCT(100));
     lv_obj_center(label);
-    zv_nav_add(btn);
 
     return btn;
 }
@@ -107,7 +105,6 @@ lv_obj_t *ir_send_signal_page_create(lv_obj_t *menu)
     lv_label_set_text(send_label, "Send");
     lv_obj_set_style_text_color(send_label, ZV_COLOR_TEXT_MAIN, 0);
     lv_obj_center(send_label);
-    zv_nav_add(send_btn);
 
     return page;
 }

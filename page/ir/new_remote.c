@@ -39,7 +39,6 @@ static lv_obj_t *ir_create_chip_button(lv_obj_t *parent, const char *text)
     lv_label_set_text(label, text);
     lv_obj_set_style_text_color(label, ZV_COLOR_TEXT_MAIN, 0);
     lv_obj_center(label);
-    zv_nav_add(btn);
 
     return btn;
 }
@@ -58,7 +57,6 @@ static lv_obj_t *ir_create_icon_button(lv_obj_t *parent, const char *icon)
     lv_label_set_text(label, icon);
     lv_obj_set_style_text_color(label, ZV_COLOR_TEXT_MAIN, 0);
     lv_obj_center(label);
-    zv_nav_add(btn);
 
     return btn;
 }
@@ -219,7 +217,6 @@ lv_obj_t *ir_new_remote_page_create(lv_obj_t *menu)
     lv_obj_set_style_pad_left(g_new_remote.name_input, 10, 0);
     lv_obj_add_event_cb(g_new_remote.name_input, ir_name_focus_cb, LV_EVENT_FOCUSED, &g_new_remote);
     lv_obj_add_event_cb(g_new_remote.name_input, ir_name_focus_cb, LV_EVENT_DEFOCUSED, &g_new_remote);
-    zv_nav_add(g_new_remote.name_input);
 
     ir_create_section_label(root, "Category:");
 
@@ -280,7 +277,6 @@ lv_obj_t *ir_new_remote_page_create(lv_obj_t *menu)
     lv_label_set_text(cancel_label, "Cancel");
     lv_obj_set_style_text_color(cancel_label, ZV_COLOR_TEXT_MAIN, 0);
     lv_obj_center(cancel_label);
-    zv_nav_add(cancel_btn);
 
     lv_obj_t *create_btn = lv_btn_create(footer_row);
     lv_obj_set_size(create_btn, LV_PCT(45), 40);
@@ -295,7 +291,6 @@ lv_obj_t *ir_new_remote_page_create(lv_obj_t *menu)
     lv_label_set_text(create_label, "Create");
     lv_obj_set_style_text_color(create_label, ZV_COLOR_TEXT_MAIN, 0);
     lv_obj_center(create_label);
-    zv_nav_add(create_btn);
 
     g_new_remote.keyboard = lv_keyboard_create(page);
     lv_obj_set_size(g_new_remote.keyboard, LV_PCT(100), 120);
