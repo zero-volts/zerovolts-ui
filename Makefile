@@ -15,18 +15,20 @@ SRC := \
 	page/ir/remotes.c \
 	page/ir/send_signal.c \
 	utils/file.c \
-	utils/cJSON.c
+	utils/cJSON.c \
+	../tactile_switch/gpio_buttons.c
 
 
 INCLUDES := \
 	-I. \
+	-I../tactile_switch \
 	-I$(LVPORT)/lvgl \
 	-I$(LVPORT)/lvgl/src/drivers/display/fb \
 	-I$(LVPORT)/lvgl/src/drivers/evdev \
 	-I$(LVPORT)/build
 
 CFLAGS := -DLV_CONF_INCLUDE_SIMPLE -Wall
-LDFLAGS := -lm -lpthread -ldl
+LDFLAGS := -lm -lpthread -ldl -lgpiod
 
 LIBS := $(LVPORT)/build/lvgl/lib/liblvgl.a
 

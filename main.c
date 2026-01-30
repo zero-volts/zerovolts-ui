@@ -9,6 +9,8 @@
 #include "lv_linux_fbdev.h"
 #include "lv_evdev.h"
 
+#include "gpio_buttons.h"
+
 #include "components/top_bar.h"
 #include "components/ui_theme.h"
 #include "components/component_helper.h"
@@ -39,6 +41,64 @@ int driver_initialization(lv_display_t *display)
 }
 
 /* ================= NAV ================= */
+
+static struct gpio_btn *nav_btn = NULL;
+static struct gpio_btn *select_btn = NULL;
+static int last_nav_state = 1;
+static int last_select_state = 1;
+static uint32_t last_nav_ms = 0;
+static uint32_t last_select_ms = 0;
+
+static void keypad_read(lv_indev_t * indev, lv_indev_data_t * data)
+{
+    (void)indev;
+    static bool send_release = false;
+    static uint32_t pending_key = 0;
+    const uint32_t debounce_ms = 50;
+
+    if (send_release) {
+        data->state = LV_INDEV_STATE_RELEASED;
+        data->key = pending_key;
+        send_release = false;
+        return;
+    }
+
+    uint32_t now = lv_tick_get();
+
+    if (nav_btn) {
+        int nav_state = gpio_btn_get(nav_btn);
+        if (nav_state >= 0) {
+            if (last_nav_state == 1 && nav_state == 0 && lv_tick_elaps(last_nav_ms) > debounce_ms) {
+                pending_key = LV_KEY_NEXT;
+                data->state = LV_INDEV_STATE_PRESSED;
+                data->key = pending_key;
+                send_release = true;
+                last_nav_ms = now;
+                last_nav_state = nav_state;
+                return;
+            }
+            last_nav_state = nav_state;
+        }
+    }
+
+    if (select_btn) {
+        int select_state = gpio_btn_get(select_btn);
+        if (select_state >= 0) {
+            if (last_select_state == 1 && select_state == 0 && lv_tick_elaps(last_select_ms) > debounce_ms) {
+                pending_key = LV_KEY_ENTER;
+                data->state = LV_INDEV_STATE_PRESSED;
+                data->key = pending_key;
+                send_release = true;
+                last_select_ms = now;
+                last_select_state = select_state;
+                return;
+            }
+            last_select_state = select_state;
+        }
+    }
+
+    data->state = LV_INDEV_STATE_RELEASED;
+}
 
 
 /* Crea un root container full size dentro de una page */
@@ -192,8 +252,30 @@ int main(void)
 
     lv_menu_set_page(menu, home_page);
 
+    lv_group_t *group = lv_group_create();
+    lv_group_set_wrap(group, true);
+    zv_nav_set_group(group);
+    zv_nav_update_group(menu, home_page);
+
+    unsigned int NAV_GPIO = 21;     // 40 pin fisico (mueve foco)
+    unsigned int SELECT_GPIO = 26;  // 37 pin fisico (enter/seleccion)
+
+    nav_btn = gpio_btn_init(NAV_GPIO);
+    select_btn = gpio_btn_init(SELECT_GPIO);
+
+    lv_indev_t *keypad = lv_indev_create();
+    lv_indev_set_type(keypad, LV_INDEV_TYPE_KEYPAD);
+    lv_indev_set_read_cb(keypad, keypad_read);
+    lv_indev_set_group(keypad, group);
+
+    lv_obj_t *last_page = lv_menu_get_cur_main_page(menu);
     while (1) {
         lv_timer_handler();
+        lv_obj_t *cur_page = lv_menu_get_cur_main_page(menu);
+        if (cur_page && cur_page != last_page) {
+            zv_nav_update_group(menu, cur_page);
+            last_page = cur_page;
+        }
         usleep(5000);
     }
 
