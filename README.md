@@ -150,3 +150,78 @@ evtest /dev/input/event4
 ```bash
 ./zero-volts-ui
 ```
+
+---
+
+# 📡 9. IR: cómo se guardan y se envían señales
+
+## Estructura de archivos
+
+Las señales aprendidas se guardan en:
+
+```bash
+remotes_stored/<remote>/buttons/<button>.raw
+```
+
+Ejemplo:
+
+```bash
+remotes_stored/ventilador/buttons/off.raw
+```
+
+## Captura (learn)
+
+El backend actual usa `ir-ctl`:
+
+```bash
+timeout 7s ir-ctl -r -1 -d '/dev/lirc1' > '<button>.raw.tmp'
+```
+
+Luego el archivo temporal se valida y, si pasa, se renombra a `*.raw`.
+
+## Envío (send)
+
+Para transmitir una señal guardada:
+
+```bash
+ir-ctl -d '/dev/lirc0' -s '<button>.raw'
+```
+
+## Formato esperado del archivo `.raw`
+
+- Tokens con signo (`+` pulso, `-` espacio), por ejemplo: `+1270 -397 +1279 -396 ...`
+- Debe tener cantidad mínima de tokens (`IR_RAW_MIN_TOKENS`, hoy 160).
+- Debe tener cantidad **par** de tokens (pulso/espacio).
+
+## Falla común: captura impar al final
+
+A veces una captura válida en apariencia termina en `+...` (pulso) sin el `-...` final (gap),
+dejando un total impar de tokens. En ese caso la validación falla.
+
+Se agregó una normalización automática:
+
+- Si el archivo queda impar y termina en pulso (`+`), se agrega un gap sintético:
+  `-20000`
+- Se vuelve a validar.
+- Si pasa, se acepta y se guarda como `*.raw`.
+
+## Archivos inválidos para diagnóstico
+
+Si la captura sigue fallando, el intento se conserva para análisis:
+
+```bash
+<button>.raw.invalid1
+<button>.raw.invalid2
+<button>.raw.invalid3
+```
+
+Esto permite comparar contra un archivo que sí funciona (`off.raw`, por ejemplo).
+
+## Comandos útiles de comparación
+
+```bash
+ls -l remotes_stored/<remote>/buttons/
+wc -w remotes_stored/<remote>/buttons/off.raw remotes_stored/<remote>/buttons/<button>.raw.invalid1
+head -n 1 remotes_stored/<remote>/buttons/off.raw
+head -n 1 remotes_stored/<remote>/buttons/<button>.raw.invalid1
+```

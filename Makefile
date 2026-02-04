@@ -1,4 +1,5 @@
-TARGET := zero-volts-ui
+
+TARGET := bin/zero-volts-ui
 CC := g++
 LVPORT := $(HOME)/git/lv_port_linux
 
@@ -14,7 +15,9 @@ SRC := \
 	page/ir/new_remote.c \
 	page/ir/remotes.c \
 	page/ir/send_signal.c \
+	ir/ir_service.c \
 	utils/file.c \
+	utils/string_utils.c \
 	utils/cJSON.c \
 	../tactile_switch/gpio_buttons.c
 
@@ -32,10 +35,13 @@ LDFLAGS := -lm -lpthread -ldl -lgpiod
 
 LIBS := $(LVPORT)/build/lvgl/lib/liblvgl.a
 
-all: $(TARGET)
+all: setup $(TARGET)
 
 $(TARGET): $(SRC)
 	$(CC) $(SRC) -o $(TARGET) $(CFLAGS) $(INCLUDES) $(LIBS) $(LDFLAGS)
+
+setup:
+	mkdir -p bin
 
 clean:
 	rm -f $(TARGET)

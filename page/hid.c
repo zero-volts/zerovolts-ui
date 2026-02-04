@@ -114,6 +114,9 @@ static void hid_btn_delete_cb(lv_event_t *e)
 
 static void add_file_to_list(const file_desc *description, void *list)
 {
+    if (!description || !description->is_file)
+        return;
+
     lv_obj_t *btn = lv_list_add_button(g_hid.list, NULL, description->file_name);
     lv_obj_set_style_bg_color(btn, ZV_COLOR_BG_PANEL, 0);
 

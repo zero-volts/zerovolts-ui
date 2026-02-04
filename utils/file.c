@@ -8,7 +8,7 @@
 
 #include "file.h"
 
-#define FILE_PATH_LENGTH 512 
+#define FILE_PATH_LENGTH 1024 
 
 char *read_file_as_buffer(const char *path, long* file_size_out)
 {
@@ -85,6 +85,60 @@ int write_entire_file(const char *path, const char *data, size_t len)
     return 0;
 }
 
+bool file_is_directory(const char *path)
+{
+    struct stat st;
+    if (!path || !path[0])
+        return false;
+
+    if (stat(path, &st) != 0)
+        return false;
+
+    return S_ISDIR(st.st_mode);
+}
+
+static int file_ensure_dir_shallow(const char *path)
+{
+    struct stat st;
+
+    if (!path || !path[0])
+        return -1;
+
+    if (stat(path, &st) == 0)
+        return S_ISDIR(st.st_mode) ? 0 : -1;
+
+    if (mkdir(path, 0755) != 0)
+        return -1;
+
+    return 0;
+}
+
+int file_ensure_dir_recursive(const char *path)
+{
+    char tmp[PATH_MAX];
+    size_t len;
+
+    if (!path || !path[0])
+        return -1;
+
+    len = strnlen(path, sizeof(tmp));
+    if (len == 0 || len >= sizeof(tmp))
+        return -1;
+
+    snprintf(tmp, sizeof(tmp), "%s", path);
+
+    for (char *p = tmp + 1; *p; p++) {
+        if (*p == '/') {
+            *p = '\0';
+            if (tmp[0] && file_ensure_dir_shallow(tmp) != 0)
+                return -1;
+            *p = '/';
+        }
+    }
+
+    return file_ensure_dir_shallow(tmp);
+}
+
 void get_file_list(const char* directory_path, file_callback callback, void *obj_target)
 {
     DIR *directory = opendir(directory_path);
@@ -97,17 +151,27 @@ void get_file_list(const char* directory_path, file_callback callback, void *obj
     struct dirent *dir;
     while( (dir = readdir(directory)) != NULL)
     {
+        struct stat st;
         if (dir->d_name[0] == '.')
             continue;
 
         char full_path[FILE_PATH_LENGTH];
         snprintf(full_path, sizeof(full_path), "%s/%s", directory_path, dir->d_name);
+
+        if (stat(full_path, &st) != 0)
+            continue;
+
         if (callback)
         {
-            file_desc description = {
-                .file_name = dir->d_name,
-                .file_path = full_path
-            };
+            file_desc description;
+            memset(&description, 0, sizeof(description));
+            snprintf(description.file_name, sizeof(description.file_name), "%s", dir->d_name);
+            snprintf(description.file_path, sizeof(description.file_path), "%s", full_path);
+            description.is_file = S_ISREG(st.st_mode);
+            description.is_dir = S_ISDIR(st.st_mode);
+            description.size = st.st_size;
+            description.mode = st.st_mode;
+            description.mtime = (long long)st.st_mtime;
       
             callback(&description, obj_target);
         }
@@ -120,6 +184,8 @@ cJSON *read_json_file(const char *path)
 {
     long size = 0;
     char *file_content = read_file_as_buffer(path, &size);
+    if (!file_content)
+        return NULL;
 
     // printf("file content: %s\n", file_content);
 
@@ -130,7 +196,7 @@ cJSON *read_json_file(const char *path)
         if (error_ptr != NULL)
             printf("Error: %s\n", error_ptr);
 
-        cJSON_Delete(json);
+        free(file_content);
         return NULL;
     }
 

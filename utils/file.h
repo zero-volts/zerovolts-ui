@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include <libgen.h>   // dirname
+#include <sys/types.h>
 #include "cJSON.h"
 
 #ifdef __cplusplus
@@ -10,13 +11,20 @@ extern "C" {
 #endif
 
 typedef struct {
-    const char *file_name;
-    const char *file_path;
+    char file_name[256];
+    char file_path[1024];
+    bool is_file;
+    bool is_dir;
+    off_t size;
+    mode_t mode;
+    long long mtime;
 } file_desc;
 
 typedef void (*file_callback)(const file_desc *description, void *obj_target);
 
 int file_exists(const char *path);
+bool file_is_directory(const char *path);
+int file_ensure_dir_recursive(const char *path);
 int get_executable_dir(char *out, size_t out_size);
 bool file_has_extension(const char *name, const char *ext);
 

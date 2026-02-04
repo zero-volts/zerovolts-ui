@@ -18,6 +18,11 @@ typedef struct {
 
     struct {
         char remotes_path[512];
+        char backend[32];
+        char tx_device[128];
+        char rx_device[128];
+        int learn_timeout_ms;
+        bool use_on_screen_keyboard;
     } ir;
 } zv_config;
 

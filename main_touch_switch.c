@@ -23,9 +23,33 @@ static int last_select_state = 1;
 static uint32_t last_nav_ms = 0;
 static uint32_t last_select_ms = 0;
 
+static uint32_t resolve_nav_key(lv_indev_t *indev)
+{
+    lv_group_t *group = lv_indev_get_group(indev);
+    lv_obj_t *focused = group ? lv_group_get_focused(group) : NULL;
+
+    if (!focused)
+        return LV_KEY_NEXT;
+
+    /* Keep classic focus navigation unless we are inside a widget that needs directional keys. */
+    if (lv_obj_check_type(focused, &lv_keyboard_class))
+        return LV_KEY_RIGHT;
+
+    if (lv_obj_check_type(focused, &lv_dropdown_class) &&
+        lv_dropdown_is_open(focused)) {
+        return LV_KEY_DOWN;
+    }
+
+    if (lv_obj_check_type(focused, &lv_dropdownlist_class) &&
+        !lv_obj_has_flag(focused, LV_OBJ_FLAG_HIDDEN)) {
+        return LV_KEY_DOWN;
+    }
+
+    return LV_KEY_NEXT;
+}
+
 static void keypad_read(lv_indev_t * indev, lv_indev_data_t * data)
 {
-    (void)indev;
     static bool send_release = false;
     static uint32_t pending_key = 0;
     const uint32_t debounce_ms = 50;
@@ -41,9 +65,10 @@ static void keypad_read(lv_indev_t * indev, lv_indev_data_t * data)
 
     if (nav_btn) {
         int nav_state = gpiod_line_get_value(nav_btn->line);
-        if (nav_state >= 0) {
+        if (nav_state >= 0) 
+        {
             if (last_nav_state == 1 && nav_state == 0 && lv_tick_elaps(last_nav_ms) > debounce_ms) {
-                pending_key = LV_KEY_NEXT;
+                pending_key = resolve_nav_key(indev);
                 data->state = LV_INDEV_STATE_PRESSED;
                 data->key = pending_key;
                 send_release = true;
@@ -51,13 +76,15 @@ static void keypad_read(lv_indev_t * indev, lv_indev_data_t * data)
                 last_nav_state = nav_state;
                 return;
             }
+
             last_nav_state = nav_state;
         }
     }
 
     if (select_btn) {
         int select_state = gpiod_line_get_value(select_btn->line);
-        if (select_state >= 0) {
+        if (select_state >= 0) 
+        {
             if (last_select_state == 1 && select_state == 0 && lv_tick_elaps(last_select_ms) > debounce_ms) {
                 pending_key = LV_KEY_ENTER;
                 data->state = LV_INDEV_STATE_PRESSED;
@@ -67,6 +94,7 @@ static void keypad_read(lv_indev_t * indev, lv_indev_data_t * data)
                 last_select_state = select_state;
                 return;
             }
+            
             last_select_state = select_state;
         }
     }

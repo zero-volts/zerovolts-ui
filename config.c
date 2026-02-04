@@ -17,6 +17,11 @@ void config_set_defaults(void)
     _config.hid.selected_file[0] = '\0';
     _config.hid.is_enabled = false;
     _config.ir.remotes_path[0] = '\0';
+    snprintf(_config.ir.backend, sizeof(_config.ir.backend), "%s", "irctl");
+    snprintf(_config.ir.tx_device, sizeof(_config.ir.tx_device), "%s", "/dev/lirc0");
+    snprintf(_config.ir.rx_device, sizeof(_config.ir.rx_device), "%s", "/dev/lirc1");
+    _config.ir.learn_timeout_ms = 5000;
+    _config.ir.use_on_screen_keyboard = true;
 }
 
 int initialize_config(const char *path_config)
@@ -58,6 +63,14 @@ static bool json_get_bool(cJSON *obj, const char *key, bool fallback)
     return fallback;
 }
 
+static int json_get_int(cJSON *obj, const char *key, int fallback)
+{
+    cJSON *v = cJSON_GetObjectItemCaseSensitive(obj, key);
+    if (cJSON_IsNumber(v))
+        return v->valueint;
+    return fallback;
+}
+
 static cJSON *cfg_to_json(void)
 {
     cJSON *root = cJSON_CreateObject();
@@ -70,6 +83,11 @@ static cJSON *cfg_to_json(void)
 
     cJSON *ir = cJSON_AddObjectToObject(root, "ir");
     cJSON_AddStringToObject(ir, "remotes_path", _config.ir.remotes_path);
+    cJSON_AddStringToObject(ir, "backend", _config.ir.backend);
+    cJSON_AddStringToObject(ir, "tx_device", _config.ir.tx_device);
+    cJSON_AddStringToObject(ir, "rx_device", _config.ir.rx_device);
+    cJSON_AddNumberToObject(ir, "learn_timeout_ms", _config.ir.learn_timeout_ms);
+    cJSON_AddBoolToObject(ir, "use_on_screen_keyboard", _config.ir.use_on_screen_keyboard);
 
     return root;
 }
@@ -98,6 +116,15 @@ static void json_to_cfg(cJSON *root)
     {
         json_get_string(ir, "remotes_path", _config.ir.remotes_path, _config.ir.remotes_path,
             sizeof(_config.ir.remotes_path));
+        json_get_string(ir, "backend", _config.ir.backend, _config.ir.backend,
+            sizeof(_config.ir.backend));
+        json_get_string(ir, "tx_device", _config.ir.tx_device, _config.ir.tx_device,
+            sizeof(_config.ir.tx_device));
+        json_get_string(ir, "rx_device", _config.ir.rx_device, _config.ir.rx_device,
+            sizeof(_config.ir.rx_device));
+        _config.ir.learn_timeout_ms = json_get_int(ir, "learn_timeout_ms", _config.ir.learn_timeout_ms);
+        _config.ir.use_on_screen_keyboard =
+            json_get_bool(ir, "use_on_screen_keyboard", _config.ir.use_on_screen_keyboard);
     }
 }
 
