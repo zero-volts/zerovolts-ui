@@ -220,19 +220,22 @@ int file_exists(const char *path)
 int get_executable_dir(char *out, size_t out_size)
 {
     char exe_path[PATH_MAX];
-    size_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
-    if ((int)len == -1) {
+    ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
+    if (len < 0) 
         return -1;
-    }
 
     exe_path[len] = '\0';
 
-    char *dir = dirname(exe_path);
+    char tmp[PATH_MAX];
+    strncpy(tmp, exe_path, sizeof(tmp));
+    tmp[sizeof(tmp) - 1] = '\0';
+
+    char *dir = dirname(tmp);  // dirname puede modificar el buffer
     if (!dir) 
         return -2;
 
     strncpy(out, dir, out_size);
     out[out_size - 1] = '\0';
-
+    
     return 0;
 }

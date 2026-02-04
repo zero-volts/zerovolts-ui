@@ -213,21 +213,14 @@ int main(void)
     if (driver_initialization(display) != 0)
         return -1;
 
-    char base_path[PATH_MAX];
-    if (get_executable_dir(base_path, sizeof(base_path)) == 0) 
+    char exe_dir[PATH_MAX];
+    if (get_executable_dir(exe_dir, sizeof(exe_dir)) == 0) 
     {
-        static const char config_suffix[] = "/app-config.json";
         char config_path[PATH_MAX];
-        size_t base_len = strnlen(base_path, sizeof(base_path));
-        size_t suffix_len = sizeof(config_suffix) - 1;
+        snprintf(config_path, sizeof(config_path), "%s/../app-config.json", exe_dir);
 
-        if (base_len + suffix_len + 1 > sizeof(config_path)) {
-            fprintf(stderr, "Config path is too long\n");
-            return -1;
-        }
-
-        memcpy(config_path, base_path, base_len);
-        memcpy(config_path + base_len, config_suffix, suffix_len + 1);
+        printf("[CFG] exe_dir=%s\n", exe_dir);
+        printf("[CFG] config_path=%s\n", config_path);
 
         initialize_config(config_path);
         config_load();

@@ -6,7 +6,7 @@
 		"is_enabled":	false
 	},
 	"ir": {
-		"remotes_path": "/home/zerovolts/git/zerovolts-ui/data/ir/remotes",
+		"remotes_path": "/home/zerovolts/git/zerovolts-ui/data/ir/remotes/",
 		"backend": "irctl",
 		"tx_device": "/dev/lirc0",
 		"rx_device": "/dev/lirc1",
