@@ -264,52 +264,69 @@ static int system_status_code(int rc)
     return -1;
 }
 
+static void normalize_dir_path(char *path)
+{
+    size_t len;
+
+    if (!path)
+        return;
+
+    len = strlen(path);
+    while (len > 1 && path[len - 1] == '/') {
+        path[len - 1] = '\0';
+        len--;
+    }
+}
+
 static bool validate_raw_capture_file(const char *raw_path, int *token_count_out, int *last_sign_out)
 {
-    char *buf;
-    char *p;
     long sz = 0;
     int token_count = 0;
     int last_sign = 0;
+    int first_sign = 0;
 
-    if (token_count_out)
+    if (token_count_out) 
         *token_count_out = 0;
-    if (last_sign_out)
+
+    if (last_sign_out) 
         *last_sign_out = 0;
 
-    buf = read_file_as_buffer(raw_path, &sz);
-    if (!buf || sz <= 0) {
-        free(buf);
-        return false;
+    char *buf = read_file_as_buffer(raw_path, &sz);
+    if (!buf || sz <= 0) { 
+        free(buf); 
+        return false; 
     }
 
-    p = buf;
-    while (*p) {
+    char *p = buf;
+    while (*p) 
+    {
         char *end = NULL;
         long value;
 
-        while (*p == ' ' || *p == '\n' || *p == '\t' || *p == '\r')
-            p++;
-
-        if (*p == '\0')
+        while (*p == ' ' || *p == '\n' || *p == '\t' || *p == '\r') p++;
+        if (*p == '\0') 
             break;
 
-        if (*p != '+' && *p != '-') {
-            free(buf);
-            return false;
+        if (*p != '+' && *p != '-') { 
+            free(buf); 
+            return false; 
         }
+
         last_sign = (*p == '+') ? 1 : -1;
+        if (token_count == 0) 
+            first_sign = last_sign;
+
         p++;
 
-        if (*p < '0' || *p > '9') {
-            free(buf);
-            return false;
+        if (*p < '0' || *p > '9') { 
+            free(buf); 
+            return false; 
         }
 
         value = strtol(p, &end, 10);
-        if (end == p || value <= 0) {
-            free(buf);
-            return false;
+        if (end == p || value <= 0) { 
+            free(buf); 
+            return false; 
         }
 
         token_count++;
@@ -318,15 +335,17 @@ static bool validate_raw_capture_file(const char *raw_path, int *token_count_out
 
     free(buf);
 
-    if (token_count_out)
+    if (token_count_out) 
         *token_count_out = token_count;
-    if (last_sign_out)
+
+    if (last_sign_out) 
         *last_sign_out = last_sign;
 
-    if (token_count < IR_RAW_MIN_TOKENS)
+    if (token_count < IR_RAW_MIN_TOKENS) 
         return false;
 
-    if ((token_count % 2) != 0)
+    /* En formato raw “lista”, lo típico es empezar con pulse (+) */
+    if (first_sign != 1) 
         return false;
 
     return true;
@@ -462,13 +481,15 @@ static ir_status_t irctl_send_button(const char *tx_dev, const char *raw_path)
     char escaped_path[1024];
     char cmd[2048];
     int exit_code;
+    const int send_timeout_sec = 3;
 
     shell_escape_single_quotes(tx_dev, escaped_dev, sizeof(escaped_dev));
     shell_escape_single_quotes(raw_path, escaped_path, sizeof(escaped_path));
 
     snprintf(cmd, sizeof(cmd),
-             "ir-ctl -d '%s' -s '%s' >/dev/null 2>&1",
-             escaped_dev, escaped_path);
+             "timeout %ds ir-ctl -d '%s' -s '%s' >/dev/null 2>&1",
+             send_timeout_sec, escaped_dev, escaped_path);
+
     ir_trace("send cmd: %s", cmd);
 
     exit_code = system_status_code(system(cmd));
@@ -525,6 +546,7 @@ ir_status_t ir_service_init(const ir_service_cfg_t *cfg)
     snprintf(g_ir.rx_dev, sizeof(g_ir.rx_dev), "%s",
              (cfg->rx_dev && cfg->rx_dev[0]) ? cfg->rx_dev : IR_DEFAULT_RX_DEV);
     snprintf(g_ir.remotes_root, sizeof(g_ir.remotes_root), "%s", cfg->remotes_root);
+    normalize_dir_path(g_ir.remotes_root);
 
     g_ir.learn_timeout_ms = cfg->learn_timeout_ms > 0 ? cfg->learn_timeout_ms : IR_DEFAULT_TIMEOUT_MS;
 

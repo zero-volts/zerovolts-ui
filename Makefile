@@ -1,7 +1,9 @@
 
-TARGET := bin/zero-volts-ui
+APP_TARGET := bin/zero-volts-ui
 CC := g++
 LVPORT := $(HOME)/git/lv_port_linux
+EXAMPLE_SRCS := $(wildcard examples/main_*.c)
+EXAMPLE_TARGETS := $(patsubst examples/main_%.c,bin/example-%,$(EXAMPLE_SRCS))
 
 SRC := \
 	main.c \
@@ -35,16 +37,29 @@ LDFLAGS := -lm -lpthread -ldl -lgpiod
 
 LIBS := $(LVPORT)/build/lvgl/lib/liblvgl.a
 
-all: setup $(TARGET)
+.PHONY: all setup clean run examples example
 
-$(TARGET): $(SRC)
-	$(CC) $(SRC) -o $(TARGET) $(CFLAGS) $(INCLUDES) $(LIBS) $(LDFLAGS)
+all: setup $(APP_TARGET)
+
+$(APP_TARGET): $(SRC)
+	$(CC) $(SRC) -o $(APP_TARGET) $(CFLAGS) $(INCLUDES) $(LIBS) $(LDFLAGS)
 
 setup:
 	mkdir -p bin
 
-clean:
-	rm -f $(TARGET)
+examples: setup $(EXAMPLE_TARGETS)
 
-run: $(TARGET)
-	./$(TARGET)
+bin/example-%: examples/main_%.c
+	$(CC) $< -o $@ $(CFLAGS) $(INCLUDES) $(LIBS) $(LDFLAGS)
+
+example: setup
+ifndef NAME
+	$(error Debes indicar NAME. Ejemplo: make example NAME=hello_world)
+endif
+	$(MAKE) bin/example-$(NAME)
+
+clean:
+	rm -f $(APP_TARGET) $(EXAMPLE_TARGETS)
+
+run: $(APP_TARGET)
+	./$(APP_TARGET)
