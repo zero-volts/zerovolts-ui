@@ -67,3 +67,8 @@ void zv_trim_inplace(char *s)
 
     s[end - start] = '\0';
 }
+
+int zv_is_empty(const char *str)
+{
+    return (str == NULL || str[0] == '\0');
+}

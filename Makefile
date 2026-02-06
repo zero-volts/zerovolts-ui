@@ -11,6 +11,8 @@ SRC := \
 	components/top_bar.c \
 	components/component_helper.c \
 	components/nav.c \
+	page/base_view.c \
+	page/home_view.c \
 	page/hid.c \
 	page/ir/ir.c \
 	page/ir/learn_button.c \

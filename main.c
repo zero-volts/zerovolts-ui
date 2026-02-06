@@ -15,6 +15,7 @@
 #include "components/ui_theme.h"
 #include "components/component_helper.h"
 #include "components/nav.h"
+#include "page/home_view.h"
 #include "page/hid.h"
 #include "page/ir/ir.h"
 #include "page/ir/learn_button.h"
@@ -22,6 +23,10 @@
 #include "ir/ir_service.h"
 #include "config.h"
 #include "utils/file.h"
+
+
+#define NAV_GPIO    21  // 40 pin fisico (mueve foco)
+#define SELECT_GPIO 26  // 37 pin fisico (enter/seleccion)
 
 /* ================= TOUCH ================= */
 
@@ -41,6 +46,24 @@ int driver_initialization(lv_display_t *display)
     lv_evdev_set_calibration(touch, 296, 294, 3931, 3843);
 
     return 0;
+}
+
+const zv_config *setup_config()
+{
+    char exe_dir[PATH_MAX];
+    if (get_executable_dir(exe_dir, sizeof(exe_dir)) == 0) 
+    {
+        char config_path[PATH_MAX];
+        snprintf(config_path, sizeof(config_path), "%s/../app-config.json", exe_dir);
+
+        printf("[CFG] exe_dir=%s\n", exe_dir);
+        printf("[CFG] config_path=%s\n", config_path);
+
+        initialize_config(config_path);
+        config_load();
+    }
+
+    return config_get();
 }
 
 /* ================= NAV ================= */
@@ -129,65 +152,31 @@ static void keypad_read(lv_indev_t * indev, lv_indev_data_t * data)
     data->state = LV_INDEV_STATE_RELEASED;
 }
 
-
-/* Crea un root container full size dentro de una page */
-static lv_obj_t *page_root_full(lv_obj_t *page)
+void setup_navigation_groups(lv_obj_t *menu, lv_obj_t *page)
 {
-    lv_obj_t *root = lv_obj_create(page);
-    lv_obj_set_size(root, LV_PCT(100), LV_PCT(100));
-    lv_obj_set_style_pad_all(root, 16, 0);
-    lv_obj_set_style_border_width(root, 0, 0);
-    lv_obj_set_style_radius(root, 0, 0);
-    lv_obj_set_style_bg_opa(root, LV_OPA_TRANSP, 0);
-    lv_obj_clear_flag(root, LV_OBJ_FLAG_SCROLLABLE);
+    lv_group_t *group = lv_group_create();
+    lv_group_set_wrap(group, true);
+    zv_nav_set_group(group);
+    zv_nav_update_group(menu, page);
 
-    return root;
-}
+    nav_btn = gpio_btn_init(NAV_GPIO);
+    select_btn = gpio_btn_init(SELECT_GPIO);
 
-lv_obj_t *create_home_page(lv_obj_t *parent)
-{
-    lv_obj_t *home = page_root_full(parent);
-    
-    lv_obj_set_layout(home, LV_LAYOUT_FLEX);
-    lv_obj_set_flex_flow(home, LV_FLEX_FLOW_ROW_WRAP);
-    lv_obj_set_style_pad_row(home, 14, 0);
-
-    return home;
-}
-
-static lv_obj_t * find_label_child(lv_obj_t *parent)
-{
-    uint32_t n = lv_obj_get_child_count(parent);
-    for(uint32_t i = 0; i < n; i++) 
-    {
-        lv_obj_t *child = lv_obj_get_child(parent, i);
-        if(lv_obj_check_type(child, &lv_label_class)) return child;
-    }
-
-    return NULL;
-}
-
-static lv_obj_t * find_btn_child(lv_obj_t *parent)
-{
-    uint32_t n = lv_obj_get_child_count(parent);
-    for(uint32_t i = 0; i < n; i++) 
-    {
-        lv_obj_t *child = lv_obj_get_child(parent, i);
-        if(lv_obj_check_type(child, &lv_button_class)) return child;
-    }
-
-    return NULL;
+    lv_indev_t *keypad = lv_indev_create();
+    lv_indev_set_type(keypad, LV_INDEV_TYPE_KEYPAD);
+    lv_indev_set_read_cb(keypad, keypad_read);
+    lv_indev_set_group(keypad, group);
 }
 
 void zv_menu_header_style(lv_obj_t *menu)
 {
     lv_obj_t *header = lv_menu_get_main_header(menu);
-    lv_obj_t *title = find_label_child(header);
+    lv_obj_t *title = find_first_element_child(header, &lv_label_class);
 
     if(title) 
         lv_obj_set_style_text_color(title, ZV_COLOR_TEXT_MAIN, 0);
     
-    lv_obj_t *back_btn = find_btn_child(header);
+    lv_obj_t *back_btn = find_first_element_child(header, &lv_button_class);
     if(back_btn) 
     {
         lv_obj_set_size(back_btn, 30, 30);
@@ -212,20 +201,7 @@ int main(void)
 
     if (driver_initialization(display) != 0)
         return -1;
-
-    char exe_dir[PATH_MAX];
-    if (get_executable_dir(exe_dir, sizeof(exe_dir)) == 0) 
-    {
-        char config_path[PATH_MAX];
-        snprintf(config_path, sizeof(config_path), "%s/../app-config.json", exe_dir);
-
-        printf("[CFG] exe_dir=%s\n", exe_dir);
-        printf("[CFG] config_path=%s\n", config_path);
-
-        initialize_config(config_path);
-        config_load();
-    }
-
+    
     lv_obj_t *scr = lv_screen_active();
     lv_obj_set_style_pad_all(scr, 0, 0);
 
@@ -234,8 +210,7 @@ int main(void)
     lv_obj_set_flex_flow(scr, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_style_pad_row(scr, 0, 0);
 
-    const zv_config *config = config_get();
-
+    const zv_config *config = setup_config();
     ir_service_cfg_t ir_cfg = {
         .backend = config->ir.backend,
         .tx_dev = config->ir.tx_device,
@@ -264,42 +239,40 @@ int main(void)
     lv_obj_clear_flag(menu, LV_OBJ_FLAG_SCROLLABLE);
 
     /* -------- PAGES -------- */
-    lv_obj_t *home_page = lv_menu_page_create(menu, NULL);
+    
+    static home_item home_items[] = {
+        {
+            .label = "Bad USB",
+            .icon = LV_SYMBOL_USB,
+            .create_page = hid_page_create,
+            .rotate_icon_90 = false,
+        },
+        {
+            .label = "Infrared",
+            .icon = LV_SYMBOL_WIFI,
+            .create_page = ir_page_create,
+            .rotate_icon_90 = true,
+        },
+        {
+            .label = "Wifi",
+            .icon = LV_SYMBOL_WIFI,
+            .create_page = NULL,
+            .rotate_icon_90 = false,
+        },
+    };
 
-    lv_obj_t *hid_page = hid_page_create(menu, config);
-    lv_obj_t *ir_page = ir_page_create(menu, config);
-    lv_obj_t *home = create_home_page(home_page);
+    home_view home_view_obj;
+    home_view *home = home_view_create(&home_view_obj, menu, config, home_items, 
+            sizeof(home_items) / sizeof(home_items[0]));
+    if (!home) {
+        printf("Can't create home view\n");
+        return -1;
+    }
 
-    static nav_ctx_t nav1;
-    nav1.menu = menu; 
-    nav1.page = hid_page;
-
-    static nav_ctx_t nav2;
-    nav2.menu = menu; 
-    nav2.page = ir_page;
-
-    create_square_main_button(home, "Bad USB", LV_SYMBOL_USB, zv_goto_page_cb, &nav1);
-    lv_obj_t *ir_button = create_square_main_button(home, "Infrared", LV_SYMBOL_WIFI, zv_goto_page_cb, &nav2);
-    rotate_icon_by_tag(ir_button, 90);
-
+    lv_obj_t *home_page = get_page(home);
     lv_menu_set_page(menu, home_page);
 
-    lv_group_t *group = lv_group_create();
-    lv_group_set_wrap(group, true);
-    zv_nav_set_group(group);
-    zv_nav_update_group(menu, home_page);
-
-    unsigned int NAV_GPIO = 21;     // 40 pin fisico (mueve foco)
-    unsigned int SELECT_GPIO = 26;  // 37 pin fisico (enter/seleccion)
-
-    nav_btn = gpio_btn_init(NAV_GPIO);
-    select_btn = gpio_btn_init(SELECT_GPIO);
-
-    lv_indev_t *keypad = lv_indev_create();
-    lv_indev_set_type(keypad, LV_INDEV_TYPE_KEYPAD);
-    lv_indev_set_read_cb(keypad, keypad_read);
-    lv_indev_set_group(keypad, group);
-
+    setup_navigation_groups(menu, home_page);
     lv_obj_t *last_page = lv_menu_get_cur_main_page(menu);
     while (1) {
         lv_timer_handler();

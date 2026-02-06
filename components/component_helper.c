@@ -66,3 +66,15 @@ void rotate_icon_by_tag(lv_obj_t * btn, int32_t angle)
         }
     }
 }
+
+lv_obj_t *find_first_element_child(lv_obj_t *parent, const lv_obj_class_t *class_p)
+{
+    uint32_t n = lv_obj_get_child_count(parent);
+    for(uint32_t i = 0; i < n; i++) 
+    {
+        lv_obj_t *child = lv_obj_get_child(parent, i);
+        if(lv_obj_check_type(child, class_p)) return child;
+    }
+
+    return NULL;
+}
