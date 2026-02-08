@@ -15,23 +15,9 @@
 #define ZV_HID_DEFAULT_SELECTED_PATH "/var/lib/zerovolts/hid-selected.txt"
 
 typedef struct {
-    lv_obj_t *page;
-    lv_obj_t *root;
-
-    lv_obj_t *list;
-    lv_obj_t *status;
-    lv_obj_t *toggle;
-    lv_obj_t *selected_lbl;
-
-    char scripts_dir[512];
-    char selected_path[512];
-
-    char selected_script[512];
-    bool hid_enabled;
-} hid_ui_t;
-
-static hid_ui_t g_hid;
-
+    hid_view *view;
+    char *path;
+} hid_item_ctx;
 
 static int zv_hid_enable(void)
 {
@@ -63,89 +49,104 @@ static int zv_hid_stop_session(void)
 /* ===================== PERSISTENCIA ===================== */
 
 
-static void set_status(const char *msg, lv_color_t color)
+static void set_status(const char *msg, lv_color_t color, hid_view *self)
 {
-    if(!g_hid.status) return;
-    lv_label_set_text(g_hid.status, msg);
-    lv_obj_set_style_text_color(g_hid.status, color, 0);
+    if(!self->status) return;
+    lv_label_set_text(self->status, msg);
+    lv_obj_set_style_text_color(self->status, color, 0);
 }
 
-static void hid_set_selected_label(void)
+static void hid_set_selected_label(hid_view *self)
 {
-    if(!g_hid.selected_lbl) 
+    if(!self->selected_lbl) 
         return;
 
-    if(g_hid.selected_script[0]) 
+    if(self->script.selected_script[0]) 
     {    
-        const char *base = strrchr(g_hid.selected_script, '/');
-        base = base ? base + 1 : g_hid.selected_script;
-        lv_label_set_text_fmt(g_hid.selected_lbl, "Selected: %s", base);
+        const char *base = strrchr(self->script.selected_script, '/');
+        base = base ? base + 1 : self->script.selected_script;
+        lv_label_set_text_fmt(self->selected_lbl, "Selected: %s", base);
     } else {
-        lv_label_set_text(g_hid.selected_lbl, "Selected: (none)");
+        lv_label_set_text(self->selected_lbl, "Selected: (none)");
     }
 }
 
-static void clear_list(void)
+static void clear_list(lv_obj_t *list)
 {
-    if(!g_hid.list) return;
-    lv_obj_clean(g_hid.list);
+    if(!list) 
+        return;
+
+    lv_obj_clean(list);
 }
 
 /* ===================== EVENTS ===================== */
 
 static void hid_script_item_clicked(lv_event_t *e)
 {
-    const char *path = (const char *)lv_event_get_user_data(e);
-    if(!path) 
+    hid_item_ctx *context = (hid_item_ctx *)lv_event_get_user_data(e);
+    if(!context->path) 
         return;
 
-    snprintf(g_hid.selected_script, sizeof(g_hid.selected_script), "%s", path);
-    hid_set_selected_label();
-    
-    //set_status("Script selected. Enable HID when ready.", ZV_COLOR_TEXT_MAIN);
+    if (!context->view)
+        return;
+
+    snprintf(context->view->script.selected_script, sizeof(context->view->script.selected_script), "%s", context->path);
+    hid_set_selected_label(context->view);
 }
 
 
 static void hid_btn_delete_cb(lv_event_t *e)
 {
-    void *ud = lv_event_get_user_data(e);
-    if(ud) free(ud);
+    hid_item_ctx *context = (hid_item_ctx *)lv_event_get_user_data(e);
+    if (!context || !context->path)
+        return;
+
+    free(context->path);
+    free(context);
 }
 
-static void add_file_to_list(const file_desc *description, void *list)
+static void add_file_to_list(const file_desc *description, void *self)
 {
     if (!description || !description->is_file)
         return;
 
-    lv_obj_t *btn = lv_list_add_button(g_hid.list, NULL, description->file_name);
+    hid_view *view = (hid_view *)self;
+
+    lv_obj_t *btn = lv_list_add_button(view->list, NULL, description->file_name);
     lv_obj_set_style_bg_color(btn, ZV_COLOR_BG_PANEL, 0);
 
     lv_obj_set_style_text_color(btn, ZV_COLOR_TEXT_MAIN, 0);
 
     // path debe vivir más que la función => strdup
     char *heap_path = strdup(description->file_path);
-    lv_obj_add_event_cb(btn, hid_script_item_clicked, LV_EVENT_CLICKED, heap_path);
-    lv_obj_add_event_cb(btn, hid_btn_delete_cb, LV_EVENT_DELETE, heap_path);
+
+    hid_item_ctx *ctx = (hid_item_ctx *)malloc(sizeof(*ctx));
+    ctx->view = view;
+    ctx->path = heap_path;
+
+    lv_obj_add_event_cb(btn, hid_script_item_clicked, LV_EVENT_CLICKED, ctx);
+    lv_obj_add_event_cb(btn, hid_btn_delete_cb, LV_EVENT_DELETE, ctx);
 }
 
 
-static void refresh_list_impl(void)
+static void refresh_list_impl(hid_view *self)
 {
-    clear_list();
-    get_file_list(g_hid.scripts_dir, add_file_to_list, g_hid.list);
+    clear_list(self->list);
+    get_file_list(self->script.scripts_dir, add_file_to_list, self);
 }
 
 static void hid_refresh_btn_cb(lv_event_t *e)
 {
-    (void)e;
-    refresh_list_impl();
+    hid_view *self = (hid_view *)lv_event_get_user_data(e);
+    refresh_list_impl(self);
 }
 
 static void hid_toggle_cb(lv_event_t *e)
 {
     lv_obj_t *sw = (lv_obj_t *)lv_event_get_target(e);
-    bool on = lv_obj_has_state(sw, LV_STATE_CHECKED);
+    hid_view *self = (hid_view *)lv_event_get_user_data(e);
 
+    bool on = lv_obj_has_state(sw, LV_STATE_CHECKED);
     if (!on) 
     {
         zv_hid_stop_session();
@@ -154,14 +155,13 @@ static void hid_toggle_cb(lv_event_t *e)
         config_set_hid_selected_script("");
         config_set_hid_enabled(false);
 
-        g_hid.hid_enabled = false;
+        self->script.hid_enabled = false;
         return;
     }
 
-    
-    if(!g_hid.selected_script[0]) {
+    if(!self->script.selected_script[0]) {
         lv_obj_clear_state(sw, LV_STATE_CHECKED);
-        set_status("Select a script first.", lv_color_hex(0xFF5A5A));
+        set_status("Select a script first.", lv_color_hex(0xFF5A5A), self);
         return;
     }
 
@@ -178,42 +178,38 @@ static void hid_toggle_cb(lv_event_t *e)
         return;
     }
 
-    config_set_hid_selected_script(g_hid.selected_script);
+    config_set_hid_selected_script(self->script.selected_script);
     config_set_hid_enabled(true);
-    g_hid.hid_enabled = true;
+    self->script.hid_enabled = true;
 }
 
-lv_obj_t *hid_page_create(lv_obj_t *menu, const zv_config *cfg)
+void load_script_paths(hid_view *self, const zv_config *cfg)
 {
-    memset(&g_hid, 0, sizeof(g_hid));
+    memset(&self->script, 0, sizeof(self->script));
 
     const char *scripts_dir =
         (cfg && cfg->hid.list_path[0]) ? cfg->hid.list_path : ZV_HID_DEFAULT_SCRIPTS_DIR;
+
     const char *selected_path =
         (cfg && strlen(cfg->hid.selected_file) > 0) ? cfg->hid.selected_file : ZV_HID_DEFAULT_SELECTED_PATH;
 
-    snprintf(g_hid.scripts_dir, sizeof(g_hid.scripts_dir), "%s", scripts_dir);
-    snprintf(g_hid.selected_path, sizeof(g_hid.selected_path), "%s", selected_path);
+    snprintf(self->script.scripts_dir, sizeof(self->script.scripts_dir), "%s", scripts_dir);
+    snprintf(self->script.selected_path, sizeof(self->script.selected_path), "%s", selected_path);
+}
+
+hid_view *hid_page_create(hid_view *self, lv_obj_t *menu, const zv_config *cfg)
+{
+    base_view *view = zv_view_create(&self->base, menu, "HID / BadUSB");
+    if (!view)
+        return NULL;
+
+    lv_obj_set_style_pad_all(self->base.root, 8, 0);
+    self->base.set_flex_layout(&self->base, LV_FLEX_FLOW_COLUMN, 5,0);
     
-    //lv_label_set_text(g_hid.selected_lbl, selected_path);
-
-    g_hid.page = lv_menu_page_create(menu, "HID / BadUSB");
-    lv_obj_set_scrollbar_mode(g_hid.page, LV_SCROLLBAR_MODE_OFF); 
-
-    g_hid.root = lv_obj_create(g_hid.page);
-    lv_obj_set_size(g_hid.root, LV_PCT(100), LV_PCT(100));
-    lv_obj_set_style_pad_all(g_hid.root, 8, 0);
-    lv_obj_set_style_border_width(g_hid.root, 0, 0);
-    lv_obj_set_style_radius(g_hid.root, 0, 0);
-    lv_obj_set_style_bg_opa(g_hid.root, LV_OPA_TRANSP, 0);
-    lv_obj_clear_flag(g_hid.root, LV_OBJ_FLAG_SCROLLABLE);
-
-    lv_obj_set_layout(g_hid.root, LV_LAYOUT_FLEX);
-    lv_obj_set_flex_flow(g_hid.root, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_style_pad_row(g_hid.root, 5, 0);
-
+   load_script_paths(self, cfg);
+    
     // HID enabled container
-    lv_obj_t *enable_container = lv_obj_create(g_hid.root);
+    lv_obj_t *enable_container = lv_obj_create(self->base.root);
     lv_obj_set_size(enable_container, LV_PCT(100), 30);
     lv_obj_set_style_bg_opa(enable_container, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(enable_container, 0, 0);
@@ -223,15 +219,15 @@ lv_obj_t *hid_page_create(lv_obj_t *menu, const zv_config *cfg)
     lv_obj_set_flex_align(enable_container, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     
     // label for switch
-    g_hid.status = lv_label_create(enable_container);
-    lv_label_set_text(g_hid.status, "Enable HID");
-    lv_obj_set_style_text_color(g_hid.status, ZV_COLOR_TEXT_MAIN, 0);
+    self->status = lv_label_create(enable_container);
+    lv_label_set_text(self->status, "Enable HID");
+    lv_obj_set_style_text_color(self->status, ZV_COLOR_TEXT_MAIN, 0);
 
-    g_hid.toggle = lv_switch_create(enable_container);
-    lv_obj_add_event_cb(g_hid.toggle, hid_toggle_cb, LV_EVENT_VALUE_CHANGED, NULL);
+    self->toggle = lv_switch_create(enable_container);
+    lv_obj_add_event_cb(self->toggle, hid_toggle_cb, LV_EVENT_VALUE_CHANGED, self);
 
     // center_container
-    lv_obj_t *center_container = lv_obj_create(g_hid.root);
+    lv_obj_t *center_container = lv_obj_create(self->base.root);
     lv_obj_set_size(center_container, LV_PCT(100), 45);
     lv_obj_set_style_bg_opa(center_container, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(center_container, 0, 0);
@@ -240,8 +236,8 @@ lv_obj_t *hid_page_create(lv_obj_t *menu, const zv_config *cfg)
     lv_obj_set_flex_flow(center_container, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(center_container, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
-    g_hid.selected_lbl = lv_label_create(center_container);
-    lv_obj_set_style_text_color(g_hid.selected_lbl, ZV_COLOR_TEXT_MAIN, 0);
+    self->selected_lbl = lv_label_create(center_container);
+    lv_obj_set_style_text_color(self->selected_lbl, ZV_COLOR_TEXT_MAIN, 0);
 
     lv_obj_t *refresh_btn = lv_btn_create(center_container);
     lv_obj_set_size(refresh_btn, 45, 35);
@@ -251,7 +247,7 @@ lv_obj_t *hid_page_create(lv_obj_t *menu, const zv_config *cfg)
     lv_obj_set_style_border_color(refresh_btn, ZV_COLOR_BORDER, 0);
     lv_obj_set_style_radius(refresh_btn, 10, 0);
 
-    lv_obj_add_event_cb(refresh_btn, hid_refresh_btn_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_add_event_cb(refresh_btn, hid_refresh_btn_cb, LV_EVENT_CLICKED, self);
     lv_obj_set_flex_flow(refresh_btn, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(refresh_btn, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_row(refresh_btn, 6, 0);
@@ -261,40 +257,55 @@ lv_obj_t *hid_page_create(lv_obj_t *menu, const zv_config *cfg)
     lv_obj_set_style_text_color(ic, ZV_COLOR_TEXT_MAIN, 0);
 
     // Lista (scrollable)
-    g_hid.list = lv_list_create(g_hid.root);
-    lv_obj_set_width(g_hid.list, LV_PCT(100));
+    self->list = lv_list_create(self->base.root);
+    lv_obj_set_width(self->list, LV_PCT(100));
 
-    lv_obj_set_style_bg_color(g_hid.list, ZV_COLOR_BG_PANEL, 0);
-    lv_obj_set_style_radius(g_hid.list, 5, 0);
-    lv_obj_set_style_pad_all(g_hid.list, 5, 0);
-    lv_obj_set_style_pad_row(g_hid.list, 10, 0);
+    lv_obj_set_style_bg_color(self->list, ZV_COLOR_BG_PANEL, 0);
+    lv_obj_set_style_radius(self->list, 5, 0);
+    lv_obj_set_style_pad_all(self->list, 5, 0);
+    lv_obj_set_style_pad_row(self->list, 10, 0);
 
-    lv_obj_set_scroll_dir(g_hid.list, LV_DIR_VER);
-    lv_obj_set_scrollbar_mode(g_hid.list, LV_SCROLLBAR_MODE_AUTO);
-    lv_obj_clear_flag(g_hid.list, LV_OBJ_FLAG_SCROLL_ELASTIC);
-    lv_obj_clear_flag(g_hid.list, LV_OBJ_FLAG_SCROLL_MOMENTUM);
+    lv_obj_set_scroll_dir(self->list, LV_DIR_VER);
+    lv_obj_set_scrollbar_mode(self->list, LV_SCROLLBAR_MODE_AUTO);
+    lv_obj_clear_flag(self->list, LV_OBJ_FLAG_SCROLL_ELASTIC);
+    lv_obj_clear_flag(self->list, LV_OBJ_FLAG_SCROLL_MOMENTUM);
     
-
     //g_hid.selected_script = selected_path;
     
-    hid_set_selected_label();
+    hid_set_selected_label(self);
 
     // Refrescar scripts al crear
     //TODO: deberia llamarse desde afuera, no en el momento de creacion
-    refresh_list_impl();
+    refresh_list_impl(self);
 
-    lv_obj_set_state(g_hid.toggle, LV_STATE_CHECKED, cfg->hid.is_enabled);
-    g_hid.hid_enabled = cfg->hid.is_enabled;
+    lv_obj_set_state(self->toggle, LV_STATE_CHECKED, cfg->hid.is_enabled);
+    self->script.hid_enabled = cfg->hid.is_enabled;
 
-    return g_hid.page;
+    return self;
 }
 
-void hid_refresh_scripts(void)
+lv_obj_t *hid_view_create(lv_obj_t *menu, const zv_config *cfg)
 {
-    refresh_list_impl();
+    hid_view *view = (hid_view *)malloc(sizeof(*view));
+    if (!view)
+        return NULL;
+
+    hid_view *self = hid_page_create(view, menu, cfg);
+    if (!self)
+    {
+        free(view);
+        return NULL;
+    }
+
+    return self->base.page;
 }
 
-const char *hid_get_selected_script(void)
+void hid_refresh_scripts(hid_view *self)
 {
-    return g_hid.selected_script;
+    refresh_list_impl(self);
+}
+
+const char *hid_get_selected_script(hid_view *self)
+{
+    return self->script.selected_script;
 }

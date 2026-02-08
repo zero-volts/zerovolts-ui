@@ -244,7 +244,7 @@ int main(void)
         {
             .label = "Bad USB",
             .icon = LV_SYMBOL_USB,
-            .create_page = hid_page_create,
+            .create_page = hid_view_create,
             .rotate_icon_90 = false,
         },
         {
@@ -262,14 +262,22 @@ int main(void)
     };
 
     home_view home_view_obj;
-    home_view *home = home_view_create(&home_view_obj, menu, config, home_items, 
+    home_view *home = home_view_create(&home_view_obj, menu, config, home_items,
             sizeof(home_items) / sizeof(home_items[0]));
+
     if (!home) {
-        printf("Can't create home view\n");
+        printf("[ERR] home_view_create returned NULL (menu=%p config=%p items=%p count=%zu)\n",
+               (void *)menu, (void *)config, (void *)home_items,
+               sizeof(home_items) / sizeof(home_items[0]));
         return -1;
     }
 
     lv_obj_t *home_page = get_page(home);
+    printf("[DBG] home=%p home_page=%p menu=%p\n", (void *)home, (void *)home_page, (void *)menu);
+    if (!home_page) {
+        printf("[ERR] get_page returned NULL\n");
+        return -1;
+    }
     lv_menu_set_page(menu, home_page);
 
     setup_navigation_groups(menu, home_page);
