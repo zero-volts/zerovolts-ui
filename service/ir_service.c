@@ -2,16 +2,13 @@
 #include "utils/string_utils.h"
 
 #include <limits.h>
-#include <stdbool.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
-#include <unistd.h>
 
 #define IR_DEFAULT_TX_DEV "/dev/lirc0"
 #define IR_DEFAULT_RX_DEV "/dev/lirc1"

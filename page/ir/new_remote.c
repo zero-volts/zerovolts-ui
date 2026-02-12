@@ -2,7 +2,7 @@
 #include "components/ui_theme.h"
 #include "components/nav.h"
 #include "config.h"
-#include "ir/ir_service.h"
+#include "page/ir/ir_controller.h"
 #include "utils/string_utils.h"
 
 #include <stdio.h>
@@ -176,14 +176,14 @@ static void ir_create_remote_file(new_remote_ui_t *ui)
         return;
     }
 
-    rc = ir_service_create_remote(safe_name);
+    rc = ir_controller_create_remote(safe_name);
     if (rc == IR_OK) {
         lv_label_set_text(ui->status_label, "Remote created.");
         lv_textarea_set_text(ui->name_input, "");
         return;
     }
 
-    lv_label_set_text_fmt(ui->status_label, "Error: %s", ir_service_last_error());
+    lv_label_set_text_fmt(ui->status_label, "Error: %s", ir_controller_last_error());
 }
 
 static void ir_create_btn_cb(lv_event_t *e)

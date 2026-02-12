@@ -1,6 +1,5 @@
-#include "page/ir/send_signal.h"
 #include "components/ui_theme.h"
-#include "ir/ir_service.h"
+#include "page/ir/ir_controller.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -10,7 +9,7 @@ typedef struct {
     lv_obj_t *button_dropdown;
     lv_obj_t *grid;
     lv_obj_t *status;
-    char selected_button[IR_NAME_MAX];
+    char selected_button[IR_MAX_NAME];
 } send_signal_ui_t;
 
 static send_signal_ui_t g_send_ui;
@@ -80,8 +79,8 @@ static void send_signal_status(const char *msg)
 
 static void send_selected_button(void)
 {
-    char remote[IR_NAME_MAX];
-    char button[IR_NAME_MAX];
+    char remote[IR_MAX_NAME];
+    char button[IR_MAX_NAME];
     ir_status_t rc;
 
     get_dropdown_text(g_send_ui.remote_dropdown, remote, sizeof(remote));
@@ -97,13 +96,13 @@ static void send_selected_button(void)
         return;
     }
 
-    rc = ir_service_send_button(remote, button);
+    rc = ir_controller_send_button(remote, button);
     if (rc == IR_OK) {
         send_signal_status("Signal sent.");
         return;
     }
 
-    send_signal_status(ir_service_last_error());
+    send_signal_status(ir_controller_last_error());
 }
 
 static void send_grid_button_cb(lv_event_t *e)
@@ -129,7 +128,7 @@ static void clear_grid(void)
         lv_obj_clean(g_send_ui.grid);
 }
 
-static void set_dropdown_options_from_buttons(const ir_button_list_t *buttons)
+static void set_dropdown_options_from_buttons(const ir_button_list *buttons)
 {
     char opts[2048];
 
@@ -144,7 +143,7 @@ static void set_dropdown_options_from_buttons(const ir_button_list_t *buttons)
     }
 
     for (size_t i = 0; i < buttons->count; i++) {
-        strncat(opts, buttons->items[i].name, sizeof(opts) - strlen(opts) - 1);
+        strncat(opts, buttons->buttons[i].name, sizeof(opts) - strlen(opts) - 1);
         if (i + 1 < buttons->count)
             strncat(opts, "\n", sizeof(opts) - strlen(opts) - 1);
     }
@@ -155,13 +154,13 @@ static void set_dropdown_options_from_buttons(const ir_button_list_t *buttons)
 
 static void rebuild_button_controls(const char *remote_name)
 {
-    ir_button_list_t buttons = {0};
+    ir_button_list buttons = {0};
     ir_status_t rc;
 
     g_send_ui.selected_button[0] = '\0';
     clear_grid();
 
-    rc = ir_service_list_buttons(remote_name, &buttons);
+    rc = ir_controller_list_buttons(remote_name, &buttons);
     if (rc != IR_OK) {
         set_dropdown_options_from_buttons(NULL);
         send_signal_status("No buttons for this remote.");
@@ -171,7 +170,7 @@ static void rebuild_button_controls(const char *remote_name)
     set_dropdown_options_from_buttons(&buttons);
 
     for (size_t i = 0; i < buttons.count && i < 9; i++) {
-        lv_obj_t *btn = ir_create_key_button(g_send_ui.grid, buttons.items[i].name);
+        lv_obj_t *btn = ir_create_key_button(g_send_ui.grid, buttons.buttons[i].name);
         lv_obj_add_event_cb(btn, send_grid_button_cb, LV_EVENT_CLICKED, NULL);
     }
 
@@ -180,12 +179,12 @@ static void rebuild_button_controls(const char *remote_name)
     else
         send_signal_status("");
 
-    ir_service_free_buttons(&buttons);
+    ir_controller_free_button_list(&buttons);
 }
 
 static void remote_changed_cb(lv_event_t *e)
 {
-    char remote[IR_NAME_MAX];
+    char remote[IR_MAX_NAME];
 
     (void)e;
     get_dropdown_text(g_send_ui.remote_dropdown, remote, sizeof(remote));
@@ -209,7 +208,7 @@ static void send_refresh_remotes_cb(lv_event_t *e)
 
 static void load_remote_dropdown(void)
 {
-    ir_remote_list_t remotes = {0};
+    ir_remote_list remotes = {0};
     ir_status_t rc;
     char opts[2048];
 
@@ -218,16 +217,16 @@ static void load_remote_dropdown(void)
 
     opts[0] = '\0';
 
-    rc = ir_service_list_remotes(&remotes);
+    rc = ir_controller_list_remotes(&remotes);
     if (rc != IR_OK || remotes.count == 0) {
         lv_dropdown_set_options(g_send_ui.remote_dropdown, "");
         send_signal_status("No remotes available.");
-        ir_service_free_remotes(&remotes);
+        ir_controller_free_remote_list(&remotes);
         return;
     }
 
     for (size_t i = 0; i < remotes.count; i++) {
-        strncat(opts, remotes.items[i].name, sizeof(opts) - strlen(opts) - 1);
+        strncat(opts, remotes.remotes[i].name, sizeof(opts) - strlen(opts) - 1);
         if (i + 1 < remotes.count)
             strncat(opts, "\n", sizeof(opts) - strlen(opts) - 1);
     }
@@ -235,11 +234,14 @@ static void load_remote_dropdown(void)
     lv_dropdown_set_options(g_send_ui.remote_dropdown, opts);
     lv_dropdown_set_selected(g_send_ui.remote_dropdown, 0);
 
-    ir_service_free_remotes(&remotes);
+    ir_controller_free_remote_list(&remotes);
 
     remote_changed_cb(NULL);
 }
 
+#ifdef __cplusplus
+extern "C"
+#endif
 lv_obj_t *ir_send_signal_page_create(lv_obj_t *menu)
 {
     lv_obj_t *page = lv_menu_page_create(menu, "Send Signal");

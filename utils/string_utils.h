@@ -13,6 +13,7 @@ bool zv_sanitize_name(const char *src, char *dst, size_t dst_sz);
 bool zv_has_whitespace(const char *src);
 void zv_trim_inplace(char *s);
 int zv_is_empty(const char *str);
+int duplicate_string(const char *src, char **dst); //replacement of strdup
 
 #ifdef __cplusplus
 }

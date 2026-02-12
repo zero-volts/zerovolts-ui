@@ -2,7 +2,7 @@
 #include "components/ui_theme.h"
 #include "components/nav.h"
 #include "config.h"
-#include "ir/ir_service.h"
+#include "page/ir/ir_controller.h"
 #include "utils/string_utils.h"
 
 #include <stdio.h>
@@ -38,15 +38,13 @@ static lv_obj_t *ir_create_section_label(lv_obj_t *parent, const char *text)
 static lv_obj_t *ir_create_input_box(lv_obj_t *parent, const char *placeholder, bool dropdown)
 {
     lv_obj_t *obj = dropdown ? lv_dropdown_create(parent) : lv_textarea_create(parent);
-    lv_obj_set_width(obj, LV_PCT(100));
-    lv_obj_set_height(obj, 40);
+    lv_obj_set_width(obj, LV_PCT(82));
     lv_obj_set_style_bg_color(obj, ZV_COLOR_BG_PANEL, 0);
     lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(obj, 2, 0);
     lv_obj_set_style_border_color(obj, ZV_COLOR_BORDER, 0);
     lv_obj_set_style_radius(obj, 10, 0);
     lv_obj_set_style_text_color(obj, ZV_COLOR_TEXT_MAIN, 0);
-    lv_obj_set_style_pad_left(obj, 10, 0);
 
     if (dropdown) {
         lv_dropdown_set_options(obj, "");
@@ -98,7 +96,7 @@ static void get_dropdown_text(lv_obj_t *dd, char *out, size_t out_sz)
 
 static void load_remote_dropdown(void)
 {
-    ir_remote_list_t remotes = {0};
+    ir_remote_list remotes = {0};
     char opts[2048];
 
     if (!g_learn.remote_dropdown)
@@ -107,16 +105,16 @@ static void load_remote_dropdown(void)
     opts[0] = '\0';
     printf("[IR][learn_ui] loading remotes...\n");
 
-    if (ir_service_list_remotes(&remotes) != IR_OK || remotes.count == 0) {
+    if (ir_controller_list_remotes(&remotes) != IR_OK || remotes.count == 0) {
         printf("[IR][learn_ui] no remotes available\n");
         lv_dropdown_set_options(g_learn.remote_dropdown, "");
         learn_set_status("No remotes available. Create one first.");
-        ir_service_free_remotes(&remotes);
+        ir_controller_free_remote_list(&remotes);
         return;
     }
 
     for (size_t i = 0; i < remotes.count; i++) {
-        strncat(opts, remotes.items[i].name, sizeof(opts) - strlen(opts) - 1);
+        strncat(opts, remotes.remotes[i].name, sizeof(opts) - strlen(opts) - 1);
         if (i + 1 < remotes.count)
             strncat(opts, "\n", sizeof(opts) - strlen(opts) - 1);
     }
@@ -126,7 +124,7 @@ static void load_remote_dropdown(void)
     learn_set_status("Ready to capture.");
     printf("[IR][learn_ui] remotes loaded: %zu\n", remotes.count);
 
-    ir_service_free_remotes(&remotes);
+    ir_controller_free_remote_list(&remotes);
 }
 
 static void learn_refresh_remotes_cb(lv_event_t *e)
@@ -215,9 +213,8 @@ static void learn_button_input_event_cb(lv_event_t *e)
 
 static void learn_finish_cb(lv_event_t *e)
 {
-    char remote[IR_NAME_MAX];
-    char button[IR_NAME_MAX];
-    ir_status_t rc;
+    char remote[IR_MAX_NAME];
+    char button[IR_MAX_NAME];
     lv_obj_t *finish_btn = (lv_obj_t *)lv_event_get_target(e);
 
     get_dropdown_text(g_learn.remote_dropdown, remote, sizeof(remote));
@@ -242,15 +239,15 @@ static void learn_finish_cb(lv_event_t *e)
     learn_set_status("Recording signal... Press remote now.");
     lv_refr_now(NULL);
 
-    rc = ir_service_learn_button(remote, button);
-    printf("[IR][learn_ui] learn result rc=%d err='%s'\n", (int)rc, ir_service_last_error());
+    ir_status_t rc = ir_controller_learn_button(remote, button);
+    printf("[IR][learn_ui] learn result rc=%d err='%s'\n", (int)rc, ir_controller_last_error());
     
     if (rc == IR_OK) {
         learn_set_status("Signal captured and stored.");
         return;
     }
 
-    learn_set_status(ir_service_last_error());
+    learn_set_status(ir_controller_last_error());
 }
 
 static void learn_cancel_cb(lv_event_t *e)
@@ -286,10 +283,20 @@ lv_obj_t *ir_learn_button_page_create(lv_obj_t *menu)
     lv_obj_set_style_pad_row(root, 10, 0);
 
     ir_create_section_label(root, "Remote:");
-    g_learn.remote_dropdown = ir_create_input_box(root, "", true);
+    
+    lv_obj_t *remote_list_container = lv_obj_create(root);
+    lv_obj_set_size(remote_list_container, LV_PCT(100), 45);
+    lv_obj_set_style_bg_opa(remote_list_container, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(remote_list_container, 0, 0);
+    lv_obj_set_style_pad_all(remote_list_container, 0, 0);
+    lv_obj_set_layout(remote_list_container, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(remote_list_container, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(remote_list_container, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
-    lv_obj_t *refresh_btn = lv_btn_create(root);
-    lv_obj_set_size(refresh_btn, LV_PCT(100), 36);
+    g_learn.remote_dropdown = ir_create_input_box(remote_list_container, "", true);
+
+    lv_obj_t *refresh_btn = lv_btn_create(remote_list_container);
+    lv_obj_set_size(refresh_btn, 45, 35);
     lv_obj_set_style_bg_color(refresh_btn, ZV_COLOR_BG_PANEL, 0);
     lv_obj_set_style_bg_opa(refresh_btn, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(refresh_btn, 2, 0);
@@ -297,11 +304,10 @@ lv_obj_t *ir_learn_button_page_create(lv_obj_t *menu)
     lv_obj_set_style_radius(refresh_btn, 10, 0);
     lv_obj_add_event_cb(refresh_btn, learn_refresh_remotes_cb, LV_EVENT_CLICKED, NULL);
 
-    lv_obj_t *refresh_lbl = lv_label_create(refresh_btn);
-    lv_label_set_text(refresh_lbl, LV_SYMBOL_REFRESH "  Refresh remotes");
-    lv_obj_set_style_text_color(refresh_lbl, ZV_COLOR_TEXT_MAIN, 0);
-    lv_obj_center(refresh_lbl);
-
+    lv_obj_t *ic = lv_label_create(refresh_btn);
+    lv_label_set_text(ic, LV_SYMBOL_REFRESH);
+    lv_obj_set_style_text_color(ic, ZV_COLOR_TEXT_MAIN, 0);
+    
     ir_create_section_label(root, "Button Name:");
     g_learn.button_input = ir_create_input_box(root, "KEY_VOLUMEUP", false);
     lv_obj_add_event_cb(g_learn.button_input, learn_button_input_event_cb, LV_EVENT_FOCUSED, &g_learn);
@@ -309,11 +315,6 @@ lv_obj_t *ir_learn_button_page_create(lv_obj_t *menu)
     lv_obj_add_event_cb(g_learn.button_input, learn_button_input_event_cb, LV_EVENT_CLICKED, &g_learn);
     lv_obj_add_event_cb(g_learn.button_input, learn_button_input_event_cb, LV_EVENT_PRESSED, &g_learn);
     lv_obj_add_event_cb(g_learn.button_input, learn_button_input_event_cb, LV_EVENT_KEY, &g_learn);
-
-    lv_obj_t *icon = lv_label_create(root);
-    lv_label_set_text(icon, LV_SYMBOL_GPS);
-    lv_obj_set_style_text_color(icon, ZV_COLOR_TEXT_MAIN, 0);
-    lv_obj_align(icon, LV_ALIGN_CENTER, 0, 0);
 
     lv_obj_t *hint = lv_label_create(root);
     lv_label_set_text(hint, "Point remote at receiver and press one button.");
@@ -324,7 +325,7 @@ lv_obj_t *ir_learn_button_page_create(lv_obj_t *menu)
     ir_create_status_box(root);
 
     lv_obj_t *footer_row = lv_obj_create(root);
-    lv_obj_set_size(footer_row, LV_PCT(100), LV_SIZE_CONTENT);
+    lv_obj_set_size(footer_row, LV_PCT(100), 50);
     lv_obj_set_style_bg_opa(footer_row, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(footer_row, 0, 0);
     lv_obj_set_style_pad_all(footer_row, 0, 0);

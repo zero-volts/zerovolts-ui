@@ -1,6 +1,7 @@
 #include "string_utils.h"
 
 #include <ctype.h>
+#include <stdlib.h>
 #include <string.h>
 
 bool zv_is_valid_name_char(char c)
@@ -71,4 +72,22 @@ void zv_trim_inplace(char *s)
 int zv_is_empty(const char *str)
 {
     return (str == NULL || str[0] == '\0');
+}
+
+int duplicate_string(const char *src, char **dst)
+{
+    size_t len;
+    char *copy;
+
+    if (!src || !dst)
+        return -1;
+
+    len = strlen(src);
+    copy = (char *)malloc(len + 1);
+    if (!copy)
+        return -1;
+
+    memcpy(copy, src, len + 1);
+    *dst = copy;
+    return 0;
 }

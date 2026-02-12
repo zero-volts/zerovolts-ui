@@ -1,6 +1,6 @@
 #include "page/ir/remotes.h"
 #include "components/ui_theme.h"
-#include "ir/ir_service.h"
+#include "page/ir/ir_controller.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -56,7 +56,7 @@ static lv_obj_t *ir_create_remote_card(lv_obj_t *parent, const char *icon, const
 
 static void remotes_refresh(void)
 {
-    ir_remote_list_t remotes = {0};
+    ir_remote_list remotes = {0};
     ir_status_t rc;
 
     if (!g_remotes.list_container || !g_remotes.status_label)
@@ -65,25 +65,25 @@ static void remotes_refresh(void)
     lv_obj_clean(g_remotes.list_container);
     lv_label_set_text(g_remotes.status_label, "");
 
-    rc = ir_service_list_remotes(&remotes);
+    rc = ir_controller_list_remotes(&remotes);
     if (rc != IR_OK) {
-        lv_label_set_text_fmt(g_remotes.status_label, "Error: %s", ir_service_last_error());
+        lv_label_set_text_fmt(g_remotes.status_label, "Error: %s", ir_controller_last_error());
         return;
     }
 
     if (remotes.count == 0) {
         lv_label_set_text(g_remotes.status_label, "No remotes yet. Create one first.");
-        ir_service_free_remotes(&remotes);
+        ir_controller_free_remote_list(&remotes);
         return;
     }
 
     for (size_t i = 0; i < remotes.count; i++) {
         char subtitle[80];
-        snprintf(subtitle, sizeof(subtitle), "%d buttons learned", remotes.items[i].button_count);
-        ir_create_remote_card(g_remotes.list_container, LV_SYMBOL_VIDEO, remotes.items[i].name, subtitle);
+        snprintf(subtitle, sizeof(subtitle), "%d buttons learned", remotes.remotes[i].button_count);
+        ir_create_remote_card(g_remotes.list_container, LV_SYMBOL_VIDEO, remotes.remotes[i].name, subtitle);
     }
 
-    ir_service_free_remotes(&remotes);
+    ir_controller_free_remote_list(&remotes);
 }
 
 static void remotes_refresh_btn_cb(lv_event_t *e)

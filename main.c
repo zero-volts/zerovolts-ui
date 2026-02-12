@@ -18,9 +18,9 @@
 #include "page/home_view.h"
 #include "page/hid.h"
 #include "page/ir/ir.h"
+#include "page/ir/ir_controller.h"
 #include "page/ir/learn_button.h"
 #include "page/ir/new_remote.h"
-#include "ir/ir_service.h"
 #include "config.h"
 #include "utils/file.h"
 
@@ -211,14 +211,23 @@ int main(void)
     lv_obj_set_style_pad_row(scr, 0, 0);
 
     const zv_config *config = setup_config();
-    ir_service_cfg_t ir_cfg = {
-        .backend = config->ir.backend,
-        .tx_dev = config->ir.tx_device,
-        .rx_dev = config->ir.rx_device,
-        .remotes_root = config->ir.remotes_path,
-        .learn_timeout_ms = config->ir.learn_timeout_ms
-    };
-    ir_service_init(&ir_cfg);
+    if (!config) {
+        printf("[ERR] config is NULL\n");
+        return -1;
+    }
+
+    ir_remote_ctx ir_cfg;
+    memset(&ir_cfg, 0, sizeof(ir_cfg));
+    ir_cfg.remotes_root = (char *)config->ir.remotes_path;
+    ir_cfg.ir_ctx.backend = config->ir.backend;
+    snprintf(ir_cfg.ir_ctx.tx_dev, sizeof(ir_cfg.ir_ctx.tx_dev), "%s", config->ir.tx_device);
+    snprintf(ir_cfg.ir_ctx.rx_dev, sizeof(ir_cfg.ir_ctx.rx_dev), "%s", config->ir.rx_device);
+    ir_cfg.ir_ctx.timeout_ms = config->ir.learn_timeout_ms;
+
+    if (ir_controller_init(&ir_cfg) != IR_OK) {
+        printf("[ERR] IR init failed: %s\n", ir_controller_last_error());
+        return -1;
+    }
 
     /* -------- TOP BAR -------- */
     

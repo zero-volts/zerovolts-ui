@@ -88,8 +88,8 @@ static void handle_file_list(const file_desc *description, void *obj_target)
     remote->name[sizeof(remote->name) - 1] = '\0';
 
     char buttons_dir[PATH_MAX];
-    if (snprintf(buttons_dir, sizeof(buttons_dir), "%s/buttons", description->file_path) <= 0 ||
-        strnlen(buttons_dir, sizeof(buttons_dir)) >= sizeof(buttons_dir)) 
+    int n = snprintf(buttons_dir, sizeof(buttons_dir), "%s/buttons", description->file_path);
+    if (n < 0 || (size_t)n >= sizeof(buttons_dir))
     {
         remote->button_count = 0;
         handler_ctx->list->count++;
@@ -196,12 +196,17 @@ static ir_status_t create_buttons_directory(const char *remote_directory,
 
 ir_status_t ir_controller_init(const ir_remote_ctx *remote_ctx)
 {
-    memset(&remote_context, 0, sizeof(ir_remote_ctx));
     if (!remote_ctx || !remote_ctx->remotes_root || !remote_ctx->remotes_root[0])
         return IR_ERR_CONFIG;
 
-    remote_context.remotes_root = strdup(remote_ctx->remotes_root);
-    if (!remote_context.remotes_root)
+    if (remote_context.remotes_root) {
+        free(remote_context.remotes_root);
+        remote_context.remotes_root = NULL;
+    }
+
+    memset(&remote_context, 0, sizeof(ir_remote_ctx));
+
+    if (duplicate_string(remote_ctx->remotes_root, &remote_context.remotes_root) != 0)
         return IR_ERR_IO;
 
     remote_context.ir_ctx = remote_ctx->ir_ctx;
@@ -217,6 +222,16 @@ ir_status_t ir_controller_init(const ir_remote_ctx *remote_ctx)
     return IR_OK;
 }
 
+void ir_controller_deinit(void)
+{
+    if (remote_context.remotes_root) {
+        free(remote_context.remotes_root);
+        remote_context.remotes_root = NULL;
+    }
+
+    memset(&remote_context, 0, sizeof(remote_context));
+}
+
 ir_status_t ir_controller_create_remote(const char *remote_name)
 {
     if (zv_is_empty(remote_name))
@@ -225,7 +240,7 @@ ir_status_t ir_controller_create_remote(const char *remote_name)
     if (remote_context.remotes_root == NULL)
         return IR_ERR_CONFIG;
 
-    char remote_directory[IR_MAX_NAME];
+    char remote_directory[PATH_MAX];
     char remote_name_sanitize[IR_MAX_NAME];
 
     // Making the remote control directory
@@ -237,13 +252,13 @@ ir_status_t ir_controller_create_remote(const char *remote_name)
         return created;
 
     // Making the button directory
-    char buttons_directory[IR_MAX_NAME];
+    char buttons_directory[PATH_MAX];
     created = create_buttons_directory(remote_directory, buttons_directory, sizeof(buttons_directory));
     if (created != 0) 
         return created;
 
     // Making the metadata file
-    char meta_file_path[IR_MAX_NAME];
+    char meta_file_path[PATH_MAX];
     int ret = 0;
     ret = create_file_path(remote_directory, "meta.json", meta_file_path, sizeof(meta_file_path));
     if (ret < 0 ) {
@@ -351,18 +366,13 @@ ir_status_t ir_controller_list_buttons(const char *remote_name, ir_button_list *
 
     if (ir_list_raw_files_cb(buttons_directory, &event) != IR_OK)
     {
-        free(out_list->buttons);
-        out_list->buttons = NULL;
-        out_list->count = 0;
+        ir_controller_free_button_list(out_list);
         return IR_ERR_IO;
     }
 
     if (handler_ctx.has_error != 0) 
     {
-        free(out_list->buttons);
-        out_list->buttons = NULL;
-        out_list->count = 0;
-        
+        ir_controller_free_button_list(out_list);
         return IR_ERR_IO;
     }
 
@@ -492,4 +502,24 @@ ir_status_t ir_controller_send_button(const char *remote_name, const char *butto
 const char *ir_controller_last_error(void)
 {
     return ir_service_last_error();
+}
+
+void ir_controller_free_remote_list(ir_remote_list *list)
+{
+    if (!list)
+        return;
+
+    free(list->remotes);
+    list->remotes = NULL;
+    list->count = 0;
+}
+
+void ir_controller_free_button_list(ir_button_list *list)
+{
+    if (!list)
+        return;
+
+    free(list->buttons);
+    list->buttons = NULL;
+    list->count = 0;
 }
