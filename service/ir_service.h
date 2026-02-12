@@ -8,7 +8,7 @@
 extern "C" {
 #endif
 
-#define IR_NAME_MAX         128
+#define IR_MAX_NAME         256
 #define MAX_IR_DEV_PATH     256
 #define EXCAPED_DEV_PATH    512
 #define ESCAPED_TMP_PATH    1024
@@ -24,7 +24,6 @@ typedef enum {
     IR_ERR_INVALID      = -4,
     IR_ERR_UNSUPPORTED  = -5
 } ir_status_t;
-
 
 typedef struct {
     char tx_dev[MAX_IR_DEV_PATH];   // The transmissor /dev path like /dev/lirc0""

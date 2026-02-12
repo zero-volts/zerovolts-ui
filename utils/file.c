@@ -97,7 +97,7 @@ bool file_is_directory(const char *path)
     return S_ISDIR(st.st_mode);
 }
 
-static int file_ensure_dir_shallow(const char *path)
+static int ensure_dir_single(const char *path)
 {
     struct stat st;
 
@@ -130,13 +130,13 @@ int file_ensure_dir_recursive(const char *path)
     for (char *p = tmp + 1; *p; p++) {
         if (*p == '/') {
             *p = '\0';
-            if (tmp[0] && file_ensure_dir_shallow(tmp) != 0)
+            if (tmp[0] && ensure_dir_single(tmp) != 0)
                 return -1;
             *p = '/';
         }
     }
 
-    return file_ensure_dir_shallow(tmp);
+    return ensure_dir_single(tmp);
 }
 
 void get_file_list(const char* directory_path, file_callback callback, void *obj_target)
@@ -238,4 +238,18 @@ int get_executable_dir(char *out, size_t out_size)
     out[out_size - 1] = '\0';
     
     return 0;
+}
+
+void normalize_dir_path(char *path)
+{
+    size_t len;
+
+    if (!path)
+        return;
+
+    len = strlen(path);
+    while (len > 1 && path[len - 1] == '/') {
+        path[len - 1] = '\0';
+        len--;
+    }
 }

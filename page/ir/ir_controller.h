@@ -7,8 +7,6 @@
 extern "C" {
 #endif
 
-#define IR_MAX_NAME 128
-
 typedef struct {
     char *remotes_root;
     ir_context ir_ctx;
@@ -36,7 +34,7 @@ typedef struct {
 
 ir_status_t ir_controller_init(const ir_remote_ctx *remote_ctx);
 ir_status_t ir_controller_create_remote(const char *remote_name);
-ir_status_t ir_controller_list_remotes(ir_remote_list *out);
+ir_status_t ir_controller_list_remotes(ir_remote_list *out_list);
 ir_status_t ir_controller_list_buttons(const char *remote_name, ir_button_list *out);
 ir_status_t ir_controller_learn_button(const char *remote_name, const char *button_name);
 ir_status_t ir_controller_send_button(const char *remote_name, const char *button_name);

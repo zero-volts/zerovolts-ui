@@ -20,8 +20,6 @@
 typedef enum {
     SUCCESS = 0,
     TIMEOUT = 124,
-    SIGKILL = 137,
-    SIGTERM = 143
 } system_status;
 
 static char g_last_error[256];
@@ -132,7 +130,6 @@ static ir_status_t irctl_learn_raw (const char *out_raw_path)
         set_last_error("Empty out path to learn the signal");
         return IR_ERR_INVALID;
     }
-        
 
     char escaped_dev[EXCAPED_DEV_PATH];
     char escaped_tmp[ESCAPED_TMP_PATH];
@@ -216,7 +213,6 @@ static ir_status_t irctl_learn_raw (const char *out_raw_path)
 
 ir_status_t ir_learn_raw (const char *out_raw_path) 
 {
-
     if (context.backend == NULL)
     {
         set_last_error("[ir_learn_raw]:: backend is null");
