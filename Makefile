@@ -13,7 +13,8 @@ SRC := \
 	components/nav.c \
 	page/base_view.c \
 	page/home_view.c \
-	page/hid.c \
+	page/hid/hid_view.c \
+	page/hid/hid_controller.c \
 	page/ir/ir.c \
 	page/ir/ir_controller.c \
 	page/ir/ir_raw_helper.c \
@@ -21,6 +22,7 @@ SRC := \
 	page/ir/new_remote.c \
 	page/ir/remotes.c \
 	page/ir/send_signal.c \
+	service/hid_service.c \
 	service/ir_service.c \
 	utils/file.c \
 	utils/string_utils.c \

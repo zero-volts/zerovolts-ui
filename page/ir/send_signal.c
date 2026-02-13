@@ -1,3 +1,4 @@
+#include "send_signal.h"
 #include "components/ui_theme.h"
 #include "page/ir/ir_controller.h"
 

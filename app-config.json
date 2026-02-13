@@ -1,16 +1,16 @@
 {
-	"version":	"0.1",
+	"version":	"0.2",
 	"hid":	{
 		"script_selected_path":	"",
 		"script_list_path":	"/home/zerovolts/git/zerovolts-ui/data/badusb/",
 		"is_enabled":	false
 	},
-	"ir": {
-		"remotes_path": "/home/zerovolts/git/zerovolts-ui/data/ir/remotes/",
-		"backend": "irctl",
-		"tx_device": "/dev/lirc0",
-		"rx_device": "/dev/lirc1",
-		"learn_timeout_ms": 5000,
-		"use_on_screen_keyboard": true
+	"ir":	{
+		"remotes_path":	"/home/zerovolts/git/zerovolts-ui/data/ir/remotes/",
+		"backend":	"irctl",
+		"tx_device":	"/dev/lirc0",
+		"rx_device":	"/dev/lirc1",
+		"learn_timeout_ms":	5000,
+		"use_on_screen_keyboard":	true
 	}
 }

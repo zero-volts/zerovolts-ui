@@ -1,10 +1,10 @@
-#ifndef HID_H
-#define HID_H
+#ifndef HID_VIEW_H
+#define HID_VIEW_H
 
 #include "lvgl.h"
 #include "config.h"
-#include "base_view.h"
-#include <stdbool.h>
+#include "page/base_view.h"
+#include "page/hid/hid_controller.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -17,13 +17,7 @@ typedef struct {
     lv_obj_t *status;
     lv_obj_t *toggle;
     lv_obj_t *selected_lbl;
-
-    struct script {
-        char scripts_dir[512];
-        char selected_path[512];
-        char selected_script[512];
-        bool hid_enabled;
-    } script;
+    hid_controller controller;
 } hid_view;
 
 lv_obj_t *hid_view_create(lv_obj_t *menu, const zv_config *cfg);
@@ -34,4 +28,4 @@ const char *hid_get_selected_script(hid_view *self);
 }
 #endif
 
-#endif /* HID_H */
+#endif /* HID_VIEW_H */

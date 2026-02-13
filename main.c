@@ -16,7 +16,7 @@
 #include "components/component_helper.h"
 #include "components/nav.h"
 #include "page/home_view.h"
-#include "page/hid.h"
+#include "page/hid/hid_view.h"
 #include "page/ir/ir.h"
 #include "page/ir/ir_controller.h"
 #include "page/ir/learn_button.h"
