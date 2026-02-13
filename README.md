@@ -2,8 +2,35 @@
 Guía básica y práctica para compilar y ejecutar proyectos usando **LVGL v9**,  
 con driver **fbdev** para framebuffer y **evdev** para pantalla táctil SPI.
 
+### Inicio rápido (proyecto actual)
+Desde `zerovolts-ui/`:
+
+```bash
+make
+./bin/zero-volts-ui
+```
+
+Para limpiar:
+
+```bash
+make clean
+```
+
+## Índice
+- [1. Descargar repositorio oficial de LVGL para Linux](#sec-1)
+- [2. Instalar dependencias necesarias](#sec-2)
+- [3. Compilar LVGL (fbdev + evdev)](#sec-3)
+- [4. Ejecutar demo oficial (opcional)](#sec-4)
+- [5. Deshabilitar demos y ejemplos](#sec-5)
+- [6. Compilar tu aplicación con LVGL](#sec-6)
+- [7. Habilitar touch](#sec-7)
+- [8. Ejecutar tu aplicación](#sec-8)
+- [9. IR: cómo se guardan y se envían señales](#sec-9)
+- [10. Arquitectura actual](#sec-10)
+
 ---
 
+<a id="sec-1"></a>
 ## 🔧 1. Descargar repositorio oficial de LVGL para Linux
 
 ```bash
@@ -20,6 +47,7 @@ Esto descarga:
 
 ---
 
+<a id="sec-2"></a>
 ## 📚 2. Instalar dependencias necesarias
 
 ```bash
@@ -31,6 +59,7 @@ sudo apt install libevdev-dev
 
 ---
 
+<a id="sec-3"></a>
 ## 🛠️ 3. Compilar LVGL (fbdev + evdev)
 
 ```bash
@@ -53,6 +82,7 @@ lv_port_linux/lvgl/src/drivers/evdev/
 
 ---
 
+<a id="sec-4"></a>
 ## ▶️ 4. Ejecutar demo oficial (opcional)
 
 ```bash
@@ -61,7 +91,8 @@ lv_port_linux/lvgl/src/drivers/evdev/
 
 ---
 
-# 📝 5. Deshabilitar demos y ejemplos
+<a id="sec-5"></a>
+## 📝 5. Deshabilitar demos y ejemplos
 
 Editar:
 
@@ -84,36 +115,35 @@ cmake --build build -j$(nproc)
 
 ---
 
-# 🚀 6. Compilar tu aplicación con LVGL
+<a id="sec-6"></a>
+## 🚀 6. Compilar tu aplicación con LVGL
 
-Se recomienda **usar g++ para enlazar** debido a dependencias internas
-del port Linux que requieren `libstdc++`.
-
-### Comando:
+Forma recomendada (usa el `Makefile` del proyecto):
 
 ```bash
-g++ main.c componentes/top_bar.c -o zero-volts-ui \
-  -DLV_CONF_INCLUDE_SIMPLE \
-  -I. \
-  -I./componentes \
-  -I/home/zerovolts/git/lv_port_linux/lvgl \
-  -I/home/zerovolts/git/lv_port_linux/lvgl/src/drivers/display/fb \
-  -I/home/zerovolts/git/lv_port_linux/lvgl/src/drivers/evdev \
-  -I/home/zerovolts/git/lv_port_linux/build \
-  /home/zerovolts/git/lv_port_linux/build/lvgl/lib/liblvgl.a \
-  -lm -lpthread -ldl
+make
 ```
 
----
-# 7. Habilitar touch
+Salida principal:
 
-Para poder habilitar el touch y ver los eventos de los controles se debe agregar el siguiente codigo: 
+```bash
+bin/zero-volts-ui
+```
+
+Si quieres compilar manualmente, toma como referencia el comando generado por `make`
+y los includes/librerías definidos en `Makefile`.
+
+---
+<a id="sec-7"></a>
+## 7. Habilitar touch
+
+Para habilitar el touch y ver eventos de entrada:
 
 ```bash
 lv_indev_t *touch = lv_evdev_create(LV_INDEV_TYPE_POINTER, "/dev/input/event4");
 ```
 
-Para conocer cual es el path del dispositvo se puede correr el siguiente comando
+Para conocer cuál es el path del dispositivo:
 ```bash
 cat /proc/bus/input/devices
 ``` 
@@ -132,41 +162,43 @@ B: KEY=400 0 0 0 0 0
 B: ABS=1000003
 ```
 
-Se identifica el hardware por el nombre y  el path se obtiene desde sysfs.
+Se identifica el hardware por el nombre y el path se obtiene desde `sysfs`.
 
-Es necesario tambien calibrar la pantalla y para esto se debe agregar el codigo:
+También es necesario calibrar la pantalla:
 ```bash
 lv_evdev_set_calibration
 ```
 
-Para conocer las coordenadas al hacer el touch se puede saber ejecutando y probando los clicks
+Para conocer coordenadas al tocar la pantalla:
 ```bash
 evtest /dev/input/event4
 ```
 
 ---
-# 🧪 8. Ejecutar tu aplicación
+<a id="sec-8"></a>
+## 🧪 8. Ejecutar tu aplicación
 
 ```bash
-./zero-volts-ui
+./bin/zero-volts-ui
 ```
 
 ---
 
-# 📡 9. IR: cómo se guardan y se envían señales
+<a id="sec-9"></a>
+## 📡 9. IR: cómo se guardan y se envían señales
 
 ## Estructura de archivos
 
-Las señales aprendidas se guardan en:
+Las señales aprendidas se guardan en la ruta configurada en `app-config.json`:
 
 ```bash
-remotes_stored/<remote>/buttons/<button>.raw
+ir.remotes_path/<remote>/buttons/<button>.raw
 ```
 
-Ejemplo:
+Ejemplo con la configuración actual:
 
 ```bash
-remotes_stored/ventilador/buttons/off.raw
+/home/zerovolts/git/zerovolts-ui/data/ir/remotes/ventilador/buttons/off.raw
 ```
 
 ## Captura (learn)
@@ -219,9 +251,99 @@ Esto permite comparar contra un archivo que sí funciona (`off.raw`, por ejemplo
 
 ## Comandos útiles de comparación
 
+Primero define `REMOTES_PATH`:
+
 ```bash
-ls -l remotes_stored/<remote>/buttons/
-wc -w remotes_stored/<remote>/buttons/off.raw remotes_stored/<remote>/buttons/<button>.raw.invalid1
-head -n 1 remotes_stored/<remote>/buttons/off.raw
-head -n 1 remotes_stored/<remote>/buttons/<button>.raw.invalid1
+REMOTES_PATH="/home/zerovolts/git/zerovolts-ui/data/ir/remotes"
+```
+
+Luego ejecuta:
+
+```bash
+ls -l "$REMOTES_PATH/<remote>/buttons/"
+wc -w "$REMOTES_PATH/<remote>/buttons/off.raw" "$REMOTES_PATH/<remote>/buttons/<button>.raw.invalid1"
+head -n 1 "$REMOTES_PATH/<remote>/buttons/off.raw"
+head -n 1 "$REMOTES_PATH/<remote>/buttons/<button>.raw.invalid1"
+```
+
+---
+
+<a id="sec-10"></a>
+## 🧱 10. Arquitectura actual
+
+El proyecto usa una arquitectura por capas por funcionalidad:
+- `view`: pantallas LVGL y manejo de eventos de UI.
+- `controller`: reglas de negocio, validaciones y orquestación.
+- `service`: interacción con sistema operativo/hardware (IR, HID, filesystem, comandos).
+
+Ventajas principales:
+- Menor acoplamiento entre UI y hardware.
+- Mejor testabilidad del negocio sin depender de dispositivos reales.
+- Más facilidad para cambiar backends sin tocar las vistas.
+- Mantenimiento más simple cuando crece el proyecto.
+
+## Diagrama ASCII (arquitectura actual)
+
+```text
+┌──────────────────────────────────────────────┐
+│                    main.c                    │
+│ init LVGL + config + navegación + bucle      │
+└───────────────────────┬──────────────────────┘
+                        │
+        ┌───────────────┴───────────────┐
+        │                               │
+┌───────▼────────────────────┐  ┌───────▼────────────────────┐
+│          Módulo IR         │  │          Módulo HID        │
+└───────┬────────────────────┘  └───────┬────────────────────┘
+        │                                │
+┌───────▼─────────────┐          ┌───────▼─────────────┐
+│ page/ir/*.c         │          │ page/hid/hid_view.c │
+│ (vistas LVGL)       │          │ (vista LVGL)        │
+└───────┬─────────────┘          └───────┬─────────────┘
+        │                                │
+┌───────▼──────────────────┐     ┌───────▼──────────────────┐
+│ page/ir/ir_controller.c  │     │ page/hid/hid_controller.c│
+│ (lógica de negocio IR)   │     │ (lógica de negocio HID)  │
+└───────┬──────────────────┘     └───────┬──────────────────┘
+        │                                │
+┌───────▼──────────────────┐     ┌───────▼──────────────────┐
+│ service/ir_service.c     │     │ service/hid_service.c    │
+│ ir-ctl + filesystem      │     │ scripts + systemctl      │
+└──────────────────────────┘     └──────────────────────────┘
+```
+
+## Flujo de datos
+
+```text
+Evento UI
+  -> Controller (validación/reglas)
+    -> Service (I/O)
+      -> Resultado/estado
+        -> UI
+```
+
+## Estructura de directorios (resumen)
+
+```text
+zerovolts-ui/
+├── main.c
+├── config.*
+├── components/
+├── page/
+│   ├── base_view.*
+│   ├── home_view.*
+│   ├── hid/
+│   │   ├── hid_view.*
+│   │   └── hid_controller.*
+│   └── ir/
+│       ├── ir.*
+│       ├── views (remotes/new_remote/learn_button/send_signal)
+│       ├── ir_controller.*
+│       └── ir_raw_helper.*
+├── service/
+│   ├── ir_service.*
+│   └── hid_service.*
+├── utils/
+├── examples/
+└── scripts/
 ```
