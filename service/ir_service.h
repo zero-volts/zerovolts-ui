@@ -43,7 +43,6 @@ ir_status_t ir_learn_raw (const char *out_raw_path);
 ir_status_t ir_send_raw(const char *raw_path);
 
 ir_status_t ir_list_raw_files_cb(const char *dir, ir_callback_event *event);
-const char *ir_service_last_error(void);
 
 #ifdef __cplusplus
 }

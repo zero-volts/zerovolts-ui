@@ -1,5 +1,7 @@
 #include "service/ir_service.h"
 #include "utils/string_utils.h"
+#include "utils/logger.h"
+#include "utils/error_handler.h"
 
 #include <limits.h>
 #include <stdarg.h>
@@ -19,35 +21,8 @@ typedef enum {
     TIMEOUT = 124,
 } system_status;
 
-static char g_last_error[256];
-
 // The memory used by this struct is used a long the whole program.
 static ir_context context; 
-
-static void ir_trace(const char *fmt, ...)
-{
-    va_list args;
-    fprintf(stderr, "[IR][service] ");
-    va_start(args, fmt);
-    vfprintf(stderr, fmt, args);
-    va_end(args);
-    fprintf(stderr, "\n");
-}
-
-static void set_last_error(const char *msg)
-{
-    if (!msg) {
-        g_last_error[0] = '\0';
-        return;
-    }
-
-    snprintf(g_last_error, sizeof(g_last_error), "%s", msg);
-}
-
-const char *ir_service_last_error(void)
-{
-    return g_last_error;
-}
 
 static void shell_escape_single_quotes(const char *src, char *dst, size_t dst_sz)
 {
@@ -106,17 +81,18 @@ static ir_status_t irctl_send_raw(const char *raw_path)
     snprintf(cmd, sizeof(cmd),
              "timeout %ds ir-ctl -d '%s' -s '%s' >/dev/null 2>&1", send_timeout_sec, escaped_dev, escaped_path);
 
-    ir_trace("send cmd: %s", cmd);
+    log_debug("[IR][service]::irctl_send_raw send cmd: %s\n", cmd);
+    
     int exit_code = system_status_code(system(cmd));
     if (exit_code != 0) 
     {
         set_last_error("ir-ctl send failed");
-        ir_trace("send failed exit_code=%d tx_dev=%s raw=%s", exit_code, context.tx_dev, raw_path);
+        log_error("[IR][service]::irctl_send_raw send failed exit_code=%d tx_dev=%s raw=%s", exit_code, context.tx_dev, raw_path);
         return IR_ERR_IO;
     }
 
     set_last_error(NULL);
-    ir_trace("send ok tx_dev=%s raw=%s", context.tx_dev, raw_path);
+    log_debug("[IR][service]::irctl_send_raw send ok tx_dev=%s raw=%s", context.tx_dev, raw_path);
     return IR_OK;
 }
 
@@ -124,6 +100,7 @@ static ir_status_t irctl_learn_raw (const char *out_raw_path)
 {
     if (zv_is_empty(out_raw_path))
     {
+        log_error("[IR][service]::irctl_learn_raw Empty out path to learn the signal\n");
         set_last_error("Empty out path to learn the signal");
         return IR_ERR_INVALID;
     }
@@ -150,7 +127,7 @@ static ir_status_t irctl_learn_raw (const char *out_raw_path)
     snprintf(cmd, sizeof(cmd),
              "timeout %ds ir-ctl -r -d '%s' > '%s'", watchdog_sec, escaped_dev, escaped_tmp);
 
-    ir_trace("learn signal command: %s", cmd);
+    log_debug("[IR][service]::irctl_learn_raw learn signal command: %s", cmd);
     int exit_code = system_status_code(system(cmd));
     if (exit_code == TIMEOUT)
     {
@@ -161,21 +138,21 @@ static ir_status_t irctl_learn_raw (const char *out_raw_path)
             if (rename(tmp_path, out_raw_path) != 0) 
             {
                 remove(tmp_path);
-                set_last_error("Failed to store raw file");
-                ir_trace("learn rename after-timeout failed src=%s dst=%s errno=%d(%s)",
+                set_last_error("[IR][service]::irctl_learn_raw Failed to store raw file");
+                log_error("[IR][service]::irctl_learn_raw learn rename after-timeout failed src=%s dst=%s errno=%d(%s)",
                          tmp_path, out_raw_path, errno, strerror(errno));
-                
+                           
                 return IR_ERR_IO;
             }
 
             set_last_error(NULL);
-            ir_trace("learn captured before timeout bytes=%ld path=%s", (long)st.st_size, out_raw_path);
+            log_debug("learn captured before timeout bytes=%ld path=%s", (long)st.st_size, out_raw_path);
             return IR_OK;
         }
 
         remove(tmp_path);
         set_last_error("Learn timed out");
-        ir_trace("learn timeout after %ds", sec);
+        log_debug("learn timeout after %ds", sec);
 
         return IR_ERR_TIMEOUT;
     }
@@ -184,7 +161,7 @@ static ir_status_t irctl_learn_raw (const char *out_raw_path)
     {
         remove(tmp_path);
         set_last_error("ir-ctl learn failed");
-        ir_trace("learn command failed (exit=%d)", exit_code);
+        log_error("learn command failed (exit=%d)", exit_code);
         return IR_ERR_IO;
     }
 
@@ -198,13 +175,13 @@ static ir_status_t irctl_learn_raw (const char *out_raw_path)
     {
         remove(tmp_path);
         set_last_error("Failed to store raw file");
-        ir_trace("learn rename failed src=%s dst=%s errno=%d(%s)",
+        log_error("learn rename failed src=%s dst=%s errno=%d(%s)",
                  tmp_path, out_raw_path, errno, strerror(errno));
         return IR_ERR_IO;
     }
 
     set_last_error(NULL);
-    ir_trace("learn stored bytes=%ld path=%s", (long)st.st_size, out_raw_path);
+    log_debug("learn stored bytes=%ld path=%s", (long)st.st_size, out_raw_path);
     return IR_OK;
 }
 
@@ -212,6 +189,7 @@ ir_status_t ir_learn_raw (const char *out_raw_path)
 {
     if (context.backend == NULL)
     {
+        log_error("[IR][service]::ir_learn_raw backend is null\n");
         set_last_error("[ir_learn_raw]:: backend is null");
         return IR_ERR_INVALID;
     }
@@ -219,12 +197,15 @@ ir_status_t ir_learn_raw (const char *out_raw_path)
     if ( strcmp(context.backend, BACKEND_TYPE_IRCTL) == 0) {
        return irctl_learn_raw(out_raw_path);
     }
-    else if (strcmp(context.backend, BACKEND_TYPE_LIRC) == 0) {
+    else if (strcmp(context.backend, BACKEND_TYPE_LIRC) == 0) 
+    {
+        log_error("[IR][service]::ir_learn_raw lircdev backend not implemented yet\n");
         set_last_error("lircdev backend not implemented yet");
         return IR_ERR_UNSUPPORTED;
     } 
     else 
     {
+        log_warning("[IR][service]::ir_learn_raw Unknown IR backend\n");
         set_last_error("Unknown IR backend");
         return IR_ERR_CONFIG;
     }
@@ -234,6 +215,7 @@ ir_status_t ir_send_raw(const char *raw_path)
 {
     if (context.backend == NULL)
     {
+        log_error("[IR][service]::ir_send_raw backend is null\n");
         set_last_error("[ir_send_raw]:: backend is null");
         return IR_ERR_INVALID;
     }
@@ -242,11 +224,13 @@ ir_status_t ir_send_raw(const char *raw_path)
         return irctl_send_raw(raw_path);
     }
     else if (strcmp(context.backend, BACKEND_TYPE_LIRC) == 0) {
+        log_error("[IR][service::ir_send_raw lircdev backend not implemented yet\n");
         set_last_error("lircdev backend not implemented yet");
         return IR_ERR_UNSUPPORTED;
     } 
     else 
     {
+        log_warning("[IR][service]::ir_send_raw Unknown IR backend\n");
         set_last_error("Unknown IR backend");
         return IR_ERR_CONFIG;
     }
@@ -256,6 +240,7 @@ ir_status_t ir_service_init(const ir_context *ctx)
 {
     if (!ctx) 
     {
+        log_error("[IR][service]::ir_service_init Missing IR config...\n");
         set_last_error("Missing IR config");
         return IR_ERR_CONFIG;
     }
@@ -272,7 +257,7 @@ ir_status_t ir_service_init(const ir_context *ctx)
     context.timeout_ms = ctx->timeout_ms > 0 ? ctx->timeout_ms : IR_DEFAULT_TIMEOUT_MS;
     context.backend = (ctx->backend && ctx->backend[0]) ? ctx->backend : BACKEND_TYPE_IRCTL;
 
-    ir_trace("init backend=%s tx=%s, rx=%s, timeout_ms=%d",
+    log_debug("[IR][service]::ir_service_init backend=%s tx=%s, rx=%s, timeout_ms=%d",
              context.backend ? context.backend : BACKEND_TYPE_IRCTL,
              context.tx_dev, context.rx_dev, context.timeout_ms);
 
@@ -297,17 +282,23 @@ static void collect_raw_item(const file_desc *desc, void *obj_target)
 
 ir_status_t ir_list_raw_files_cb(const char *dir, ir_callback_event *event)
 {
-    if (!event) {
+    if (!event) 
+    {
+        log_error("[IR][service]::ir_list_raw_files_cb Callback is required\n");
         set_last_error("Callback is required");
         return IR_ERR_INVALID;
     }
 
-    if (!dir || !dir[0]) {
+    if (!dir || !dir[0]) 
+    {
+        log_error("[IR][service]::ir_list_raw_files_cb Directory is required\n");
         set_last_error("Directory is required");
         return IR_ERR_INVALID;
     }
 
-    if (!file_is_directory(dir)) {
+    if (!file_is_directory(dir)) 
+    {
+        log_error("[IR][service]::ir_list_raw_files_cb Directory not found\n");
         set_last_error("Directory not found");
         return IR_ERR_IO;
     }

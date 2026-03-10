@@ -1,6 +1,7 @@
 #include "ir_controller.h"
 #include "page/ir/ir_raw_helper.h"
 #include "utils/string_utils.h"
+#include "utils/error_handler.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -501,7 +502,7 @@ ir_status_t ir_controller_send_button(const char *remote_name, const char *butto
 
 const char *ir_controller_last_error(void)
 {
-    return ir_service_last_error();
+    return last_error();
 }
 
 void ir_controller_free_remote_list(ir_remote_list *list)

@@ -23,6 +23,7 @@
 #include "page/ir/new_remote.h"
 #include "config.h"
 #include "utils/file.h"
+#include "utils/logger.h"
 
 
 #define NAV_GPIO    21  // 40 pin fisico (mueve foco)
@@ -34,7 +35,7 @@ int driver_initialization(lv_display_t *display)
 {
     lv_linux_fbdev_set_file(display, "/dev/fb0");
     // To know the event we use "cat /proc/bus/input/devices"
-    lv_indev_t *touch = lv_evdev_create(LV_INDEV_TYPE_POINTER, "/dev/input/event4");
+    lv_indev_t *touch = lv_evdev_create(LV_INDEV_TYPE_POINTER, "/dev/input/event5");
     if (!touch) 
         return -1;
 
@@ -53,11 +54,13 @@ const zv_config *setup_config()
     char exe_dir[PATH_MAX];
     if (get_executable_dir(exe_dir, sizeof(exe_dir)) == 0) 
     {
-        char config_path[PATH_MAX];
-        snprintf(config_path, sizeof(config_path), "%s/../app-config.json", exe_dir);
+        const char *app_config_path = "/../app-config.json";
+        size_t size = strlen(exe_dir) + strlen(app_config_path) + 1;
 
-        printf("[CFG] exe_dir=%s\n", exe_dir);
-        printf("[CFG] config_path=%s\n", config_path);
+        char config_path[PATH_MAX];
+        snprintf(config_path, size, "%s%s", exe_dir, app_config_path);
+
+        log_debug("config_path=%s\n", config_path);
 
         initialize_config(config_path);
         config_load();
@@ -191,11 +194,24 @@ void zv_menu_header_style(lv_obj_t *menu)
 
 int main(void)
 {
+    char exe_dir[PATH_MAX];
+    if (get_executable_dir(exe_dir, sizeof(exe_dir)) == 0) 
+    {
+        const char *path_log = "/../data/app-log.log";
+        size_t size = strlen(exe_dir) + strlen(path_log) + 1;
+
+        char config_path[PATH_MAX];
+        snprintf(config_path, size, "%s%s", exe_dir, path_log);
+        init_logger(config_path, DEBUG);
+    }
+
+    log_info("ZeroVolts starting ....");
+    
     lv_init();
 
     lv_display_t *display = lv_linux_fbdev_create();
     if (!display) {
-        printf("Can't create the display\n");
+        log_error("Can't create the display\n");
         return -1;
     }
 
@@ -212,7 +228,7 @@ int main(void)
 
     const zv_config *config = setup_config();
     if (!config) {
-        printf("[ERR] config is NULL\n");
+        log_error("config is NULL\n");
         return -1;
     }
 
@@ -225,7 +241,7 @@ int main(void)
     ir_cfg.ir_ctx.timeout_ms = config->ir.learn_timeout_ms;
 
     if (ir_controller_init(&ir_cfg) != IR_OK) {
-        printf("[ERR] IR init failed: %s\n", ir_controller_last_error());
+        log_error("IR init failed: %s\n", ir_controller_last_error());
         return -1;
     }
 
@@ -275,18 +291,19 @@ int main(void)
             sizeof(home_items) / sizeof(home_items[0]));
 
     if (!home) {
-        printf("[ERR] home_view_create returned NULL (menu=%p config=%p items=%p count=%zu)\n",
+        log_error("home_view_create returned NULL (menu=%p config=%p items=%p count=%zu)\n",
                (void *)menu, (void *)config, (void *)home_items,
                sizeof(home_items) / sizeof(home_items[0]));
         return -1;
     }
 
     lv_obj_t *home_page = get_page(home);
-    printf("[DBG] home=%p home_page=%p menu=%p\n", (void *)home, (void *)home_page, (void *)menu);
+    log_debug("home=%p home_page=%p menu=%p\n", (void *)home, (void *)home_page, (void *)menu);
     if (!home_page) {
-        printf("[ERR] get_page returned NULL\n");
+        log_error("get_page returned NULL\n");
         return -1;
     }
+
     lv_menu_set_page(menu, home_page);
 
     setup_navigation_groups(menu, home_page);
