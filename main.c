@@ -31,12 +31,21 @@
 
 /* ================= TOUCH ================= */
 
-int driver_initialization(lv_display_t *display)
+int driver_initialization(lv_display_t *display, const zv_config *config)
 {
-    lv_linux_fbdev_set_file(display, "/dev/fb0");
-    // To know the event we use "cat /proc/bus/input/devices"
-    lv_indev_t *touch = lv_evdev_create(LV_INDEV_TYPE_POINTER, "/dev/input/event5");
-    if (!touch) 
+    lv_linux_fbdev_set_file(display, config->display.fb_device);
+
+    // Auto-detect touchscreen via /proc/bus/input/devices (INPUT_PROP_DIRECT)
+    char touch_path[128];
+    if (detect_touch_event_path(touch_path, sizeof(touch_path)) != 0)
+    {
+        log_error("Touch auto-detect failed, no touchscreen found\n");
+        return -1;
+    }
+
+    log_info("Touch auto-detected: %s\n", touch_path);
+    lv_indev_t *touch = lv_evdev_create(LV_INDEV_TYPE_POINTER, touch_path);
+    if (!touch)
         return -1;
 
     // We swap axes because LVGL don't know that the screen is rotated 90degrees, so with
@@ -64,6 +73,10 @@ const zv_config *setup_config()
 
         initialize_config(config_path);
         config_load();
+
+        char project_root[PATH_MAX];
+        snprintf(project_root, sizeof(project_root), "%s/..", exe_dir);
+        config_resolve_paths(project_root);
     }
 
     return config_get();
@@ -206,7 +219,13 @@ int main(void)
     }
 
     log_info("ZeroVolts starting ....");
-    
+
+    const zv_config *config = setup_config();
+    if (!config) {
+        log_error("config is NULL\n");
+        return -1;
+    }
+
     lv_init();
 
     lv_display_t *display = lv_linux_fbdev_create();
@@ -215,9 +234,9 @@ int main(void)
         return -1;
     }
 
-    if (driver_initialization(display) != 0)
+    if (driver_initialization(display, config) != 0)
         return -1;
-    
+
     lv_obj_t *scr = lv_screen_active();
     lv_obj_set_style_pad_all(scr, 0, 0);
 
@@ -225,12 +244,6 @@ int main(void)
     lv_obj_set_layout(scr, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(scr, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_style_pad_row(scr, 0, 0);
-
-    const zv_config *config = setup_config();
-    if (!config) {
-        log_error("config is NULL\n");
-        return -1;
-    }
 
     ir_remote_ctx ir_cfg;
     memset(&ir_cfg, 0, sizeof(ir_cfg));
@@ -249,8 +262,8 @@ int main(void)
     
     top_bar_t *top_bar = top_bar_create(scr);
 
-    char version[3];
-    snprintf(version, sizeof(version) + sizeof(config->version), "v%s", config->version);
+    char version[24];
+    snprintf(version, sizeof(version), "v%s", config->version);
     top_bar_set_title(top_bar, version);
 
     /* -------- MENU (full restante) -------- */

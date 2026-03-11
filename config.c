@@ -6,7 +6,8 @@
 #include "config.h"
 #include "utils/file.h"
 
-char config_path[PATH_MAX];
+static char config_path[PATH_MAX];
+static char project_root[PATH_MAX];
 static zv_config _config;
 
 void config_set_defaults(void)
@@ -22,6 +23,8 @@ void config_set_defaults(void)
     snprintf(_config.ir.rx_device, sizeof(_config.ir.rx_device), "%s", "/dev/lirc1");
     _config.ir.learn_timeout_ms = 5000;
     _config.ir.use_on_screen_keyboard = true;
+
+    snprintf(_config.display.fb_device, sizeof(_config.display.fb_device), "%s", "/dev/fb0");
 }
 
 int initialize_config(const char *path_config)
@@ -71,6 +74,20 @@ static int json_get_int(cJSON *obj, const char *key, int fallback)
     return fallback;
 }
 
+static const char *strip_project_root(const char *path)
+{
+    if (!project_root[0] || !path || !path[0])
+        return path;
+
+    size_t root_len = strlen(project_root);
+
+    // Match "project_root/" prefix
+    if (strncmp(path, project_root, root_len) == 0 && path[root_len] == '/')
+        return path + root_len + 1;
+
+    return path;
+}
+
 static cJSON *cfg_to_json(void)
 {
     cJSON *root = cJSON_CreateObject();
@@ -78,16 +95,19 @@ static cJSON *cfg_to_json(void)
 
     cJSON *hid = cJSON_AddObjectToObject(root, "hid");
     cJSON_AddStringToObject(hid, "script_selected_path", _config.hid.selected_file);
-    cJSON_AddStringToObject(hid, "script_list_path", _config.hid.list_path);
+    cJSON_AddStringToObject(hid, "script_list_path", strip_project_root(_config.hid.list_path));
     cJSON_AddBoolToObject(hid, "is_enabled", _config.hid.is_enabled);
 
     cJSON *ir = cJSON_AddObjectToObject(root, "ir");
-    cJSON_AddStringToObject(ir, "remotes_path", _config.ir.remotes_path);
+    cJSON_AddStringToObject(ir, "remotes_path", strip_project_root(_config.ir.remotes_path));
     cJSON_AddStringToObject(ir, "backend", _config.ir.backend);
     cJSON_AddStringToObject(ir, "tx_device", _config.ir.tx_device);
     cJSON_AddStringToObject(ir, "rx_device", _config.ir.rx_device);
     cJSON_AddNumberToObject(ir, "learn_timeout_ms", _config.ir.learn_timeout_ms);
     cJSON_AddBoolToObject(ir, "use_on_screen_keyboard", _config.ir.use_on_screen_keyboard);
+
+    cJSON *display = cJSON_AddObjectToObject(root, "display");
+    cJSON_AddStringToObject(display, "fb_device", _config.display.fb_device);
 
     return root;
 }
@@ -125,6 +145,13 @@ static void json_to_cfg(cJSON *root)
         _config.ir.learn_timeout_ms = json_get_int(ir, "learn_timeout_ms", _config.ir.learn_timeout_ms);
         _config.ir.use_on_screen_keyboard =
             json_get_bool(ir, "use_on_screen_keyboard", _config.ir.use_on_screen_keyboard);
+    }
+
+    cJSON *display = cJSON_GetObjectItemCaseSensitive(root, "display");
+    if (cJSON_IsObject(display))
+    {
+        json_get_string(display, "fb_device", _config.display.fb_device,
+            _config.display.fb_device, sizeof(_config.display.fb_device));
     }
 }
 
@@ -188,4 +215,26 @@ void config_set_hid_enabled(bool enabled)
 {
     _config.hid.is_enabled = enabled;
     config_save();
+}
+
+void config_resolve_paths(const char *root)
+{
+    if (!root || !root[0])
+        return;
+
+    snprintf(project_root, sizeof(project_root), "%s", root);
+
+    // If path starts with '/', it's already absolute — leave it alone.
+    // Otherwise, prepend project_root to make it absolute.
+    if (_config.ir.remotes_path[0] && _config.ir.remotes_path[0] != '/') {
+        char tmp[512];
+        snprintf(tmp, sizeof(tmp), "%s/%s", root, _config.ir.remotes_path);
+        snprintf(_config.ir.remotes_path, sizeof(_config.ir.remotes_path), "%s", tmp);
+    }
+
+    if (_config.hid.list_path[0] && _config.hid.list_path[0] != '/') {
+        char tmp[512];
+        snprintf(tmp, sizeof(tmp), "%s/%s", root, _config.hid.list_path);
+        snprintf(_config.hid.list_path, sizeof(_config.hid.list_path), "%s", tmp);
+    }
 }

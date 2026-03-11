@@ -29,12 +29,14 @@
 
 
  /*
- * Why 160:
- * - Empirical threshold to reject very short/noisy captures.
- * - Real remote frames captured in this project are typically well above this.
- * - Reduces false positives from accidental or partial reads.
+ * Why 20:
+ * - Minimum of 10 pulse/gap pairs to reject noise and accidental reads.
+ * - Accepts all common IR protocols: NEC (~67 tokens/frame),
+ *   Samsung (~26 tokens/frame), RC-5 (~25), RC-6, Sony SIRC (~25), etc.
+ * - Fan remotes (~185 tokens) and other long captures still pass easily.
+ * - Previous value of 160 rejected valid Samsung and other short-frame protocols.
  */
-#define IR_RAW_MIN_TOKENS 160
+#define IR_RAW_MIN_TOKENS 20
 
 /*
  * Validate a raw capture file produced by ir-ctl.

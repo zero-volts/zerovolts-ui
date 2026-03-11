@@ -7,6 +7,7 @@
 #include <unistd.h>
 
 #include "file.h"
+#include "logger.h"
 
 #define FILE_PATH_LENGTH 1024 
 
@@ -36,7 +37,6 @@ char *read_file_as_buffer(const char *path, long* file_size_out)
     if (buffer == NULL)
     {
         printf("read_file_as_buffer::Can't allocate memory to read the file\n");
-        free(buffer);
         fclose(file);
         return NULL;
     }
@@ -236,8 +236,129 @@ int get_executable_dir(char *out, size_t out_size)
 
     strncpy(out, dir, out_size);
     out[out_size - 1] = '\0';
-    
+
     return 0;
+}
+
+static bool name_contains_touch(const char *name)
+{
+    // Case-insensitive search for "touch" in device name
+    for (const char *p = name; *p; p++)
+    {
+        if ((p[0] == 'T' || p[0] == 't') &&
+            (p[1] == 'O' || p[1] == 'o') &&
+            (p[2] == 'U' || p[2] == 'u') &&
+            (p[3] == 'C' || p[3] == 'c') &&
+            (p[4] == 'H' || p[4] == 'h'))
+            return true;
+    }
+    return false;
+}
+
+static int extract_event_path(const char *handlers, char *out, size_t out_size)
+{
+    const char *ev = strstr(handlers, "event");
+    if (!ev)
+        return -1;
+
+    char event_name[32];
+    sscanf(ev, "%31s", event_name);
+    snprintf(out, out_size, "/dev/input/%s", event_name);
+    return 0;
+}
+
+int detect_touch_event_path(char *out, size_t out_size)
+{
+    FILE *f = fopen("/proc/bus/input/devices", "r");
+    if (!f)
+    {
+        log_error("detect_touch: cannot open /proc/bus/input/devices\n");
+        return -1;
+    }
+
+    char line[512];
+    char handlers[256] = "";
+    char device_name[256] = "";
+    bool found_handler = false;
+    int device_count = 0;
+
+    // Fallback: store first device with "touch" in its name
+    char fallback_handlers[256] = "";
+    char fallback_name[256] = "";
+
+    while (fgets(line, sizeof(line), f))
+    {
+        if (line[0] == '\n')
+        {
+            // End of device block — check for name-based fallback
+            if (found_handler && name_contains_touch(device_name) && !fallback_handlers[0])
+            {
+                snprintf(fallback_handlers, sizeof(fallback_handlers), "%s", handlers);
+                snprintf(fallback_name, sizeof(fallback_name), "%s", device_name);
+            }
+
+            found_handler = false;
+            handlers[0] = '\0';
+            device_name[0] = '\0';
+            continue;
+        }
+
+        if (strncmp(line, "N: Name=", 8) == 0)
+        {
+            snprintf(device_name, sizeof(device_name), "%s", line + 8);
+            size_t len = strlen(device_name);
+            if (len > 0 && device_name[len - 1] == '\n')
+                device_name[len - 1] = '\0';
+            device_count++;
+        }
+
+        if (strncmp(line, "H: Handlers=", 12) == 0)
+        {
+            snprintf(handlers, sizeof(handlers), "%s", line + 12);
+            found_handler = true;
+        }
+
+        // PROP=2 (bit 1) = INPUT_PROP_DIRECT = touchscreen
+        if (strncmp(line, "B: PROP=", 8) == 0 && found_handler)
+        {
+            unsigned long prop = strtoul(line + 8, NULL, 16);
+            log_debug("detect_touch: device %s handlers=%s PROP=0x%lx\n",
+                      device_name, handlers, prop);
+
+            if (prop & 0x2)
+            {
+                if (extract_event_path(handlers, out, out_size) == 0)
+                {
+                    log_info("detect_touch: found via PROP=2: %s -> %s\n", device_name, out);
+                    fclose(f);
+                    return 0;
+                }
+                log_warning("detect_touch: PROP=2 matched but no event handler found\n");
+            }
+        }
+    }
+
+    // Check last device block (file may not end with blank line)
+    if (found_handler && name_contains_touch(device_name) && !fallback_handlers[0])
+    {
+        snprintf(fallback_handlers, sizeof(fallback_handlers), "%s", handlers);
+        snprintf(fallback_name, sizeof(fallback_name), "%s", device_name);
+    }
+
+    fclose(f);
+
+    // Fallback: use device with "touch" in its name (e.g., ADS7846 Touchscreen)
+    if (fallback_handlers[0])
+    {
+        if (extract_event_path(fallback_handlers, out, out_size) == 0)
+        {
+            log_info("detect_touch: found via name match: %s -> %s\n", fallback_name, out);
+            return 0;
+        }
+    }
+
+    log_warning("detect_touch: scanned %d devices, no touchscreen found\n", device_count);
+    return -1;
 }
 
 void normalize_dir_path(char *path)

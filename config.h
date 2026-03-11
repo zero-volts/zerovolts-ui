@@ -9,7 +9,6 @@ extern "C" {
 
 typedef struct {
     char version[16];
-    
     struct {
         bool is_enabled;
         char list_path[512];
@@ -24,11 +23,16 @@ typedef struct {
         int learn_timeout_ms;
         bool use_on_screen_keyboard;
     } ir;
+
+    struct {
+        char fb_device[128];
+    } display;
 } zv_config;
 
 int initialize_config(const char *path_config);
 int config_load();
 int config_save();
+void config_resolve_paths(const char *project_root);
 
 const zv_config *config_get();
 

@@ -2,11 +2,14 @@
 	"version":	"0.2",
 	"hid":	{
 		"script_selected_path":	"",
-		"script_list_path":	"/home/zerovolts/git/zerovolts-ui/data/badusb/",
+		"script_list_path":	"data/badusb/",
 		"is_enabled":	false
 	},
+	"display":	{
+		"fb_device":	"/dev/fb0"
+	},
 	"ir":	{
-		"remotes_path":	"/home/zerovolts/git/zerovolts-ui/data/ir/remotes/",
+		"remotes_path":	"data/ir/remotes/",
 		"backend":	"irctl",
 		"tx_device":	"/dev/lirc0",
 		"rx_device":	"/dev/lirc1",

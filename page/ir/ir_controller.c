@@ -10,7 +10,7 @@
 #include <unistd.h>
 #include <errno.h>
 
-#define DEFUALT_LIST_AMOUNT 8
+#define DEFAULT_LIST_AMOUNT 8
 #define IR_LEARN_MAX_ATTEMPTS 3
 
 typedef struct {
@@ -290,13 +290,13 @@ ir_status_t ir_controller_list_remotes(ir_remote_list *out_list)
         return IR_ERR_CONFIG;
     
     memset(out_list, 0, sizeof(*out_list));
-    out_list->remotes = (ir_remote_info *) calloc (DEFUALT_LIST_AMOUNT, sizeof(ir_remote_info));
+    out_list->remotes = (ir_remote_info *) calloc (DEFAULT_LIST_AMOUNT, sizeof(ir_remote_info));
     if (!out_list->remotes)
         return IR_ERR_IO;
 
     remotes_handler_ctx handler_ctx;
     memset(&handler_ctx, 0, sizeof(handler_ctx));
-    handler_ctx.capacity = DEFUALT_LIST_AMOUNT;
+    handler_ctx.capacity = DEFAULT_LIST_AMOUNT;
     handler_ctx.list = out_list;
 
     get_file_list(remote_context.remotes_root, handle_file_list, &handler_ctx);
@@ -351,13 +351,13 @@ ir_status_t ir_controller_list_buttons(const char *remote_name, ir_button_list *
     if (ret < 0)
         return IR_ERR_INVALID;
 
-    out_list->buttons = (ir_button *)calloc(DEFUALT_LIST_AMOUNT, sizeof(ir_button));
+    out_list->buttons = (ir_button *)calloc(DEFAULT_LIST_AMOUNT, sizeof(ir_button));
     if (!out_list->buttons)
         return IR_ERR_IO;
 
     buttons_handler_ctx handler_ctx;
     memset(&handler_ctx, 0, sizeof(handler_ctx));
-    handler_ctx.capacity = DEFUALT_LIST_AMOUNT;
+    handler_ctx.capacity = DEFAULT_LIST_AMOUNT;
     handler_ctx.list = out_list;
 
     ir_callback_event event;

@@ -28,6 +28,7 @@ int file_ensure_dir_recursive(const char *path);
 int get_executable_dir(char *out, size_t out_size);
 bool file_has_extension(const char *name, const char *ext);
 void normalize_dir_path(char *path);
+int detect_touch_event_path(char *out, size_t out_size);
 
 char *read_file_as_buffer(const char *path, long* file_size_out);
 int write_entire_file(const char *path, const char *data, size_t len);

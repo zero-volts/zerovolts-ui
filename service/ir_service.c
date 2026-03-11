@@ -82,9 +82,9 @@ static ir_status_t irctl_send_raw(const char *raw_path)
              "timeout %ds ir-ctl -d '%s' -s '%s' >/dev/null 2>&1", send_timeout_sec, escaped_dev, escaped_path);
 
     log_debug("[IR][service]::irctl_send_raw send cmd: %s\n", cmd);
-    
+
     int exit_code = system_status_code(system(cmd));
-    if (exit_code != 0) 
+    if (exit_code != 0)
     {
         set_last_error("ir-ctl send failed");
         log_error("[IR][service]::irctl_send_raw send failed exit_code=%d tx_dev=%s raw=%s", exit_code, context.tx_dev, raw_path);
