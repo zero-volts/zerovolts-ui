@@ -1,25 +1,16 @@
 #include "hid_service.h"
+#include "utils/logger.h"
+#include "utils/error_handler.h"
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 
 static char g_last_error[256];
-
-static void set_last_error(const char *msg)
-{
-    if (!msg) {
-        g_last_error[0] = '\0';
-        return;
-    }
-
-    snprintf(g_last_error, sizeof(g_last_error), "%s", msg);
-}
-
-const char *hid_service_last_error(void)
-{
-    return g_last_error;
-}
+typedef struct {
+    file_callback callback;
+    void *user_data;
+} list_scripts_ctx;
 
 static hid_status_t run_command(const char *cmd, const char *error_msg)
 {
@@ -61,11 +52,6 @@ hid_status_t hid_service_stop_session(void)
     return run_command("sudo systemctl stop zv-hid-session.service",
         "Failed to stop HID session");
 }
-
-typedef struct {
-    file_callback callback;
-    void *user_data;
-} list_scripts_ctx;
 
 static void list_scripts_adapter(const file_desc *description, void *user_data)
 {

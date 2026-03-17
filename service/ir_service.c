@@ -83,6 +83,7 @@ static ir_status_t irctl_send_raw(const char *raw_path)
 
     log_debug("[IR][service]::irctl_send_raw send cmd: %s\n", cmd);
 
+    // TODO: dont use system to make a call to the sustem, use fork or something like that
     int exit_code = system_status_code(system(cmd));
     if (exit_code != 0)
     {

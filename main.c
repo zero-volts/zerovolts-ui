@@ -43,7 +43,6 @@ int driver_initialization(lv_display_t *display, const zv_config *config)
         return -1;
     }
 
-    log_info("Touch auto-detected: %s\n", touch_path);
     lv_indev_t *touch = lv_evdev_create(LV_INDEV_TYPE_POINTER, touch_path);
     if (!touch)
         return -1;
@@ -290,20 +289,15 @@ int main(void)
             .icon = LV_SYMBOL_WIFI,
             .create_page = ir_page_create,
             .rotate_icon_90 = true,
-        },
-        {
-            .label = "Wifi",
-            .icon = LV_SYMBOL_WIFI,
-            .create_page = NULL,
-            .rotate_icon_90 = false,
-        },
+        }
     };
 
     home_view home_view_obj;
     home_view *home = home_view_create(&home_view_obj, menu, config, home_items,
             sizeof(home_items) / sizeof(home_items[0]));
 
-    if (!home) {
+    if (!home)
+    {
         log_error("home_view_create returned NULL (menu=%p config=%p items=%p count=%zu)\n",
                (void *)menu, (void *)config, (void *)home_items,
                sizeof(home_items) / sizeof(home_items[0]));
@@ -321,13 +315,17 @@ int main(void)
 
     setup_navigation_groups(menu, home_page);
     lv_obj_t *last_page = lv_menu_get_cur_main_page(menu);
-    while (1) {
+    while (1)
+    {
         lv_timer_handler();
         lv_obj_t *cur_page = lv_menu_get_cur_main_page(menu);
-        if (cur_page && cur_page != last_page) {
+
+        if (cur_page && cur_page != last_page)
+        {
             zv_nav_update_group(menu, cur_page);
             last_page = cur_page;
         }
+
         usleep(5000);
     }
 

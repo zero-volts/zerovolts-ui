@@ -1,4 +1,6 @@
 #include "page/hid/hid_controller.h"
+#include "utils/logger.h"
+#include "utils/error_handler.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,24 +16,9 @@ typedef struct {
     int has_error;
 } scripts_handler_ctx;
 
-static char g_last_error[256];
-
-static void set_last_error(const char *msg)
-{
-    if (!msg) {
-        g_last_error[0] = '\0';
-        return;
-    }
-
-    snprintf(g_last_error, sizeof(g_last_error), "%s", msg);
-}
-
 const char *hid_controller_last_error(void)
 {
-    if (g_last_error[0])
-        return g_last_error;
-
-    return hid_service_last_error();
+    return last_error();
 }
 
 hid_status_t hid_controller_init(hid_controller *controller, const zv_config *cfg)
@@ -95,21 +82,27 @@ hid_status_t hid_controller_toggle(hid_controller *controller, bool enable)
         return HID_OK;
     }
 
-    if (!controller->selected_script[0]) {
+    if (!controller->selected_script[0])
+    {
         set_last_error("Select a script first.");
         return HID_ERR_INVALID;
     }
 
     hid_status_t rc = hid_service_enable();
-    if (rc != HID_OK) {
-        set_last_error(hid_service_last_error());
+    if (rc != HID_OK)
+    {
+        log_error("[HID::controller]::hid_controller_toggle enabling service %s\n", last_error());
+        set_last_error(last_error());
         return rc;
     }
 
     rc = hid_service_start_session();
-    if (rc != HID_OK) {
+    if (rc != HID_OK)
+    {
         (void)hid_service_disable();
-        set_last_error(hid_service_last_error());
+
+        log_error("[HID::controller]::hid_controller_toggle starting session %s\n", last_error());
+        set_last_error(last_error());
         return rc;
     }
 
@@ -117,6 +110,7 @@ hid_status_t hid_controller_toggle(hid_controller *controller, bool enable)
     config_set_hid_enabled(true);
     controller->hid_enabled = true;
     set_last_error(NULL);
+
     return HID_OK;
 }
 
@@ -162,7 +156,9 @@ hid_status_t hid_controller_list_scripts(hid_controller *controller, hid_script_
     out_list->scripts = (hid_script_item *)calloc(HID_DEFAULT_LIST_CAPACITY, sizeof(hid_script_item));
     if (!out_list->scripts)
     {
+        log_error("[HID::controller]::hid_controller_list_scripts Not enough memory\n");
         set_last_error("Not enough memory");
+
         return HID_ERR_IO;
     }
 
@@ -175,7 +171,7 @@ hid_status_t hid_controller_list_scripts(hid_controller *controller, hid_script_
     if (rc != HID_OK || ctx.has_error)
     {
         hid_controller_free_script_list(out_list);
-        set_last_error(rc != HID_OK ? hid_service_last_error() : "Failed to build script list");
+        set_last_error(rc != HID_OK ? last_error() : "Failed to build script list");
         return rc != HID_OK ? rc : HID_ERR_IO;
     }
 

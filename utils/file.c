@@ -300,6 +300,7 @@ int detect_touch_event_path(char *out, size_t out_size)
             found_handler = false;
             handlers[0] = '\0';
             device_name[0] = '\0';
+
             continue;
         }
 
@@ -322,9 +323,6 @@ int detect_touch_event_path(char *out, size_t out_size)
         if (strncmp(line, "B: PROP=", 8) == 0 && found_handler)
         {
             unsigned long prop = strtoul(line + 8, NULL, 16);
-            log_debug("detect_touch: device %s handlers=%s PROP=0x%lx\n",
-                      device_name, handlers, prop);
-
             if (prop & 0x2)
             {
                 if (extract_event_path(handlers, out, out_size) == 0)
@@ -333,6 +331,7 @@ int detect_touch_event_path(char *out, size_t out_size)
                     fclose(f);
                     return 0;
                 }
+
                 log_warning("detect_touch: PROP=2 matched but no event handler found\n");
             }
         }
