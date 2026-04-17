@@ -26,7 +26,7 @@ lv_obj_t *ir_page_create(lv_obj_t *menu, const zv_config *cfg)
 
     lv_obj_t *page = lv_menu_page_create(menu, "Infrared");
     lv_obj_set_scrollbar_mode(page, LV_SCROLLBAR_MODE_OFF);
-    lv_obj_set_style_bg_color(page, ZV_COLOR_BG_MAIN, 0); 
+    lv_obj_set_style_bg_color(page, ZV_COLOR_BG_MAIN, 0);
     lv_obj_set_style_bg_opa(page, LV_OPA_COVER, 0);
 
     lv_obj_t *remotes_page = ir_remotes_page_create(menu);
@@ -60,25 +60,25 @@ lv_obj_t *ir_page_create(lv_obj_t *menu, const zv_config *cfg)
         {
             .text = "Remotes",
             .subtitle = "Saved remotes",
-            .left_bage = { .label = LV_SYMBOL_HOME, .type = BAGE_TEXT_TYPE },
+            .left_badge = { .label = LV_SYMBOL_HOME, .type = BAGE_TEXT_TYPE },
             .user_data = &nav_remotes,
         },
         {
             .text = "New Remote",
             .subtitle = "Create a new remote",
-            .left_bage = { .label = LV_SYMBOL_PLUS, .type = BAGE_TEXT_TYPE },
+            .left_badge = { .label = LV_SYMBOL_PLUS, .type = BAGE_TEXT_TYPE },
             .user_data = &nav_new_remote,
         },
         {
             .text = "Learn Button",
             .subtitle = "Capture a new signal",
-            .left_bage = { .label = LV_SYMBOL_SAVE, .type = BAGE_TEXT_TYPE },
+            .left_badge = { .label = LV_SYMBOL_SAVE, .type = BAGE_TEXT_TYPE },
             .user_data = &nav_learn_button,
         },
         {
             .text = "Send Signal",
             .subtitle = "Transmit a saved signal",
-            .left_bage = { .label = LV_SYMBOL_GPS, .type = BAGE_TEXT_TYPE  },
+            .left_badge = { .label = LV_SYMBOL_GPS, .type = BAGE_TEXT_TYPE  },
             .user_data = &nav_send_signal,
         },
     };

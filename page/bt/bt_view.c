@@ -26,7 +26,6 @@ lv_obj_t *bt_page_create(lv_obj_t *menu, const zv_config *cfg)
     lv_obj_t *scanner_page = bt_scanner_page_create(menu);
 
     static nav_ctx_t nav_scanner;
-    static nav_ctx_t nav_beacon;
 
     nav_scanner.menu = menu;
     nav_scanner.page = scanner_page;
@@ -39,7 +38,7 @@ lv_obj_t *bt_page_create(lv_obj_t *menu, const zv_config *cfg)
     list_item_t item = {
         .text = "Scanner",
         .subtitle= "Discover devices",
-        .left_bage = {
+        .left_badge = {
             .type = BAGE_IMG_TYPE,
             .icon = {
                 .path = "/home/zerovolts/git/zerovolts-ui/data/assets/tower.png",

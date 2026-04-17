@@ -17,7 +17,7 @@ typedef struct {
     int connectable;
 } device_t;
 
-typedef void (*bt_event_cb)(device_t *device);
+typedef void (*bt_event_cb)(const char *event, device_t *device);
 
 uart_status_t bt_controller_init(); // TODO: revisar si necesitamos mas datos
 uart_status_t start_scan();

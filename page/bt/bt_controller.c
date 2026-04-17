@@ -27,6 +27,18 @@ static void event_handler(const char *tag_id, char *buffer)
         return;
     }
 
+    if (strstr(buffer, "SCAN:START") != NULL) 
+    {
+        internl_cb("SCAN:START", NULL);
+        return;
+    }
+
+    if (strstr(buffer, "SCAN:DONE") != NULL) 
+    {
+        internl_cb("SCAN:DONE", NULL);
+        return;
+    }
+
     log_info("buffer handler: %s\n", buffer);
     if (strstr(buffer, "SCAN:DEVICE") == NULL) {
         return;
@@ -38,9 +50,9 @@ static void event_handler(const char *tag_id, char *buffer)
     token = strtok_r(buffer, "|", &saveptr);
 
     device_t device = {0};
-    while (token != NULL) {
-        printf("Token: %s\n", token);
-
+    while (token != NULL)
+    {
+        //log_info("token: %s\n", token);
         if (strcmp(token, "SCAN:DEVICE") == 0) {
             token = strtok_r(NULL, "|", &saveptr);
             continue;
@@ -49,7 +61,6 @@ static void event_handler(const char *tag_id, char *buffer)
         char *innersaveptr;
         char *key = strtok_r(token, "=", &innersaveptr);
         char *value = strtok_r(NULL, "=", &innersaveptr);
-
         if (key && value) 
         {    
             if (strcmp(key, "name") == 0) {
@@ -74,7 +85,7 @@ static void event_handler(const char *tag_id, char *buffer)
     }
 
     if (internl_cb != NULL)
-        internl_cb(&device);
+        internl_cb("SCAN:UPDATE", &device);
 }
 
 uart_status_t bt_controller_init()
