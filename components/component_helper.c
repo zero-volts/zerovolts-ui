@@ -1,11 +1,13 @@
 #include "component_helper.h"
 #include "components/ui_theme.h"
 
+#include <stdio.h>
+
 #define ICON_IDENTIFYER 100
 
 lv_obj_t *create_square_main_button(lv_obj_t *parent, const char *text, const char *icon, lv_event_cb_t cb, void *user_data)
 {
-    lv_obj_t * btn = lv_btn_create(parent);
+    lv_obj_t *btn = lv_btn_create(parent);
     lv_obj_set_size(btn, LV_PCT(48), 100);
     lv_obj_set_style_bg_color(btn, ZV_COLOR_BG_PANEL, 0);
     lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
@@ -15,7 +17,7 @@ lv_obj_t *create_square_main_button(lv_obj_t *parent, const char *text, const ch
 
     lv_obj_add_event_cb(btn, cb, LV_EVENT_CLICKED, user_data);
     
-    // estados
+    // states
     lv_obj_set_style_bg_color(btn, ZV_COLOR_BG_BUTTON_PRESSED, LV_STATE_PRESSED);
     lv_obj_set_style_border_color(btn, ZV_COLOR_TERMINAL, LV_STATE_FOCUSED);
     lv_obj_set_style_border_color(btn, ZV_COLOR_TERMINAL, LV_STATE_CHECKED);

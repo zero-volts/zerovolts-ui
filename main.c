@@ -19,9 +19,14 @@
 #include "page/hid/hid_view.h"
 #include "page/ir/ir.h"
 #include "page/ir/ir_controller.h"
+#include "page/bt/bt_controller.h"
 #include "page/ir/learn_button.h"
 #include "page/ir/new_remote.h"
+#include "page/bt/bt_view.h"
+#include "page/base_view.h"
 #include "config.h"
+#include "service/uart_service.h"
+#include "utils/error_handler.h"
 #include "utils/file.h"
 #include "utils/logger.h"
 
@@ -257,6 +262,12 @@ int main(void)
         return -1;
     }
 
+    if (bt_controller_init() != UART_OK )
+    {
+        log_error("Bluetooth init failed\n");
+        return -1;
+    }
+
     /* -------- TOP BAR -------- */
     
     top_bar_t *top_bar = top_bar_create(scr);
@@ -289,6 +300,12 @@ int main(void)
             .icon = LV_SYMBOL_WIFI,
             .create_page = ir_page_create,
             .rotate_icon_90 = true,
+        },
+        {
+            .label = "Bluetooth",
+            .icon = LV_SYMBOL_BLUETOOTH,
+            .create_page = bt_page_create,
+            .rotate_icon_90 = false,
         }
     };
 
@@ -318,6 +335,9 @@ int main(void)
     while (1)
     {
         lv_timer_handler();
+
+        uart_process_loop();
+
         lv_obj_t *cur_page = lv_menu_get_cur_main_page(menu);
 
         if (cur_page && cur_page != last_page)

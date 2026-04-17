@@ -13,6 +13,7 @@ SRC := \
 	components/top_bar.c \
 	components/component_helper.c \
 	components/nav.c \
+	components/list/ui_list.c \
 	page/base_view.c \
 	page/home_view.c \
 	page/hid/hid_view.c \
@@ -24,8 +25,12 @@ SRC := \
 	page/ir/new_remote.c \
 	page/ir/remotes.c \
 	page/ir/send_signal.c \
+	page/bt/bt_controller.c \
+	page/bt/bt_view.c \
+	page/bt/bt_scanner.c \
 	service/hid_service.c \
 	service/ir_service.c \
+	service/uart_service.c \
 	utils/file.c \
 	utils/string_utils.c \
 	utils/cJSON.c \
