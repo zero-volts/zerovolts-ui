@@ -14,6 +14,7 @@ SRC := \
 	components/component_helper.c \
 	components/nav.c \
 	components/list/ui_list.c \
+	components/ui_loading_btn.c \
 	page/base_view.c \
 	page/home_view.c \
 	page/hid/hid_view.c \

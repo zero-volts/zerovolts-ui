@@ -20,13 +20,13 @@ typedef struct {
     const char *label;
     bage_type type;
     obj_icon_t icon;
-} list_item_bage_t;
+} list_item_badge_t;
 
 typedef struct {
     const char *text;
     const char *subtitle;
-    list_item_bage_t left_bage;
-    list_item_bage_t right_bage;
+    list_item_badge_t left_badge;
+    list_item_badge_t right_badge;
 
     const char *raw_value;
     void *user_data;
