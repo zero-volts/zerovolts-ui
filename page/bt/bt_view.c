@@ -32,6 +32,8 @@ lv_obj_t *bt_page_create(lv_obj_t *menu, const zv_config *cfg)
     nav_scanner.page = scanner_page;
 
     ui_list *list = create_list(page, 100, 80);
+    set_list_border(list, false);
+    set_list_bg_color(list, ZV_COLOR_BG_MAIN);
     set_event_data(list, handler, &nav_scanner);
 
     list_item_t item = {

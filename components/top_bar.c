@@ -5,7 +5,7 @@
 #include <time.h>
 #include "ui_theme.h"
 
-#define TOP_BAR_HEIGHT 25
+#define TOP_BAR_HEIGHT 28
 
 typedef struct {
     top_bar_t *bar;
@@ -65,20 +65,22 @@ static void cpu_temp_timer_cb(lv_timer_t *t)
 
 static void apply_default_styles(top_bar_t *bar)
 {
-    /* Contenedor */
+    // container
     lv_obj_set_size(bar->container, LV_PCT(100), TOP_BAR_HEIGHT);
     lv_obj_set_style_pad_left(bar->container, 10, 0);
     lv_obj_set_style_pad_right(bar->container, 10, 0);
     lv_obj_set_style_pad_top(bar->container, 6, 0);
     lv_obj_set_style_pad_bottom(bar->container, 6, 0);
 
-    lv_obj_set_style_border_width(bar->container, 0, 0);
     lv_obj_set_style_radius(bar->container, 0, 0);
 
     lv_obj_set_style_bg_opa(bar->container, LV_OPA_COVER, 0);
     lv_obj_set_style_bg_color(bar->container, ZV_COLOR_BG_PANEL, 0);
 
-    lv_obj_set_style_text_color(bar->container, ZV_COLOR_TERMINAL, 0);
+    // Bottom border 
+    lv_obj_set_style_border_color(bar->container, ZV_COLOR_BORDER, 0);
+    lv_obj_set_style_border_width(bar->container, 1, 0);
+    lv_obj_set_style_border_side(bar->container, LV_BORDER_SIDE_BOTTOM, 0);
 }
 
 top_bar_t *top_bar_create(lv_obj_t *parent)
@@ -97,7 +99,7 @@ top_bar_t *top_bar_create(lv_obj_t *parent)
 
     apply_default_styles(bar);
 
-    /* Layout principal: izquierda y derecha */
+    // Main layout 
     lv_obj_set_layout(bar->container, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(bar->container, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(
@@ -110,6 +112,7 @@ top_bar_t *top_bar_create(lv_obj_t *parent)
     bar->title = lv_label_create(bar->container);
     lv_label_set_text(bar->title, "v0.1");
     lv_obj_set_style_text_font(bar->title, LV_FONT_DEFAULT, 0);
+    lv_obj_set_style_text_color(bar->title, ZV_COLOR_TERMINAL, 0);
 
     lv_obj_t *right = lv_obj_create(bar->container);
     lv_obj_remove_style_all(right);
@@ -121,11 +124,13 @@ top_bar_t *top_bar_create(lv_obj_t *parent)
 
     bar->cpu_temp = lv_label_create(right);
     lv_label_set_text(bar->cpu_temp, "--.-°C");
+    lv_obj_set_style_text_color(bar->cpu_temp, ZV_COLOR_TEXT_MUTED, 0);
 
     bar->clock = lv_label_create(right);
     lv_label_set_text(bar->clock, "--:--:--");
+    lv_obj_set_style_text_color(bar->clock, ZV_COLOR_TEXT_MID, 0);
 
-    /* Internals + timer */
+    // Internals + timer
     top_bar_internal_t *it = (top_bar_internal_t *)malloc(sizeof(top_bar_internal_t));
     if(it) 
     {
