@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-ui_list *list = NULL;
+static ui_list *scanner_list = NULL;
 static void handler(ui_list *list, const list_item_t *item, void *user_data)
 {
     printf("Seleccionado :%s, MAC: %s\n", item->text, item->subtitle);
@@ -14,11 +14,12 @@ static void handler(ui_list *list, const list_item_t *item, void *user_data)
 
 static void handler_devices(device_t *device)
 {
-    if (list == NULL)
+    if (scanner_list == NULL)
         return;
-    
-    char rssi_buffer[16]; 
+
+    char rssi_buffer[16];
     snprintf(rssi_buffer, sizeof(rssi_buffer), "Rssi: %d", device->rssi);
+    
     list_item_t item = {
         .text = device->name,
         .subtitle = device->mac,
@@ -35,13 +36,12 @@ static void handler_devices(device_t *device)
         }
     };
 
-    add_item(list, &item);
+    add_item(scanner_list, &item);
 }
 
-static void hid_refresh_btn_cb(lv_event_t *e)
+static void handler_scan_btn(lv_event_t *e)
 {
-    printf("antes de llamar el scann\n");
-    clean_list(list);
+    clean_list(scanner_list);
     start_scan();
 }
 
@@ -73,7 +73,7 @@ lv_obj_t *bt_scanner_page_create(lv_obj_t *menu)
 
     lv_obj_t *scann_btn = lv_btn_create(scann_btn_container);
     lv_obj_set_size(scann_btn, 70, 60);
-    lv_obj_add_event_cb(scann_btn, hid_refresh_btn_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_add_event_cb(scann_btn, handler_scan_btn, LV_EVENT_CLICKED, NULL);
 
     lv_obj_t *lb = lv_label_create(scann_btn);
     lv_label_set_text(lb, "Scan");
