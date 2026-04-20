@@ -15,6 +15,7 @@ SRC := \
 	components/nav.c \
 	components/list/ui_list.c \
 	components/ui_loading_btn.c \
+	components/ui_info_panel.c \
 	page/base_view.c \
 	page/home_view.c \
 	page/hid/hid_view.c \
@@ -28,6 +29,7 @@ SRC := \
 	page/ir/send_signal.c \
 	page/bt/bt_controller.c \
 	page/bt/bt_view.c \
+	page/bt/bt_device_detail.c \
 	page/bt/bt_scanner.c \
 	service/hid_service.c \
 	service/ir_service.c \

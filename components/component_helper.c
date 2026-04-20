@@ -80,3 +80,14 @@ lv_obj_t *find_first_element_child(lv_obj_t *parent, const lv_obj_class_t *class
 
     return NULL;
 }
+
+lv_obj_t *create_btn(lv_obj_t *parent, const char *text, int width, int height)
+{
+    lv_obj_t *btn = lv_btn_create(parent);
+    lv_obj_set_size(btn, width, height);
+
+    lv_obj_t *label = lv_label_create(btn);
+    lv_label_set_text(label, text);
+
+    return btn;
+}

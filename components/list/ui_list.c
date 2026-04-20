@@ -19,6 +19,7 @@ typedef struct {
     char *text_buf;
     char *subtitle_buf;
     char *raw_value_buf;
+    void *user_data_buf;
 } ui_list_item_ctx_t;
 
 static void on_item_click(lv_event_t *e)
@@ -38,9 +39,11 @@ static void on_item_delete(lv_event_t *e)
     ui_list_item_ctx_t *ctx = (ui_list_item_ctx_t *)lv_event_get_user_data(e);
     if (ctx) 
     {
+        printf("por eliminar: %s\n", ctx->subtitle_buf);
         free(ctx->text_buf);
         free(ctx->subtitle_buf);
         free(ctx->raw_value_buf);
+        free(ctx->user_data_buf);
         free(ctx);
     }
 }
@@ -96,11 +99,29 @@ lv_obj_t *add_item(ui_list *list, const list_item_t *item)
     ctx->text_buf = item->text ? strdup(item->text) : NULL;
     ctx->subtitle_buf = item->subtitle ? strdup(item->subtitle) : NULL;
     ctx->raw_value_buf = item->raw_value ? strdup(item->raw_value) : NULL;
+    ctx->user_data_buf = NULL;
+
+    if (item->user_data != NULL && item->user_data_size > 0)
+    {
+        ctx->user_data_buf = malloc(item->user_data_size);
+        if (ctx->user_data_buf == NULL)
+        {
+            free(ctx->text_buf);
+            free(ctx->subtitle_buf);
+            free(ctx->raw_value_buf);
+            free(ctx);
+            lv_obj_del(btn);
+            return NULL;
+        }
+
+        memcpy(ctx->user_data_buf, item->user_data, item->user_data_size);
+    }
 
     ctx->item.text = ctx->text_buf;
     ctx->item.subtitle = ctx->subtitle_buf;
     ctx->item.raw_value = ctx->raw_value_buf;
-    ctx->item.user_data = item->user_data;
+    ctx->item.user_data = ctx->user_data_buf;
+    ctx->item.user_data_size = item->user_data_size;
 
     lv_obj_add_event_cb(btn, on_item_click, LV_EVENT_CLICKED, ctx);
     lv_obj_add_event_cb(btn, on_item_delete, LV_EVENT_DELETE, ctx);

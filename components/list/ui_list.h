@@ -30,6 +30,7 @@ typedef struct {
 
     const char *raw_value;
     void *user_data;
+    size_t user_data_size;
 } list_item_t;
 
 typedef struct ui_list ui_list;

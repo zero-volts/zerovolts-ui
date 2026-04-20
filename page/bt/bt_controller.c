@@ -8,13 +8,15 @@
 #define UART_BAUDRATE 115200
 #define UART_BT_TAG_ID "BT_TAG_CONTROLLER"
 
-#define MAX_DEVICES 5
-device_t devices[MAX_DEVICES];
-
-static int device_count = 0;
-
+// #define MAX_DEVICES 5
+// device_t devices[MAX_DEVICES];
 static bt_event_cb internl_cb = NULL;
 
+struct bt_context_t {
+    device_t selected;
+};
+
+static bt_context_t context;
 
 void set_scanner_cb(bt_event_cb new_callback)
 {
@@ -111,4 +113,37 @@ uart_status_t start_scan()
     }
 
     return UART_OK;
+}
+
+
+bt_context_t *bt_controller_ctx(void)
+{
+    return &context;
+}
+
+const device_t *selected_device(bt_context_t *ctx)
+{
+    if (ctx == NULL)
+        return NULL;
+
+    if (ctx->selected.mac[0] == '\0')
+        return NULL;
+
+    return &ctx->selected;
+}
+
+void bt_controller_select(const device_t *dev)
+{
+    if (dev == NULL)
+    {
+        memset(&context.selected, 0, sizeof(context.selected));
+        return;
+    }
+
+    context.selected = *dev;
+}
+
+void bt_controller_clean_ctx(void)
+{
+    memset(&context.selected, 0, sizeof(context.selected));
 }
