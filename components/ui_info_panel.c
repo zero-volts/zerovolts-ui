@@ -73,3 +73,12 @@ void add_info_panel_item(ui_info_panel *panel, kv_item_t item)
 
     panel->item_count += 1;
 }
+
+void clear_info_panel(ui_info_panel *panel)
+{
+    if (!panel || !panel->main_layout)
+        return;
+
+    lv_obj_clean(panel->main_layout);
+    panel->item_count = 0;
+}

@@ -19,6 +19,7 @@ typedef struct ui_info_panel ui_info_panel;
 
 ui_info_panel *create_info_panel(lv_obj_t *parent, int width, int height);
 void add_info_panel_item(ui_info_panel *panel, kv_item_t item);
+void clear_info_panel(ui_info_panel *panel);
 
 #ifdef __cplusplus
 }

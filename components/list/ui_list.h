@@ -20,6 +20,8 @@ typedef struct {
     const char *label;
     bage_type type;
     obj_icon_t icon;
+    lv_color_t text_color;
+    bool has_text_color;
 } list_item_badge_t;
 
 typedef struct {
@@ -29,6 +31,16 @@ typedef struct {
     list_item_badge_t right_badge;
 
     const char *raw_value;
+
+    /*
+     * user_data + user_data_size controlan la forma en que el item
+     * guarda el dato del caller:
+     *   - user_data_size > 0 : deep copy (la lista hace malloc+memcpy y se
+     *                          libera al borrar el item).
+     *   - user_data_size == 0: shallow (se guarda el puntero tal cual; el
+     *                          caller es responsable de mantenerlo vivo
+     *                          mientras exista el item).
+     */
     void *user_data;
     size_t user_data_size;
 } list_item_t;
