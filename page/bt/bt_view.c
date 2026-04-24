@@ -19,7 +19,7 @@ static void handler(ui_list *list, const list_item_t *item, void *user_data)
 lv_obj_t *bt_page_create(lv_obj_t *menu, const zv_config *cfg)
 {
     lv_obj_t *page = lv_menu_page_create(menu, "Bluetooth");
-    lv_obj_set_scrollbar_mode(page, LV_SCROLLBAR_MODE_OFF); 
+    lv_obj_set_scrollbar_mode(page, LV_SCROLLBAR_MODE_OFF);
 
     (void)cfg;
 

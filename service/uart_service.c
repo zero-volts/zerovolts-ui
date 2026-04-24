@@ -13,12 +13,9 @@
 #define TAG_MAX_LEN 32
 static const char *TAG = "UART_SERVICE";
 
-/*
- * Este file descriptor representa la conexión UART abierta.
- * Lo dejamos static para que el servicio sea dueño del puerto y
- * no se pueda modificar accidentalmente desde otros archivos.
- */
+// File descriptor that represent the open connection throught UART
 static int uart_fd = -1;
+
 static char uart_rx_accum[512];
 static size_t uart_rx_len = 0;
 typedef struct {
@@ -30,13 +27,9 @@ static event_t events[MAX_HANDLERS];
 static int events_count = 0;
 
 
-/*
- * termios no usa directamente enteros como 115200 o 9600.
- * Usa constantes del sistema como B115200, B9600, etc.
- * Esta función traduce un baudrate "normal" a la constante correcta.
- */
 static speed_t uart_get_speed(int baudrate)
 {
+    // Parsing baudrate numbers to be used in termios.
     switch (baudrate)
     {
         case 9600:
@@ -54,14 +47,9 @@ static speed_t uart_get_speed(int baudrate)
     }
 }
 
-/*
- * write() no garantiza que escriba todo el buffer en una sola llamada.
- * Por eso hacemos un loop hasta terminar de mandar todos los bytes.
- */
 static uart_status_t uart_write_all(int fd, const char *buffer, size_t len)
 {
     size_t total = 0;
-
     while (total < len)
     {
         ssize_t written = write(fd, buffer + total, len - total);
@@ -93,15 +81,10 @@ uart_status_t uart_service_init(const char *device, int baudrate)
     }
 
     /*
-     * O_RDWR:
-     * abre el dispositivo tanto para lectura como para escritura.
-     *
-     * O_NOCTTY:
-     *  evita que este puerto serie se convierta en la terminal de control
-     *  del proceso. Esto es importante porque no estamos usando un terminal
-     *  interactivo, sino un enlace UART con otro dispositivo.
-     * O_NONBLOCK:
-     *   open() no se bloquea esperando carrier detect
+     * O_RDWR: Open the device to write and read
+     * O_NOCTTY: Avoid that the port converts into terminal. wwe dont want an interactiver terminal 
+     *          we want a UART communiction link
+     * O_NONBLOCK: Non blocking port 
      */
     uart_fd = open(device, O_RDWR | O_NOCTTY | O_NONBLOCK);
     if (uart_fd == -1)
@@ -132,12 +115,8 @@ uart_status_t uart_service_init(const char *device, int baudrate)
         return UART_ERR_INVALID;
     }
 
-    /*
-     * Configura la velocidad de entrada y salida.
-     * Ambas deben coincidir con el firmware del ESP32.
-     */
-    cfsetispeed(&tty, speed);  // velocidad de entrada
-    cfsetospeed(&tty, speed);  // velocidad de salida
+    cfsetispeed(&tty, speed);  // in speed
+    cfsetospeed(&tty, speed);  // out speed
 
     /*
      * c_cflag: control flags

@@ -16,7 +16,7 @@ lv_obj_t *create_square_main_button(lv_obj_t *parent, const char *text, const ch
     lv_obj_set_style_radius(btn, 10, 0);
 
     lv_obj_add_event_cb(btn, cb, LV_EVENT_CLICKED, user_data);
-    
+
     // states
     lv_obj_set_style_bg_color(btn, ZV_COLOR_BG_BUTTON_PRESSED, LV_STATE_PRESSED);
     lv_obj_set_style_border_color(btn, ZV_COLOR_TERMINAL, LV_STATE_FOCUSED);
@@ -50,7 +50,7 @@ void rotate_icon_by_tag(lv_obj_t * btn, int32_t angle)
         {
             // 1. Forzar actualización para tener dimensiones correctas
             lv_obj_update_layout(child);
-            
+
             // 2. Establecer pivote en el centro exacto del icono
             int width = lv_obj_get_width(child);
             int height = lv_obj_get_height(child);
