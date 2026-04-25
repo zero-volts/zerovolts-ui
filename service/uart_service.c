@@ -18,6 +18,9 @@ static int uart_fd = -1;
 
 static char uart_rx_accum[512];
 static size_t uart_rx_len = 0;
+
+// Internal container to keep track of any "service/object" that want to be notify
+// by this service.
 typedef struct {
     char tag[TAG_MAX_LEN];
     uart_event_cb callback;
@@ -25,7 +28,6 @@ typedef struct {
 
 static event_t events[MAX_HANDLERS];
 static int events_count = 0;
-
 
 static speed_t uart_get_speed(int baudrate)
 {
@@ -120,64 +122,64 @@ uart_status_t uart_service_init(const char *device, int baudrate)
 
     /*
      * c_cflag: control flags
-     * Aquí se define el "formato físico" de los frames UART.
+     * Defines the physical format of UART frames.
      */
-    tty.c_cflag &= ~PARENB;   /* PARENB: desactiva paridad. Queda la N de "8N1". */
-    tty.c_cflag &= ~CSTOPB;   /* CSTOPB: usa 1 stop bit en vez de 2. Queda el 1 de "8N1". */
-    tty.c_cflag &= ~CSIZE;    /* CSIZE: limpia la máscara actual de tamaño de palabra. */
-    tty.c_cflag |= CS8;       /* CS8: selecciona 8 bits de datos. Queda el 8 de "8N1". */
-    tty.c_cflag &= ~CRTSCTS;  /* CRTSCTS: desactiva flow control por hardware RTS/CTS. */
-    tty.c_cflag |= CREAD;     /* CREAD: habilita el receptor. Sin esto no lees datos. */
-    tty.c_cflag |= CLOCAL;    /* CLOCAL: ignora señales de control tipo módem. */
+    tty.c_cflag &= ~PARENB;   /* PARENB: disables parity. This is the N in "8N1". */
+    tty.c_cflag &= ~CSTOPB;   /* CSTOPB: uses 1 stop bit instead of 2. This is the 1 in "8N1". */
+    tty.c_cflag &= ~CSIZE;    /* CSIZE: clears the current word-size mask. */
+    tty.c_cflag |= CS8;       /* CS8: selects 8 data bits. This is the 8 in "8N1". */
+    tty.c_cflag &= ~CRTSCTS;  /* CRTSCTS: disables RTS/CTS hardware flow control. */
+    tty.c_cflag |= CREAD;     /* CREAD: enables the receiver. Without this, no data is read. */
+    tty.c_cflag |= CLOCAL;    /* CLOCAL: ignores modem-style control signals. */
 
     /*
      * c_iflag: input flags
-     * Controla cómo se interpretan los bytes que entran.
-     * Para comunicarte con un microcontrolador conviene apagar
-     * transformaciones automáticas y trabajar en modo "raw".
+     * Controls how incoming bytes are interpreted.
+     * For microcontroller communication, disable automatic
+     * transformations and work in raw mode.
      */
-    tty.c_iflag &= ~IXON;     /* IXON: desactiva XON/XOFF recibido para software flow control. */
-    tty.c_iflag &= ~IXOFF;    /* IXOFF: desactiva XON/XOFF transmitido para software flow control. */
-    tty.c_iflag &= ~IXANY;    /* IXANY: evita que cualquier byte reactive una pausa XON/XOFF. */
-    tty.c_iflag &= ~ICRNL;    /* ICRNL: no convierte '\r' en '\n' al recibir. */
-    tty.c_iflag &= ~INLCR;    /* INLCR: no convierte '\n' en '\r' al recibir. */
-    tty.c_iflag &= ~IGNCR;    /* IGNCR: no ignora '\r'; lo recibimos y decidimos nosotros. */
+    tty.c_iflag &= ~IXON;     /* IXON: disables received XON/XOFF software flow control. */
+    tty.c_iflag &= ~IXOFF;    /* IXOFF: disables transmitted XON/XOFF software flow control. */
+    tty.c_iflag &= ~IXANY;    /* IXANY: prevents any byte from resuming an XON/XOFF pause. */
+    tty.c_iflag &= ~ICRNL;    /* ICRNL: does not convert received '\r' into '\n'. */
+    tty.c_iflag &= ~INLCR;    /* INLCR: does not convert received '\n' into '\r'. */
+    tty.c_iflag &= ~IGNCR;    /* IGNCR: does not ignore '\r'; receive it and decide in code. */
 
     /*
      * c_lflag: local flags
-     * Son banderas típicas de terminales humanas. Para UART con un ESP32
-     * no queremos comportamiento de terminal, sino lectura byte a byte.
+     * These are typical flags for human terminals. For UART with an ESP32,
+     * use byte-by-byte reads instead of terminal behavior.
      */
-    tty.c_lflag &= ~ICANON;   /* ICANON: desactiva modo canónico; read() no espera una línea entera. */
-    tty.c_lflag &= ~ECHO;     /* ECHO: no reenvía a pantalla lo que entra. */
-    tty.c_lflag &= ~ECHOE;    /* ECHOE: evita comportamiento de borrado visual. */
-    tty.c_lflag &= ~ISIG;     /* ISIG: evita interpretar Ctrl-C, Ctrl-Z, etc. como señales. */
+    tty.c_lflag &= ~ICANON;   /* ICANON: disables canonical mode; read() does not wait for a full line. */
+    tty.c_lflag &= ~ECHO;     /* ECHO: does not echo incoming data to the screen. */
+    tty.c_lflag &= ~ECHOE;    /* ECHOE: prevents visual erase behavior. */
+    tty.c_lflag &= ~ISIG;     /* ISIG: prevents Ctrl-C, Ctrl-Z, etc. from being interpreted as signals. */
 
     /*
      * c_oflag: output flags
-     * Controla post-procesamiento de lo que sale.
-     * Lo desactivamos para que write() mande exactamente lo pedido.
+     * Controls post-processing of outgoing data.
+     * Disable it so write() sends exactly what was requested.
      */
-    tty.c_oflag &= ~OPOST;    /* OPOST: desactiva procesamiento automático de salida. */
+    tty.c_oflag &= ~OPOST;    /* OPOST: disables automatic output processing. */
 
     /*
      * c_cc: special control characters
      *
      * VMIN = 0:
-     * read() puede devolver inmediatamente si no llegó nada.
+     * read() can return immediately if no data has arrived.
      *
      * VTIME = 0:
-     * no esperamos en termios. La estrategia para la UI será:
-     * "consultar si hay datos" y consumir solo lo disponible.
+     * do not wait in termios. The UI strategy is:
+     * "check whether data exists" and consume only what is available.
      *
-     * Esto evita que el hilo de LVGL quede congelado esperando UART.
+     * This prevents the LVGL thread from freezing while waiting for UART.
      */
     tty.c_cc[VMIN] = 0;
     tty.c_cc[VTIME] = 0;
 
     /*
-     * Limpia buffers de entrada y salida pendientes antes de arrancar.
-     * Así evitas procesar basura vieja si el puerto ya tenía datos.
+     * Clears pending input and output buffers before starting.
+     * This avoids processing stale data if the port already had data.
      */
     if (tcflush(uart_fd, TCIOFLUSH) != 0)
     {
@@ -190,7 +192,7 @@ uart_status_t uart_service_init(const char *device, int baudrate)
 
     /*
      * TCSANOW:
-     * aplica la configuración inmediatamente.
+     * applies the configuration immediately.
      */
     if (tcsetattr(uart_fd, TCSANOW, &tty) != 0)
     {
@@ -203,6 +205,7 @@ uart_status_t uart_service_init(const char *device, int baudrate)
 
     set_last_error(NULL);
     log_info("[UART][service] uart ready dev=%s baud=%d", device, baudrate);
+
     return UART_OK;
 }
 
@@ -221,11 +224,11 @@ uart_status_t uart_send_line(const char *cmd)
     }
 
     /*
-     * Tu firmware en el ESP32 arma comandos hasta encontrar '\n'.
-     * Por eso aquí agregamos el salto de línea al final.
+     * The ESP32 firmware builds commands until it finds '\n'.
+     * That is why a newline is appended at the end here.
      *
-     * Ejemplo:
-     *   "PING"  -> se envía como "PING\n"
+     * Example:
+     *   "PING"  -> sent as "PING\n"
      */
     char frame[256];
     int frame_len = snprintf(frame, sizeof(frame), "%s\n", cmd);
@@ -240,8 +243,8 @@ uart_status_t uart_send_line(const char *cmd)
         return rc;
 
     /*
-     * tcdrain() espera hasta que el sistema termine de transmitir
-     * físicamente los bytes pendientes del buffer de salida.
+     * tcdrain() waits until the system finishes physically transmitting
+     * the pending bytes from the output buffer.
      */
     if (tcdrain(uart_fd) != 0)
     {
@@ -252,6 +255,7 @@ uart_status_t uart_send_line(const char *cmd)
 
     set_last_error(NULL);
     log_debug("[UART][service] sent cmd=%s", cmd);
+
     return UART_OK;
 }
 
@@ -315,10 +319,10 @@ uart_status_t uart_poll_line(char *buffer, size_t buffer_size)
         else
         {
             /*
-             * La línea excede el buffer de acumulación.
-             * Consumimos los bytes restantes hasta '\n' para que la
-             * próxima llamada a uart_poll_line arranque limpia,
-             * sin leer basura de la mitad de esta línea corrupta.
+             * The line exceeds the accumulation buffer.
+             * Consume the remaining bytes up to '\n' so the
+             * next call to uart_poll_line starts clean,
+             * without reading stale data from the middle of this corrupt line.
              */
             uart_rx_len = 0;
             while (1)
@@ -394,5 +398,5 @@ void add_event_callback(uart_event_cb new_cb, const char *tag_id)
 
 void remove_event_callback(const char *tag_id)
 {
-    // TODO: implementarlo!
+    // TODO: implement this
 }

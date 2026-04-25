@@ -39,7 +39,6 @@ static void on_item_delete(lv_event_t *e)
     ui_list_item_ctx_t *ctx = (ui_list_item_ctx_t *)lv_event_get_user_data(e);
     if (ctx)
     {
-        printf("por eliminar: %s\n", ctx->subtitle_buf);
         free(ctx->text_buf);
         free(ctx->subtitle_buf);
         free(ctx->raw_value_buf);
@@ -119,7 +118,7 @@ lv_obj_t *add_item(ui_list *list, const list_item_t *item)
     }
     else
     {
-        // size==0 -> shallow: el caller mantiene vivo el puntero
+        // size==0 -> shallow: the caller keeps the pointer alive
         ctx->item.user_data = item->user_data;
     }
 

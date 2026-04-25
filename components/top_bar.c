@@ -139,7 +139,7 @@ top_bar_t *top_bar_create(lv_obj_t *parent)
         it->timer = lv_timer_create(clock_timer_cb, 1000, it);
         it->temp_timer = lv_timer_create(cpu_temp_timer_cb, 3000, it);
 
-        /* Mostrar hora inmediatamente (sin esperar 1s) */
+        /* Show the time immediately (without waiting 1s) */
         clock_timer_cb(it->timer);
         cpu_temp_timer_cb(it->temp_timer);
         lv_obj_set_user_data(bar->container, it);

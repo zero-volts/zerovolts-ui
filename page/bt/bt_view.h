@@ -1,7 +1,6 @@
 #ifndef BT_VIEW_H
 #define BT_VIEW_H
 
-
 #include "lvgl.h"
 #include "config.h"
 

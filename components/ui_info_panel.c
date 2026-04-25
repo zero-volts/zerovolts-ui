@@ -44,7 +44,7 @@ void add_info_panel_item(ui_info_panel *panel, kv_item_t item)
     lv_obj_set_size(item_container, LV_PCT(100), 40);
     lv_obj_set_style_bg_opa(item_container, LV_OPA_TRANSP, 0);
 
-    // el nuevo último item parte sin borde
+    // The new last item starts without a border
     lv_obj_set_style_border_width(item_container, 0, 0);
     lv_obj_set_style_border_side(item_container, LV_BORDER_SIDE_BOTTOM, 0);
 

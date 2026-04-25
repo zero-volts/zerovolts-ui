@@ -9,7 +9,7 @@
  * IR raw helpers used by ir_controller_learn_button().
  *
  * Source of truth for this logic:
- * - README section "IR: cómo se guardan y se envían señales" (raw capture/send)
+ * - README IR raw capture/send section
  *
  * - `man ir-ctl` and `ir-ctl --help` (capture/send behavior and raw mode usage)
  * - LIRC raw timing conventions (+pulse / -space sequences)

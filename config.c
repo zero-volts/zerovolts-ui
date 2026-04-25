@@ -114,7 +114,7 @@ static cJSON *cfg_to_json(void)
 
 static void json_to_cfg(cJSON *root)
 {
-    // Partimos con defaults para compatibilidad hacia atrás
+    // Start with defaults for backward compatibility
     config_set_defaults();
 
     json_get_string(root, "version", _config.version, _config.version, sizeof(_config.version));

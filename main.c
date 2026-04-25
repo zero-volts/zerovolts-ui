@@ -31,8 +31,8 @@
 #include "utils/logger.h"
 
 
-#define NAV_GPIO    21  // 40 pin fisico (mueve foco)
-#define SELECT_GPIO 26  // 37 pin fisico (enter/seleccion)
+#define NAV_GPIO    21  // Physical pin 40 (moves focus)
+#define SELECT_GPIO 26  // Physical pin 37 (enter/select)
 
 /* ================= TOUCH ================= */
 
@@ -276,7 +276,7 @@ int main(void)
     snprintf(version, sizeof(version), "v%s", config->version);
     top_bar_set_title(top_bar, version);
 
-    /* -------- MENU (full restante) -------- */
+    /* -------- MENU (remaining space) -------- */
     lv_obj_t *menu = lv_menu_create(scr);
     zv_menu_header_style(menu);
     lv_obj_set_size(menu, LV_PCT(100), LV_PCT(100));

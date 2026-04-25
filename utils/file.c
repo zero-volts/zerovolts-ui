@@ -230,7 +230,7 @@ int get_executable_dir(char *out, size_t out_size)
     strncpy(tmp, exe_path, sizeof(tmp));
     tmp[sizeof(tmp) - 1] = '\0';
 
-    char *dir = dirname(tmp);  // dirname puede modificar el buffer
+    char *dir = dirname(tmp);  // dirname can modify the buffer
     if (!dir) 
         return -2;
 

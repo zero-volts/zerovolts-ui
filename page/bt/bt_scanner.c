@@ -123,7 +123,7 @@ static void on_filter_change(ui_pills *pills, int index, const char *label, void
     (void)pills;
     (void)label;
     (void)user_data;
-    // TODO: aplicar filtro sobre scanner_list según index
+    // TODO: apply a filter over scanner_list based on index
     switch(index)
     {
         case 0:

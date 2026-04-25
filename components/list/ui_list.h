@@ -33,13 +33,12 @@ typedef struct {
     const char *raw_value;
 
     /*
-     * user_data + user_data_size controlan la forma en que el item
-     * guarda el dato del caller:
-     *   - user_data_size > 0 : deep copy (la lista hace malloc+memcpy y se
-     *                          libera al borrar el item).
-     *   - user_data_size == 0: shallow (se guarda el puntero tal cual; el
-     *                          caller es responsable de mantenerlo vivo
-     *                          mientras exista el item).
+     * user_data + user_data_size control how the item stores caller data:
+     *   - user_data_size > 0 : deep copy (the list uses malloc+memcpy and
+     *                          releases it when deleting the item).
+     *   - user_data_size == 0: shallow (stores the pointer as-is; the
+     *                          caller is responsible for keeping it alive
+     *                          while the item exists).
      */
     void *user_data;
     size_t user_data_size;

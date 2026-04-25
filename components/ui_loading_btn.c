@@ -16,7 +16,7 @@ ui_loading_button *create_loading_btn(lv_obj_t *parent, int width, int height, c
         return NULL;
     }
 
-    // Botón principal
+    // Main button
     comp->btn = lv_btn_create(parent);
     lv_obj_set_size(comp->btn, width, height);
 
@@ -28,13 +28,13 @@ ui_loading_button *create_loading_btn(lv_obj_t *parent, int width, int height, c
         LV_FLEX_ALIGN_CENTER
     );
 
-    // Spinner (oculto por defecto)
+    // Spinner (hidden by default)
     comp->spinner = lv_spinner_create(comp->btn);
     lv_spinner_set_anim_params(comp->spinner, 1000, 60);
     lv_obj_set_size(comp->spinner, 16, 16);
     lv_obj_add_flag(comp->spinner, LV_OBJ_FLAG_HIDDEN);
 
-    // Texto
+    // Text
     comp->label = lv_label_create(comp->btn);
     lv_label_set_text(comp->label, text);
 
