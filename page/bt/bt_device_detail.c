@@ -2,6 +2,7 @@
 #include "bt_controller.h"
 #include "components/ui_info_panel.h"
 #include "components/ui_theme.h"
+#include "app_context.h"
 
 #include <stdio.h>
 
@@ -57,7 +58,7 @@ void bt_device_detail_refresh(void)
 
     clear_info_panel(device_info);
 
-    const device_t *device = selected_device(bt_controller_ctx());
+    const device_t *device = bt_context_get_selected();
     if (device == NULL)
         return;
 

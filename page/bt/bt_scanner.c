@@ -6,6 +6,7 @@
 #include "bt_device_detail.h"
 #include "bt_controller.h"
 #include "components/nav.h"
+#include "app_context.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -28,7 +29,7 @@ static void handler(ui_list *list, const list_item_t *item, void *user_data)
 {
     (void)list;
 
-    bt_controller_select((const device_t *)item->user_data);
+    bt_context_set_selected((device_t *)item->user_data);
 
     nav_ctx_t *ctx = (nav_ctx_t *)user_data;
     if (!ctx || !ctx->menu || !ctx->page)
@@ -80,7 +81,7 @@ static void handler_devices(const char *event, device_t *device)
         snprintf(device_text, sizeof(device_text), "Devices: %d", item_count);
         lv_label_set_text(lb_devices_amount, device_text);
 
-        bt_controller_ctx_add_device(device);
+        bt_context_add_device(device);
     }
 }
 
@@ -89,9 +90,10 @@ static void handler_scan_btn(lv_event_t *e)
     (void)e;
     loading_button_set_loading(scann_btn, true);
     clean_list(scanner_list);
-    bt_controller_clean_ctx();
+    
     if (lb_devices_amount)
         lv_label_set_text(lb_devices_amount, "Devices: 0");
+
     start_scan();
 }
 
@@ -123,7 +125,7 @@ static void on_filter_change(ui_pills *pills, int index, const char *label, void
     (void)pills;
     (void)label;
     (void)user_data;
-    // TODO: apply a filter over scanner_list based on index
+    
     switch(index)
     {
         case 0:
@@ -140,12 +142,12 @@ static void on_filter_change(ui_pills *pills, int index, const char *label, void
             break;
     }
 
-    device_t **devices = bt_get_devices();
+    int devices_length = bt_get_visible_devices_length();
+    device_t *devices = bt_get_visible_devices();
     clean_list(scanner_list);
-    for (int i = 0; i < devices_length(); i++)
+    for (int i = 0; i < devices_length; i++)
     {
-        
-        device_t *device = (device_t *)devices[i];
+        device_t *device = &devices[i];
         char rssi_buffer[16];
         snprintf(rssi_buffer, sizeof(rssi_buffer), "%d", device->rssi);
         list_item_t item = {
@@ -187,7 +189,6 @@ lv_obj_t *bt_scanner_page_create(lv_obj_t *menu)
     lv_obj_t *page = lv_menu_page_create(menu, "BLE Scanner");
 
     set_scanner_cb(handler_devices);
-    bt_controller_clean_ctx();
 
     lv_obj_t *root = lv_obj_create(page);
     lv_obj_set_size(root, LV_PCT(100), LV_PCT(100));

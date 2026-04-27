@@ -8,6 +8,7 @@ EXAMPLE_TARGETS := $(patsubst examples/main_%.c,bin/example-%,$(EXAMPLE_SRCS))
 SRC := \
 	main.c \
 	config.c \
+	app_context.c \
 	utils/error_handler.c \
 	utils/logger.c \
 	components/top_bar.c \
