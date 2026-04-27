@@ -16,9 +16,9 @@ typedef struct {
 } list_items_ctx;
 
 static list_items_ctx local_ctx;
-static bt_event_cb internal_cb = NULL;
+static scanner_handler internal_cb = NULL;
 
-void set_scanner_cb(bt_event_cb new_callback)
+void set_scanner_cb(scanner_handler new_callback)
 {
     internal_cb = new_callback;
 }
@@ -74,13 +74,13 @@ static void event_handler(const char *tag_id, char *buffer)
 
     if (strstr(buffer, BT_COMMAND_RES_SCANN_START) != NULL)
     {
-        internal_cb(BT_COMMAND_RES_SCANN_START, NULL);
+        internal_cb(NULL, UI_LOADING);
         return;
     }
 
     if (strstr(buffer, BT_COMMAND_RES_SCANN_DONE) != NULL)
     {
-        internal_cb(BT_COMMAND_RES_SCANN_DONE, NULL);
+        internal_cb(NULL, UI_DONE);
         return;
     }
 
@@ -90,7 +90,10 @@ static void event_handler(const char *tag_id, char *buffer)
 
     device_t device = parse_device(buffer);
     if (internal_cb != NULL)
-        internal_cb(BT_COMMAND_RES_SCANN_UPDATE, &device);
+    {
+        internal_cb(&device, UI_LOADING);
+        bt_context_add_device(&device);
+    }
 }
 
 uart_status_t bt_controller_init()

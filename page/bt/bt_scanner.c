@@ -40,49 +40,58 @@ static void handler(ui_list *list, const list_item_t *item, void *user_data)
     zv_nav_update_group(ctx->menu, ctx->page);
 }
 
-static void handler_devices(const char *event, device_t *device)
+static list_item_t create_list_item(device_t *device, char *rssi_buffer, size_t rssi_buffer_size)
+{
+    snprintf(rssi_buffer, rssi_buffer_size, "%d", device->rssi);
+
+    list_item_t item = {
+        .text = device->name,
+        .subtitle = device->mac,
+        .left_badge = {
+            .type = BAGE_IMG_TYPE,
+            .icon = {
+                .path = "/home/zerovolts/git/zerovolts-ui/data/assets/tower.png",
+                .size = { .width = 30, .height = 30 }
+            }
+        },
+        .right_badge = {
+            .label = rssi_buffer,
+            .type = BAGE_TEXT_TYPE,
+            .text_color = rssi_color(device->rssi),
+            .has_text_color = true,
+        },
+        .user_data = device,
+        .user_data_size = sizeof(device_t)
+    };
+
+    return item;
+}
+
+static void handler_devices(device_t *device, ui_status_t status)
 {
     if (scanner_list == NULL)
         return;
 
-    if (strstr(event, "SCAN:DONE") != NULL)
-        loading_button_set_loading(scann_btn, false);
-
-    if (strstr(event, "SCAN:UPDATE") != NULL)
-    {
-        char rssi_buffer[16];
-        snprintf(rssi_buffer, sizeof(rssi_buffer), "%d", device->rssi);
-
-        list_item_t item = {
-            .text = device->name,
-            .subtitle = device->mac,
-            .left_badge = {
-                .type = BAGE_IMG_TYPE,
-                .icon = {
-                    .path = "/home/zerovolts/git/zerovolts-ui/data/assets/tower.png",
-                    .size = { .width = 30, .height = 30 }
-                }
-            },
-            .right_badge = {
-                .label = rssi_buffer,
-                .type = BAGE_TEXT_TYPE,
-                .text_color = rssi_color(device->rssi),
-                .has_text_color = true,
-            },
-            .user_data = device,
-            .user_data_size = sizeof(device_t)
-        };
-
-        add_item(scanner_list, &item);
-
-        int item_count = item_length(scanner_list);
-
-        char device_text[24];
-        snprintf(device_text, sizeof(device_text), "Devices: %d", item_count);
-        lv_label_set_text(lb_devices_amount, device_text);
-
-        bt_context_add_device(device);
+    if (status == UI_LOADING) {
+        loading_button_set_loading(scann_btn, true);
     }
+
+    if (status == UI_DONE) {
+        loading_button_set_loading(scann_btn, false);
+        return;
+    }
+
+    if (device == NULL)
+        return;
+
+    char rssi_buffer[16];
+    list_item_t item = create_list_item(device, rssi_buffer, sizeof(rssi_buffer));
+    add_item(scanner_list, &item);
+
+    char device_text[24];
+    int item_count = item_length(scanner_list);
+    snprintf(device_text, sizeof(device_text), "Devices: %d", item_count);
+    lv_label_set_text(lb_devices_amount, device_text);
 }
 
 static void handler_scan_btn(lv_event_t *e)
@@ -145,33 +154,19 @@ static void on_filter_change(ui_pills *pills, int index, const char *label, void
     int devices_length = bt_get_visible_devices_length();
     device_t *devices = bt_get_visible_devices();
     clean_list(scanner_list);
+
     for (int i = 0; i < devices_length; i++)
     {
         device_t *device = &devices[i];
-        char rssi_buffer[16];
-        snprintf(rssi_buffer, sizeof(rssi_buffer), "%d", device->rssi);
-        list_item_t item = {
-            .text = device->name,
-            .subtitle = device->mac,
-            .left_badge = {
-                .type = BAGE_IMG_TYPE,
-                .icon = {
-                    .path = "/home/zerovolts/git/zerovolts-ui/data/assets/tower.png",
-                    .size = { .width = 30, .height = 30 }
-                }
-            },
-            .right_badge = {
-                .label = rssi_buffer,
-                .type = BAGE_TEXT_TYPE,
-                .text_color = rssi_color(device->rssi),
-                .has_text_color = true,
-            },
-            .user_data = device,
-            .user_data_size = sizeof(device_t)
-        };
 
+        char rssi_buffer[16];
+        list_item_t item = create_list_item(device, rssi_buffer, sizeof(rssi_buffer));
         add_item(scanner_list, &item);
     }
+
+    char device_text[24];
+    snprintf(device_text, sizeof(device_text), "Devices: %d", item_length(scanner_list));
+    lv_label_set_text(lb_devices_amount, device_text);
 }
 
 static void create_filter_panel(lv_obj_t *parent)

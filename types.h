@@ -17,6 +17,12 @@ typedef struct {
     int connectable;
 } device_t;
 
+typedef enum {
+    UI_IDLE = 0,
+    UI_LOADING,
+    UI_DONE
+} ui_status_t;
+
 #ifdef __cplusplus
 }
 #endif

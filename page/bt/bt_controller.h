@@ -9,11 +9,11 @@ extern "C" {
 #endif
 
 typedef struct bt_context_t bt_context_t;
-typedef void (*bt_event_cb)(const char *event, device_t *device);
+typedef void (*scanner_handler)(device_t *device, ui_status_t status);
 
 uart_status_t bt_controller_init(); // TODO: check whether we need more data
 uart_status_t start_scan();
-void set_scanner_cb(bt_event_cb new_callback);
+void set_scanner_cb(scanner_handler new_callback);
 
 void bt_reset_visible_devices(void);
 void bt_apply_connectable_filter(void);
