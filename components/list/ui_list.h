@@ -11,9 +11,9 @@ extern "C" {
 #endif
 
 typedef enum {
-    BAGE_NONE = 0,
-    BAGE_IMG_TYPE,
-    BAGE_TEXT_TYPE
+    BADGE_NONE = 0,
+    BADGE_IMG_TYPE,
+    BADGE_TEXT_TYPE
 } bage_type;
 
 typedef struct {

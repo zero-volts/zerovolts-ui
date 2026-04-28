@@ -11,6 +11,7 @@ typedef struct ui_pills ui_pills;
 typedef void (*ui_pills_event_cb_t)(ui_pills *pills, int index, const char *label, void *user_data);
 
 ui_pills *create_pills(lv_obj_t *parent);
+ui_pills *create_pills_sized(lv_obj_t *parent, int container_width, int pill_height);
 void pills_add(ui_pills *pills, const char *label);
 void pills_set_active(ui_pills *pills, int index);
 int pills_get_active(const ui_pills *pills);

@@ -152,23 +152,23 @@ lv_obj_t *add_item(ui_list *list, const list_item_t *item)
     lv_obj_set_style_pad_bottom(content, 0, 0);
     lv_obj_set_style_pad_column(content, 8, 0);
 
-    if(item->left_badge.type == BAGE_IMG_TYPE)
+    if(item->left_badge.type == BADGE_IMG_TYPE)
     {
-        obj_icon_t bagde_icon = item->left_badge.icon;
-        if (bagde_icon.path != NULL && bagde_icon.path[0] != '\0')
+        obj_icon_t badge_icon = item->left_badge.icon;
+        if (badge_icon.path != NULL && badge_icon.path[0] != '\0')
         {
             lv_obj_t *icon = lv_img_create(content);
             lv_obj_clear_flag(icon, LV_OBJ_FLAG_CLICKABLE);
-            lv_obj_set_size(icon, bagde_icon.size.width, bagde_icon.size.height);
+            lv_obj_set_size(icon, badge_icon.size.width, badge_icon.size.height);
 
             char lv_path[1024];
-            snprintf(lv_path, sizeof(lv_path), "A:%s", bagde_icon.path);
+            snprintf(lv_path, sizeof(lv_path), "A:%s", badge_icon.path);
 
             lv_img_set_src(icon, lv_path);
             lv_image_set_scale(icon, LV_SCALE_NONE * 0.3);
         }
     }
-    else if (item->left_badge.type == BAGE_TEXT_TYPE &&
+    else if (item->left_badge.type == BADGE_TEXT_TYPE &&
              item->left_badge.label != NULL && item->left_badge.label[0] != '\0')
     {
         lv_obj_t *icon = lv_label_create(content);
@@ -212,7 +212,7 @@ lv_obj_t *add_item(ui_list *list, const list_item_t *item)
         lv_obj_set_style_text_font(lb_subtitle, &lv_font_montserrat_10, 0);
     }
 
-     if (item->right_badge.type == BAGE_IMG_TYPE)
+     if (item->right_badge.type == BADGE_IMG_TYPE)
     {
         obj_icon_t right_icon = item->right_badge.icon;
         if (right_icon.path != NULL && right_icon.path[0] != '\0')
@@ -228,7 +228,7 @@ lv_obj_t *add_item(ui_list *list, const list_item_t *item)
             lv_image_set_scale(icon, LV_SCALE_NONE * 0.3);
         }
     }
-    else if(item->right_badge.type == BAGE_TEXT_TYPE)
+    else if(item->right_badge.type == BADGE_TEXT_TYPE)
     {
         lv_obj_t *text = lv_label_create(content);
         lv_obj_clear_flag(text, LV_OBJ_FLAG_CLICKABLE);

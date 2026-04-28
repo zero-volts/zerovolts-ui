@@ -10,6 +10,7 @@ struct ui_pills {
     lv_obj_t *container;
     lv_obj_t *buttons[MAX_PILLS];
     char *labels[MAX_PILLS];
+    int pill_height;
     int count;
     int active;
     ui_pills_event_cb_t cb;
@@ -56,17 +57,18 @@ static void on_pill_delete(lv_event_t *e)
     free(ctx);
 }
 
-ui_pills *create_pills(lv_obj_t *parent)
+ui_pills *create_pills_sized(lv_obj_t *parent, int container_width, int pill_height)
 {
     ui_pills *p = (ui_pills *)calloc(1, sizeof(ui_pills));
     if (!p)
         return NULL;
 
     p->active = -1;
+    p->pill_height = pill_height;
 
     p->container = lv_obj_create(parent);
     lv_obj_remove_style_all(p->container);
-    lv_obj_set_size(p->container, LV_PCT(100), LV_SIZE_CONTENT);
+    lv_obj_set_size(p->container, container_width, LV_SIZE_CONTENT);
     lv_obj_set_layout(p->container, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(p->container, LV_FLEX_FLOW_ROW_WRAP);
     lv_obj_set_style_pad_column(p->container, 4, 0);
@@ -74,6 +76,11 @@ ui_pills *create_pills(lv_obj_t *parent)
     lv_obj_clear_flag(p->container, LV_OBJ_FLAG_SCROLLABLE);
 
     return p;
+}
+
+ui_pills *create_pills(lv_obj_t *parent)
+{
+    return create_pills_sized(parent, LV_PCT(100), 40);
 }
 
 void pills_add(ui_pills *pills, const char *label)
@@ -84,7 +91,7 @@ void pills_add(ui_pills *pills, const char *label)
     int idx = pills->count;
 
     lv_obj_t *btn = lv_btn_create(pills->container);
-    lv_obj_set_size(btn, LV_SIZE_CONTENT, 40);
+    lv_obj_set_size(btn, LV_SIZE_CONTENT, pills->pill_height);
     lv_obj_set_style_radius(btn, 16, 0);
     lv_obj_set_style_border_width(btn, 2, 0);
     lv_obj_set_style_pad_left(btn, 12, 0);
@@ -102,11 +109,14 @@ void pills_add(ui_pills *pills, const char *label)
         lv_obj_del(btn);
         return;
     }
+
     ctx->pills = pills;
     ctx->index = idx;
 
-    lv_obj_add_event_cb(btn, on_pill_click, LV_EVENT_CLICKED, ctx);
-    lv_obj_add_event_cb(btn, on_pill_delete, LV_EVENT_DELETE, ctx);
+    if (pills->cb){
+        lv_obj_add_event_cb(btn, on_pill_click, LV_EVENT_CLICKED, ctx);
+        lv_obj_add_event_cb(btn, on_pill_delete, LV_EVENT_DELETE, ctx);
+    }
 
     pills->buttons[idx] = btn;
     pills->labels[idx] = strdup(label);
@@ -147,8 +157,10 @@ void pills_clear(ui_pills *pills)
 
     lv_obj_clean(pills->container);
 
-    for (int i = 0; i < pills->count; i++) {
+    for (int i = 0; i < pills->count; i++)
+    {
         free(pills->labels[i]);
+
         pills->labels[i] = NULL;
         pills->buttons[i] = NULL;
     }
