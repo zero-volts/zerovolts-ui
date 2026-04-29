@@ -5,7 +5,7 @@ extern "C" {
 #endif
 
 #define UNKNOWN_NAME "Unknown"
-#define BT_ALLOWD_MAX_DEVICES 20
+#define BT_ALLOWED_MAX_DEVICES 20
 #define BT_MAX_SERVICES 20
 #define BT_MAX_CHARS_PER_SERVICE 16
 #define BT_UUID_STR_LEN 37

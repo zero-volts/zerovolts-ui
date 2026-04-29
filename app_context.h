@@ -18,7 +18,7 @@ app_context_t *app_context_get();
 void bt_context_add_device(device_t *device);
 void bt_context_clear_devices(void);
 device_t *bt_context_get_devices(void);
-void bt_context_set_selected(device_t *device);
+void bt_context_set_selected(const device_t *device);
 const device_t *bt_context_get_selected(void);
 int bt_context_devices_length(void);
 

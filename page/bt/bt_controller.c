@@ -12,7 +12,7 @@
 #define UART_BT_TAG_ID "BT_TAG_CONTROLLER"
 
 typedef struct {
-    device_t devices[BT_ALLOWD_MAX_DEVICES];
+    device_t devices[BT_ALLOWED_MAX_DEVICES];
     int amount;
 } list_items_ctx;
 
@@ -222,15 +222,15 @@ static void event_handler(const char *tag_id, char *buffer)
     // -- SCAN --
     if (internal_cb != NULL)
     {
-        if (strstr(buffer, BT_COMMAND_RES_SCANN_START) != NULL) {
+        if (strstr(buffer, BT_COMMAND_RES_SCAN_START) != NULL) {
             internal_cb(NULL, UI_LOADING);
             return;
         }
-        if (strstr(buffer, BT_COMMAND_RES_SCANN_DONE) != NULL) {
+        if (strstr(buffer, BT_COMMAND_RES_SCAN_DONE) != NULL) {
             internal_cb(NULL, UI_DONE);
             return;
         }
-        if (strstr(buffer, BT_COMMAND_RES_SCANN_DEVICE) != NULL) {
+        if (strstr(buffer, BT_COMMAND_RES_SCAN_DEVICE) != NULL) {
             device_t device = parse_device(buffer);
             internal_cb(&device, UI_LOADING);
             bt_context_add_device(&device);
@@ -359,6 +359,21 @@ uart_status_t bt_disconnect(void)
 }
 
 // ---- bluetooth app context functions ---- ///
+void bt_controller_select_device(const device_t *device)
+{
+    bt_context_set_selected(device);
+}
+
+const device_t *bt_controller_get_selected(void)
+{
+    return bt_context_get_selected();
+}
+
+void bt_controller_reset_devices(void)
+{
+    bt_context_clear_devices();
+}
+
 void bt_reset_visible_devices(void)
 {
     local_ctx.amount = 0;

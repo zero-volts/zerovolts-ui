@@ -14,11 +14,11 @@ typedef enum {
     BADGE_NONE = 0,
     BADGE_IMG_TYPE,
     BADGE_TEXT_TYPE
-} bage_type;
+} badge_type;
 
 typedef struct {
     const char *label;
-    bage_type type;
+    badge_type type;
     obj_icon_t icon;
     lv_color_t text_color;
     bool has_text_color;

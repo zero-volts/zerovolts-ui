@@ -4,7 +4,6 @@
 #include "components/ui_loading_btn.h"
 #include "components/ui_pills.h"
 #include "components/ui_theme.h"
-#include "app_context.h"
 #include "bt_uuid_registry.h"
 
 #include <ctype.h>
@@ -157,7 +156,7 @@ static void on_connect_click(lv_event_t *e)
         return;
     }
 
-    const device_t *dev = bt_context_get_selected();
+    const device_t *dev = bt_controller_get_selected();
     if (!dev) {
         if (own_ctx.status_label) lv_label_set_text(own_ctx.status_label, "No device selected");
         return;
@@ -280,7 +279,7 @@ void bt_device_detail_refresh(void)
 
     clear_info_panel(own_ctx.device_info);
 
-    const device_t *device = bt_context_get_selected();
+    const device_t *device = bt_controller_get_selected();
     if (device == NULL)
         return;
 

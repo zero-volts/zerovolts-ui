@@ -6,17 +6,18 @@
 #include "bt_device_detail.h"
 #include "bt_controller.h"
 #include "components/nav.h"
-#include "app_context.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 static ui_list *scanner_list = NULL;
-static ui_loading_button *scann_btn = NULL;
+static ui_loading_button *scan_btn = NULL;
 static lv_obj_t *lb_devices_amount = NULL;
 static lv_obj_t *device_detail_page = NULL;
 static ui_pills *filter_pills = NULL;
+
+static void on_filter_change(ui_pills *pills, int index, const char *label, void *user_data);
 
 static lv_color_t rssi_color(int rssi)
 {
@@ -29,7 +30,7 @@ static void handler(ui_list *list, const list_item_t *item, void *user_data)
 {
     (void)list;
 
-    bt_context_set_selected((device_t *)item->user_data);
+    bt_controller_select_device((const device_t *)item->user_data);
 
     nav_ctx_t *ctx = (nav_ctx_t *)user_data;
     if (!ctx || !ctx->menu || !ctx->page)
@@ -73,15 +74,22 @@ static void handler_devices(device_t *device, ui_status_t status)
         return;
 
     if (status == UI_LOADING) {
-        loading_button_set_loading(scann_btn, true);
+        loading_button_set_loading(scan_btn, true);
     }
 
     if (status == UI_DONE) {
-        loading_button_set_loading(scann_btn, false);
+        loading_button_set_loading(scan_btn, false);
+        // Reapply current filter so Near re-sorts and any drift gets corrected.
+        on_filter_change(NULL, pills_get_active(filter_pills), NULL, NULL);
         return;
     }
 
     if (device == NULL)
+        return;
+
+    // Respect Connectable filter during live scan; Near sorts on UI_DONE.
+    int active = pills_get_active(filter_pills);
+    if (active == 2 && !device->connectable)
         return;
 
     char rssi_buffer[16];
@@ -97,9 +105,9 @@ static void handler_devices(device_t *device, ui_status_t status)
 static void handler_scan_btn(lv_event_t *e)
 {
     (void)e;
-    loading_button_set_loading(scann_btn, true);
+    loading_button_set_loading(scan_btn, true);
     clean_list(scanner_list);
-    bt_context_clear_devices();
+    bt_controller_reset_devices();
 
     if (lb_devices_amount)
         lv_label_set_text(lb_devices_amount, "Devices: 0");
@@ -107,27 +115,27 @@ static void handler_scan_btn(lv_event_t *e)
     start_scan();
 }
 
-static void create_scaner_panel(lv_obj_t *parent)
+static void create_scanner_panel(lv_obj_t *parent)
 {
-    lv_obj_t *scann_btn_container = lv_obj_create(parent);
-    lv_obj_set_size(scann_btn_container, LV_PCT(100), 50);
-    lv_obj_set_style_bg_opa(scann_btn_container, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(scann_btn_container, 0, 0);
-    lv_obj_clear_flag(scann_btn_container, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_layout(scann_btn_container, LV_LAYOUT_FLEX);
-    lv_obj_set_flex_flow(scann_btn_container, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(scann_btn_container,
+    lv_obj_t *scan_btn_container = lv_obj_create(parent);
+    lv_obj_set_size(scan_btn_container, LV_PCT(100), 50);
+    lv_obj_set_style_bg_opa(scan_btn_container, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(scan_btn_container, 0, 0);
+    lv_obj_clear_flag(scan_btn_container, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_layout(scan_btn_container, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(scan_btn_container, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(scan_btn_container,
         LV_FLEX_ALIGN_SPACE_BETWEEN,
         LV_FLEX_ALIGN_CENTER,
         LV_FLEX_ALIGN_CENTER
     );
 
-    lb_devices_amount = lv_label_create(scann_btn_container);
+    lb_devices_amount = lv_label_create(scan_btn_container);
     lv_label_set_text(lb_devices_amount, "Devices: 0");
     lv_obj_set_style_text_color(lb_devices_amount, ZV_COLOR_TERMINAL, 0);
 
-    scann_btn = create_loading_btn(scann_btn_container, 77, 40, "Scan");
-    loading_set_event_cb(scann_btn, handler_scan_btn, NULL);
+    scan_btn = create_loading_btn(scan_btn_container, 77, 40, "Scan");
+    loading_set_event_cb(scan_btn, handler_scan_btn, NULL);
 }
 
 static void on_filter_change(ui_pills *pills, int index, const char *label, void *user_data)
@@ -197,7 +205,7 @@ lv_obj_t *bt_scanner_page_create(lv_obj_t *menu)
     lv_obj_set_layout(root, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(root, LV_FLEX_FLOW_COLUMN);
 
-    create_scaner_panel(root);
+    create_scanner_panel(root);
     create_filter_panel(root);
 
     device_detail_page = bt_device_detail_page_create(menu);

@@ -4,7 +4,7 @@
 #include <string.h>
 
 struct bt_context_t {
-    device_t devices[BT_ALLOWD_MAX_DEVICES];
+    device_t devices[BT_ALLOWED_MAX_DEVICES];
     int current_device_amount;
     device_t selected;
 };
@@ -52,7 +52,7 @@ const device_t *bt_context_get_selected(void)
     return &ctx.bt->selected;
 }
 
-void bt_context_set_selected(device_t *device)
+void bt_context_set_selected(const device_t *device)
 {
     if (device == NULL)
     {
@@ -99,9 +99,9 @@ void bt_context_add_device(device_t *device)
         return;
     }
 
-    if (bt->current_device_amount >= BT_ALLOWD_MAX_DEVICES)
+    if (bt->current_device_amount >= BT_ALLOWED_MAX_DEVICES)
     {
-        log_info("Can't save more devices, is in the limit of %d", BT_ALLOWD_MAX_DEVICES);
+        log_info("Can't save more devices, is in the limit of %d", BT_ALLOWED_MAX_DEVICES);
         return;
     }
 

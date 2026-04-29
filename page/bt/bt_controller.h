@@ -17,6 +17,10 @@ uart_status_t bt_controller_init(const uart_config_t *config);
 uart_status_t start_scan();
 void set_scanner_cb(scanner_handler new_callback);
 
+void bt_controller_select_device(const device_t *device);
+const device_t *bt_controller_get_selected(void);
+void bt_controller_reset_devices(void);
+
 void bt_reset_visible_devices(void);
 void bt_apply_connectable_filter(void);
 int bt_compare_device_ptrs_by_rssi_desc(const void *a, const void *b);

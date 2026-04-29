@@ -274,7 +274,7 @@ int main(void)
     }
 
     /* -------- TOP BAR -------- */
-    
+
     top_bar_t *top_bar = top_bar_create(scr);
 
     char version[24];
