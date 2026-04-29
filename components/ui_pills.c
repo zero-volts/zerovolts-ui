@@ -113,10 +113,8 @@ void pills_add(ui_pills *pills, const char *label)
     ctx->pills = pills;
     ctx->index = idx;
 
-    if (pills->cb){
-        lv_obj_add_event_cb(btn, on_pill_click, LV_EVENT_CLICKED, ctx);
-        lv_obj_add_event_cb(btn, on_pill_delete, LV_EVENT_DELETE, ctx);
-    }
+    lv_obj_add_event_cb(btn, on_pill_click, LV_EVENT_CLICKED, ctx);
+    lv_obj_add_event_cb(btn, on_pill_delete, LV_EVENT_DELETE, ctx);
 
     pills->buttons[idx] = btn;
     pills->labels[idx] = strdup(label);

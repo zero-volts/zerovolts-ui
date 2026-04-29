@@ -11,6 +11,7 @@ extern "C" {
 bool zv_is_valid_name_char(char c);
 bool zv_sanitize_name(const char *src, char *dst, size_t dst_sz);
 bool zv_has_whitespace(const char *src);
+bool zv_starts_with(const char *str, const char *prefix);
 void zv_trim_inplace(char *s);
 int zv_is_empty(const char *str);
 int duplicate_string(const char *src, char **dst); //replacement of strdup

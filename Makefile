@@ -29,6 +29,7 @@ SRC := \
 	page/ir/new_remote.c \
 	page/ir/remotes.c \
 	page/ir/send_signal.c \
+	page/bt/bt_uuid_registry.c \
 	page/bt/bt_controller.c \
 	page/bt/bt_view.c \
 	page/bt/bt_device_detail.c \

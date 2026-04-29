@@ -19,9 +19,9 @@ typedef void (*uart_event_cb)(const char *tag_id, char *buffer);
 
 uart_status_t uart_service_init(const char *device, int baudrate);
 uart_status_t uart_send_line(const char *cmd);
+uart_status_t uart_send_formatted_line(const char *message, ...);
 uart_status_t uart_poll_line(char *buffer, size_t buffer_size);
 void add_event_callback(uart_event_cb new_cb, const char *tag_id);
-void remove_event_callback(const char *tag_id);
 void uart_process_loop();
 void uart_service_close(void);
 

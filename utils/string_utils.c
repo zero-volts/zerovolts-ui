@@ -46,6 +46,14 @@ bool zv_has_whitespace(const char *src)
     return false;
 }
 
+bool zv_starts_with(const char *str, const char *prefix)
+{
+    if (!str || !prefix)
+        return false;
+
+    return strncmp(str, prefix, strlen(prefix)) == 0;
+}
+
 void zv_trim_inplace(char *s)
 {
     size_t start = 0;

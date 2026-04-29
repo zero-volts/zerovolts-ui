@@ -262,7 +262,12 @@ int main(void)
         return -1;
     }
 
-    if (bt_controller_init() != UART_OK )
+    uart_config_t uart_cfg;
+    memset(&uart_cfg, 0, sizeof(uart_cfg));
+    snprintf(uart_cfg.device, sizeof(uart_cfg.device), "%s", config->uart.device);
+    uart_cfg.baudrate = config->uart.baudrate;
+
+    if (bt_controller_init(&uart_cfg) != UART_OK )
     {
         log_error("Bluetooth init failed\n");
         return -1;

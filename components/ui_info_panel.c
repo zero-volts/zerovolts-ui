@@ -50,7 +50,7 @@ static lv_obj_t *create_info_panel_row_base(ui_info_panel *panel, const char *la
     lv_obj_t *key = lv_label_create(row);
     lv_label_set_text(key, label ? label : "");
     lv_obj_set_style_text_color(key, ZV_COLOR_TEXT_MUTED, 0);
-    lv_obj_set_style_text_font(key, &lv_font_montserrat_10, 0);
+    lv_obj_set_style_text_font(key, &lv_font_montserrat_12, 0);
 
     panel->item_count += 1;
 
@@ -86,10 +86,11 @@ void add_info_panel_item(ui_info_panel *panel, kv_item_t item)
     if (!row)
         return;
 
+    lv_obj_set_height(row, 40);
     lv_obj_t *value = lv_label_create(row);
     lv_label_set_text(value, item.value ? item.value : "");
     lv_obj_set_style_text_align(value, LV_TEXT_ALIGN_RIGHT, 0);
-    lv_obj_set_style_text_font(value, &lv_font_montserrat_10, 0);
+    lv_obj_set_style_text_font(value, &lv_font_montserrat_12, 0);
 
     if (item.has_value_color)
         lv_obj_set_style_text_color(value, item.value_color, 0);

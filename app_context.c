@@ -63,6 +63,12 @@ void bt_context_set_selected(device_t *device)
     ctx.bt->selected = *device;
 }
 
+void bt_context_clear_devices(void)
+{
+    ctx.bt->current_device_amount = 0;
+    memset(&ctx.bt->selected, 0, sizeof(ctx.bt->selected));
+}
+
 void bt_context_add_device(device_t *device)
 {
     if (device == NULL)

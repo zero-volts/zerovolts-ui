@@ -8,10 +8,10 @@
 #include <string.h>
 #include <termios.h>
 #include <unistd.h>
+#include <stdarg.h>
 
 #define MAX_HANDLERS 5
 #define TAG_MAX_LEN 32
-static const char *TAG = "UART_SERVICE";
 
 // File descriptor that represent the open connection throught UART
 static int uart_fd = -1;
@@ -209,6 +209,22 @@ uart_status_t uart_service_init(const char *device, int baudrate)
     return UART_OK;
 }
 
+uart_status_t uart_send_formatted_line(const char *message, ...)
+{
+    if (!message)
+        return UART_ERR_INVALID;
+
+    va_list args;
+    va_start(args, message);
+
+    char msg[1024];
+    vsnprintf(msg, sizeof(msg), message, args);
+
+    va_end(args);
+
+    return uart_send_line(msg);
+}
+
 uart_status_t uart_send_line(const char *cmd)
 {
     if (uart_fd < 0)
@@ -394,9 +410,4 @@ void add_event_callback(uart_event_cb new_cb, const char *tag_id)
 
     strncpy(event->tag, tag_id, TAG_MAX_LEN - 1);
     event->tag[TAG_MAX_LEN - 1] = '\0';
-}
-
-void remove_event_callback(const char *tag_id)
-{
-    // TODO: implement this
 }
