@@ -48,7 +48,7 @@ static list_item_t create_list_item(device_t *device, char *rssi_buffer, size_t 
         .text = device->name,
         .subtitle = device->mac,
         .left_badge = {
-            .type = BAGE_IMG_TYPE,
+            .type = BADGE_IMG_TYPE,
             .icon = {
                 .path = "/home/zerovolts/git/zerovolts-ui/data/assets/tower.png",
                 .size = { .width = 30, .height = 30 }
@@ -56,7 +56,7 @@ static list_item_t create_list_item(device_t *device, char *rssi_buffer, size_t 
         },
         .right_badge = {
             .label = rssi_buffer,
-            .type = BAGE_TEXT_TYPE,
+            .type = BADGE_TEXT_TYPE,
             .text_color = rssi_color(device->rssi),
             .has_text_color = true,
         },
@@ -99,7 +99,8 @@ static void handler_scan_btn(lv_event_t *e)
     (void)e;
     loading_button_set_loading(scann_btn, true);
     clean_list(scanner_list);
-    
+    bt_context_clear_devices();
+
     if (lb_devices_amount)
         lv_label_set_text(lb_devices_amount, "Devices: 0");
 
@@ -134,12 +135,12 @@ static void on_filter_change(ui_pills *pills, int index, const char *label, void
     (void)pills;
     (void)label;
     (void)user_data;
-    
+
     switch(index)
     {
         case 0:
             bt_reset_visible_devices();
-            break;   
+            break;
         case 1:
             bt_sort_visible_devices_by_nearest();
             break;

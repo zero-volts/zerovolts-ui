@@ -287,7 +287,7 @@ int main(void)
     lv_obj_clear_flag(menu, LV_OBJ_FLAG_SCROLLABLE);
 
     /* -------- PAGES -------- */
-    
+
     static home_item home_items[] = {
         {
             .label = "Bad USB",

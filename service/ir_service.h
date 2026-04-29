@@ -10,7 +10,7 @@ extern "C" {
 
 #define IR_MAX_NAME         256
 #define MAX_IR_DEV_PATH     256
-#define EXCAPED_DEV_PATH    512
+#define ESCAPED_DEV_PATH    512
 #define ESCAPED_TMP_PATH    1024
 #define COMMAND_SIZE        2048
 #define BACKEND_TYPE_IRCTL  "irctl"

@@ -60,25 +60,25 @@ lv_obj_t *ir_page_create(lv_obj_t *menu, const zv_config *cfg)
         {
             .text = "Remotes",
             .subtitle = "Saved remotes",
-            .left_badge = { .label = LV_SYMBOL_HOME, .type = BAGE_TEXT_TYPE },
+            .left_badge = { .label = LV_SYMBOL_HOME, .type = BADGE_TEXT_TYPE },
             .user_data = &nav_remotes,
         },
         {
             .text = "New Remote",
             .subtitle = "Create a new remote",
-            .left_badge = { .label = LV_SYMBOL_PLUS, .type = BAGE_TEXT_TYPE },
+            .left_badge = { .label = LV_SYMBOL_PLUS, .type = BADGE_TEXT_TYPE },
             .user_data = &nav_new_remote,
         },
         {
             .text = "Learn Button",
             .subtitle = "Capture a new signal",
-            .left_badge = { .label = LV_SYMBOL_SAVE, .type = BAGE_TEXT_TYPE },
+            .left_badge = { .label = LV_SYMBOL_SAVE, .type = BADGE_TEXT_TYPE },
             .user_data = &nav_learn_button,
         },
         {
             .text = "Send Signal",
             .subtitle = "Transmit a saved signal",
-            .left_badge = { .label = LV_SYMBOL_GPS, .type = BAGE_TEXT_TYPE  },
+            .left_badge = { .label = LV_SYMBOL_GPS, .type = BADGE_TEXT_TYPE  },
             .user_data = &nav_send_signal,
         },
     };

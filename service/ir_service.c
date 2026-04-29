@@ -70,7 +70,7 @@ static ir_status_t irctl_send_raw(const char *raw_path)
         return IR_ERR_INVALID;
     }
 
-    char escaped_dev[EXCAPED_DEV_PATH];
+    char escaped_dev[ESCAPED_DEV_PATH];
     char escaped_path[ESCAPED_TMP_PATH];
     char cmd[COMMAND_SIZE];
     const int send_timeout_sec = 3;
@@ -106,7 +106,7 @@ static ir_status_t irctl_learn_raw (const char *out_raw_path)
         return IR_ERR_INVALID;
     }
 
-    char escaped_dev[EXCAPED_DEV_PATH];
+    char escaped_dev[ESCAPED_DEV_PATH];
     char escaped_tmp[ESCAPED_TMP_PATH];
     char tmp_path[PATH_MAX];
     struct stat st;

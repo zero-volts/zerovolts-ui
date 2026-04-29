@@ -39,7 +39,7 @@ lv_obj_t *bt_page_create(lv_obj_t *menu, const zv_config *cfg)
         .text = "Scanner",
         .subtitle= "Discover devices",
         .left_badge = {
-            .type = BAGE_IMG_TYPE,
+            .type = BADGE_IMG_TYPE,
             .icon = {
                 .path = "/home/zerovolts/git/zerovolts-ui/data/assets/tower.png",
                 .size = {
