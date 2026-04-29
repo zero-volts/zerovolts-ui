@@ -25,6 +25,9 @@ void config_set_defaults(void)
     _config.ir.use_on_screen_keyboard = true;
 
     snprintf(_config.display.fb_device, sizeof(_config.display.fb_device), "%s", "/dev/fb0");
+
+    snprintf(_config.uart.device, sizeof(_config.uart.device), "%s", "/dev/ttyAMA5");
+    _config.uart.baudrate = 115200;
 }
 
 int initialize_config(const char *path_config)
@@ -109,6 +112,10 @@ static cJSON *cfg_to_json(void)
     cJSON *display = cJSON_AddObjectToObject(root, "display");
     cJSON_AddStringToObject(display, "fb_device", _config.display.fb_device);
 
+    cJSON *uart = cJSON_AddObjectToObject(root, "uart");
+    cJSON_AddStringToObject(uart, "device", _config.uart.device);
+    cJSON_AddNumberToObject(uart, "baudrate", _config.uart.baudrate);
+
     return root;
 }
 
@@ -152,6 +159,13 @@ static void json_to_cfg(cJSON *root)
     {
         json_get_string(display, "fb_device", _config.display.fb_device,
             _config.display.fb_device, sizeof(_config.display.fb_device));
+    }
+
+    cJSON *uart = cJSON_GetObjectItemCaseSensitive(root, "uart");
+    if (cJSON_IsObject(uart))
+    {
+        json_get_string(uart, "device", _config.uart.device, _config.uart.device, sizeof(_config.uart.device));
+        _config.uart.baudrate = json_get_int(uart, "baudrate", _config.uart.baudrate);
     }
 }
 

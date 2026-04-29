@@ -8,6 +8,11 @@ extern "C" {
 #endif
 
 typedef struct {
+    char device[20];
+    int baudrate;
+} uart_config_t;
+
+typedef struct {
     char version[16];
     struct {
         bool is_enabled;
@@ -27,6 +32,8 @@ typedef struct {
     struct {
         char fb_device[128];
     } display;
+
+    uart_config_t uart;
 } zv_config;
 
 int initialize_config(const char *path_config);

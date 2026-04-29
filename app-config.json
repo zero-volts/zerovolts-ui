@@ -1,12 +1,9 @@
 {
-	"version":	"0.2",
+	"version":	"0.3",
 	"hid":	{
 		"script_selected_path":	"",
 		"script_list_path":	"data/badusb/",
 		"is_enabled":	false
-	},
-	"display":	{
-		"fb_device":	"/dev/fb0"
 	},
 	"ir":	{
 		"remotes_path":	"data/ir/remotes/",
@@ -15,5 +12,12 @@
 		"rx_device":	"/dev/lirc1",
 		"learn_timeout_ms":	5000,
 		"use_on_screen_keyboard":	true
+	},
+	"display":	{
+		"fb_device":	"/dev/fb0"
+	},
+	"uart": {
+		"device": "/dev/ttyAMA5",
+		"baudrate": 115200
 	}
 }
