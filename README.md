@@ -79,7 +79,8 @@ Drivers disponibles:
 lv_port_linux/lvgl/src/drivers/display/fb/
 lv_port_linux/lvgl/src/drivers/evdev/
 ```
-
+ habilitar LV_USE_LODEPNG a 1 en el lv_config.h
+ y cambiar LV_MEM_SIZE a 256 en vez de 64
 ---
 
 <a id="sec-4"></a>
@@ -116,7 +117,7 @@ cmake --build build -j$(nproc)
 ---
 
 <a id="sec-6"></a>
-## 🚀 6. Compilar tu aplicación con LVGL
+## 🚀 6. Compilar la aplicación con LVGL
 
 Forma recomendada (usa el `Makefile` del proyecto):
 
@@ -130,7 +131,7 @@ Salida principal:
 bin/zero-volts-ui
 ```
 
-Si quieres compilar manualmente, toma como referencia el comando generado por `make`
+Para compilar manualmente, tomar como referencia el comando generado por `make`
 y los includes/librerías definidos en `Makefile`.
 
 ---
@@ -278,7 +279,7 @@ El proyecto usa una arquitectura por capas por funcionalidad:
 
 Ventajas principales:
 - Menor acoplamiento entre UI y hardware.
-- Mejor testabilidad del negocio sin depender de dispositivos reales.
+- Mejor testabilidad de la logica sin depender de dispositivos reales.
 - Más facilidad para cambiar backends sin tocar las vistas.
 - Mantenimiento más simple cuando crece el proyecto.
 
