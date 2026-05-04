@@ -30,7 +30,6 @@
 #include "utils/file.h"
 #include "utils/logger.h"
 
-
 #define NAV_GPIO    21  // Physical pin 40 (moves focus)
 #define SELECT_GPIO 26  // Physical pin 37 (enter/select)
 

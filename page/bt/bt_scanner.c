@@ -45,13 +45,23 @@ static list_item_t create_list_item(device_t *device, char *rssi_buffer, size_t 
 {
     snprintf(rssi_buffer, rssi_buffer_size, "%d", device->rssi);
 
+    const char *icon_path;
+    if (strcmp(device->manufacturer, "Microsoft") == 0)
+        icon_path = "icons/microsoft.png";
+    else if (strcmp(device->manufacturer, "Apple") == 0)
+        icon_path = "icons/apple.png";
+    else if (strcmp(device->manufacturer, "Samsung") == 0)
+        icon_path = "icons/samsung.png";
+    else
+        icon_path = "icons/unknown.png";
+
     list_item_t item = {
         .text = device->name,
         .subtitle = device->mac,
         .left_badge = {
             .type = BADGE_IMG_TYPE,
             .icon = {
-                .path = "/home/zerovolts/git/zerovolts-ui/data/assets/tower.png",
+                .path = icon_path,
                 .size = { .width = 30, .height = 30 }
             }
         },

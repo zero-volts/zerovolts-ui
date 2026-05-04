@@ -41,10 +41,11 @@ lv_obj_t *bt_page_create(lv_obj_t *menu, const zv_config *cfg)
         .left_badge = {
             .type = BADGE_IMG_TYPE,
             .icon = {
-                .path = "/home/zerovolts/git/zerovolts-ui/data/assets/tower.png",
+                .path = "icons/scaner.png",
                 .size = {
-                    .width = 30,
-                    .height = 30
+                    .width = 50,
+                    .height = 50,
+                    .scale = 4
                 }
             }
         },

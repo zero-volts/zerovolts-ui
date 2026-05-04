@@ -10,6 +10,7 @@ extern "C" {
 typedef struct {
     int width;
     int height;
+    int scale;
 } obj_size_t;
 
 typedef struct {

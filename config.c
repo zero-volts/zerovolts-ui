@@ -252,3 +252,26 @@ void config_resolve_paths(const char *root)
         snprintf(_config.hid.list_path, sizeof(_config.hid.list_path), "%s", tmp);
     }
 }
+
+int config_get_asset_path(const char *asset_path, char *out, size_t out_sz)
+{
+    if (!asset_path || !asset_path[0] || !out || out_sz == 0)
+        return -1;
+
+    out[0] = '\0';
+
+    const char *relative_path = asset_path;
+    while (relative_path[0] == '/')
+        relative_path++;
+
+    int written;
+    if (project_root[0])
+        written = snprintf(out, out_sz, "%s/assets/%s", project_root, relative_path);
+    else
+        written = snprintf(out, out_sz, "assets/%s", relative_path);
+
+    if (written < 0 || (size_t)written >= out_sz)
+        return -2;
+
+    return 0;
+}

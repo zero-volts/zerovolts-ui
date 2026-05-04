@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "components/ui_theme.h"
+#include "config.h"
 
 struct ui_list{
     lv_obj_t *list;
@@ -21,6 +22,36 @@ typedef struct {
     char *raw_value_buf;
     void *user_data_buf;
 } ui_list_item_ctx_t;
+
+static int icon_scale_or_default(int scale, int default_scale)
+{
+    return scale > 0 ? scale : default_scale;
+}
+
+static int set_image_src(lv_obj_t *img, const char *path)
+{
+    if (!img || !path || !path[0])
+        return -1;
+
+    char asset_path[512];
+    const char *resolved_path = path;
+    if (path[0] != '/' && strncmp(path, "A:", 2) != 0)
+    {
+        if (config_get_asset_path(path, asset_path, sizeof(asset_path)) != 0)
+            return -1;
+
+        resolved_path = asset_path;
+    }
+
+    char lv_path[1024];
+    if (strncmp(resolved_path, "A:", 2) == 0)
+        snprintf(lv_path, sizeof(lv_path), "%s", resolved_path);
+    else
+        snprintf(lv_path, sizeof(lv_path), "A:%s", resolved_path);
+
+    lv_img_set_src(img, lv_path);
+    return 0;
+}
 
 static void on_item_click(lv_event_t *e)
 {
@@ -146,26 +177,24 @@ lv_obj_t *add_item(ui_list *list, const list_item_t *item)
     lv_obj_set_size(content, LV_PCT(100), LV_PCT(100));
     lv_obj_set_flex_flow(content, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(content, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_left(content, 10, 0);
+    lv_obj_set_style_pad_left(content, 5, 0);
     lv_obj_set_style_pad_right(content, 10, 0);
     lv_obj_set_style_pad_top(content, 0, 0);
     lv_obj_set_style_pad_bottom(content, 0, 0);
-    lv_obj_set_style_pad_column(content, 8, 0);
+    lv_obj_set_style_pad_column(content, 18, 0);
 
     if(item->left_badge.type == BADGE_IMG_TYPE)
     {
         obj_icon_t badge_icon = item->left_badge.icon;
         if (badge_icon.path != NULL && badge_icon.path[0] != '\0')
         {
+            int scale = icon_scale_or_default(badge_icon.size.scale, 4);
             lv_obj_t *icon = lv_img_create(content);
             lv_obj_clear_flag(icon, LV_OBJ_FLAG_CLICKABLE);
-            lv_obj_set_size(icon, badge_icon.size.width, badge_icon.size.height);
 
-            char lv_path[1024];
-            snprintf(lv_path, sizeof(lv_path), "A:%s", badge_icon.path);
-
-            lv_img_set_src(icon, lv_path);
-            lv_image_set_scale(icon, LV_SCALE_NONE * 0.3);
+            set_image_src(icon, badge_icon.path);
+            lv_image_set_scale(icon, LV_SCALE_NONE * scale / 10);
+            lv_obj_set_size(icon, (badge_icon.size.width * scale) / 10, (badge_icon.size.height * scale) / 10);
         }
     }
     else if (item->left_badge.type == BADGE_TEXT_TYPE &&
@@ -217,15 +246,13 @@ lv_obj_t *add_item(ui_list *list, const list_item_t *item)
         obj_icon_t right_icon = item->right_badge.icon;
         if (right_icon.path != NULL && right_icon.path[0] != '\0')
         {
+            int scale = icon_scale_or_default(right_icon.size.scale, 3);
             lv_obj_t *icon = lv_img_create(content);
             lv_obj_clear_flag(icon, LV_OBJ_FLAG_CLICKABLE);
-            lv_obj_set_size(icon, right_icon.size.width, right_icon.size.height);
 
-            char lv_path[1024];
-            snprintf(lv_path, sizeof(lv_path), "A:%s", right_icon.path);
-
-            lv_img_set_src(icon, lv_path);
-            lv_image_set_scale(icon, LV_SCALE_NONE * 0.3);
+            set_image_src(icon, right_icon.path);
+            lv_image_set_scale(icon, LV_SCALE_NONE * scale / 10);
+            lv_obj_set_size(icon, (right_icon.size.width * scale) / 10, (right_icon.size.height * scale) / 10);
         }
     }
     else if(item->right_badge.type == BADGE_TEXT_TYPE)

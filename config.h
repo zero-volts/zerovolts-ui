@@ -2,6 +2,7 @@
 #define CONFIG_H
 
 #include <stdbool.h>
+#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -40,6 +41,7 @@ int initialize_config(const char *path_config);
 int config_load();
 int config_save();
 void config_resolve_paths(const char *project_root);
+int config_get_asset_path(const char *asset_path, char *out, size_t out_sz);
 
 const zv_config *config_get();
 

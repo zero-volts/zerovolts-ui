@@ -60,7 +60,17 @@ lv_obj_t *ir_page_create(lv_obj_t *menu, const zv_config *cfg)
         {
             .text = "Remotes",
             .subtitle = "Saved remotes",
-            .left_badge = { .label = LV_SYMBOL_HOME, .type = BADGE_TEXT_TYPE },
+            .left_badge = { 
+                .type = BADGE_IMG_TYPE,
+                .icon = {
+                    .path = "icons/remote_control.png",
+                    .size = {
+                        .width = 60,
+                        .height = 60,
+                        .scale = 5
+                    }
+                }
+            },
             .user_data = &nav_remotes,
         },
         {
@@ -72,13 +82,33 @@ lv_obj_t *ir_page_create(lv_obj_t *menu, const zv_config *cfg)
         {
             .text = "Learn Button",
             .subtitle = "Capture a new signal",
-            .left_badge = { .label = LV_SYMBOL_SAVE, .type = BADGE_TEXT_TYPE },
+            .left_badge = { 
+                .type = BADGE_IMG_TYPE,
+                .icon = {
+                    .path = "icons/ir_learn.png",
+                    .size = {
+                        .width = 60,
+                        .height = 60,
+                        .scale = 5
+                    }
+                }
+            },
             .user_data = &nav_learn_button,
         },
         {
             .text = "Send Signal",
             .subtitle = "Transmit a saved signal",
-            .left_badge = { .label = LV_SYMBOL_GPS, .type = BADGE_TEXT_TYPE  },
+            .left_badge = { 
+                .type = BADGE_IMG_TYPE,
+                .icon = {
+                    .path = "icons/ir_send_signal.png",
+                    .size = {
+                        .width = 60,
+                        .height = 60,
+                        .scale = 5
+                    }
+                }
+            },
             .user_data = &nav_send_signal,
         },
     };
