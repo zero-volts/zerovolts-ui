@@ -10,6 +10,8 @@ struct ui_pills {
     lv_obj_t *container;
     lv_obj_t *buttons[MAX_PILLS];
     char *labels[MAX_PILLS];
+    lv_color_t text_colors[MAX_PILLS];
+    bool has_text_color[MAX_PILLS];
     int pill_height;
     int count;
     int active;
@@ -26,13 +28,21 @@ static void apply_pill_style(lv_obj_t *btn, bool active)
 {
     lv_color_t bg = active ? ZV_COLOR_ACCENT_DIM : ZV_COLOR_BG_PANEL;
     lv_color_t border = active ? ZV_COLOR_ACCENT : ZV_COLOR_BORDER;
-    lv_color_t text = active ? ZV_COLOR_ACCENT : ZV_COLOR_TEXT_MUTED;
-
     lv_obj_set_style_bg_color(btn, bg, 0);
     lv_obj_set_style_border_color(btn, border, 0);
     lv_obj_set_style_border_color(btn, ZV_COLOR_BORDER_FOCUS, LV_STATE_FOCUSED);
+}
 
-    lv_obj_t *lbl = lv_obj_get_child(btn, 0);
+static void apply_pill_text_style(ui_pills *pills, int index)
+{
+    if (!pills || index < 0 || index >= pills->count || !pills->buttons[index])
+        return;
+
+    lv_color_t text = pills->has_text_color[index]
+                          ? pills->text_colors[index]
+                          : (index == pills->active ? ZV_COLOR_ACCENT : ZV_COLOR_TEXT_MUTED);
+
+    lv_obj_t *lbl = lv_obj_get_child(pills->buttons[index], 0);
     if (lbl)
         lv_obj_set_style_text_color(lbl, text, 0);
 }
@@ -121,6 +131,32 @@ void pills_add(ui_pills *pills, const char *label)
     pills->count++;
 
     apply_pill_style(btn, false);
+    apply_pill_text_style(pills, idx);
+}
+
+void pills_update(ui_pills *pills, int index, const char *label, lv_color_t text_color)
+{
+    if (!pills || index < 0 || index >= pills->count || !label)
+        return;
+
+    char *label_copy = strdup(label);
+    if (!label_copy)
+        return;
+
+    lv_obj_t *lbl = lv_obj_get_child(pills->buttons[index], 0);
+    if (!lbl) {
+        free(label_copy);
+        return;
+    }
+
+    free(pills->labels[index]);
+    pills->labels[index] = label_copy;
+    pills->text_colors[index] = text_color;
+    pills->has_text_color[index] = true;
+
+    lv_label_set_text(lbl, label);
+    lv_obj_center(lbl);
+    apply_pill_text_style(pills, index);
 }
 
 void pills_set_active(ui_pills *pills, int index)
@@ -128,10 +164,12 @@ void pills_set_active(ui_pills *pills, int index)
     if (!pills)
         return;
 
-    for (int i = 0; i < pills->count; i++)
-        apply_pill_style(pills->buttons[i], i == index);
-
     pills->active = index;
+
+    for (int i = 0; i < pills->count; i++) {
+        apply_pill_style(pills->buttons[i], i == index);
+        apply_pill_text_style(pills, i);
+    }
 }
 
 int pills_get_active(const ui_pills *pills)
@@ -161,6 +199,7 @@ void pills_clear(ui_pills *pills)
 
         pills->labels[i] = NULL;
         pills->buttons[i] = NULL;
+        pills->has_text_color[i] = false;
     }
 
     pills->count = 0;

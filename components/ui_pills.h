@@ -13,6 +13,7 @@ typedef void (*ui_pills_event_cb_t)(ui_pills *pills, int index, const char *labe
 ui_pills *create_pills(lv_obj_t *parent);
 ui_pills *create_pills_sized(lv_obj_t *parent, int container_width, int pill_height);
 void pills_add(ui_pills *pills, const char *label);
+void pills_update(ui_pills *pills, int index, const char *label, lv_color_t text_color);
 void pills_set_active(ui_pills *pills, int index);
 int pills_get_active(const ui_pills *pills);
 void pills_set_event_cb(ui_pills *pills, ui_pills_event_cb_t cb, void *user_data);

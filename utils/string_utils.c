@@ -9,7 +9,7 @@ bool zv_is_valid_name_char(char c)
     return (c >= 'a' && c <= 'z') ||
            (c >= 'A' && c <= 'Z') ||
            (c >= '0' && c <= '9') ||
-           c == '_' || c == '-' || c == ' ';
+           c == '_' || c == '-' || c == '+' || c == ' ';
 }
 
 bool zv_sanitize_name(const char *src, char *dst, size_t dst_sz)
