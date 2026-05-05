@@ -39,6 +39,55 @@ lv_obj_t *create_square_main_button(lv_obj_t *parent, const char *text, const ch
     return btn;
 }
 
+lv_obj_t *create_section_label(lv_obj_t *parent, const char *text)
+{
+    lv_obj_t *label = lv_label_create(parent);
+    lv_label_set_text(label, text);
+    lv_obj_set_style_text_color(label, ZV_COLOR_TEXT_MAIN, 0);
+
+    return label;
+}
+
+lv_obj_t *create_icon_button(lv_obj_t *parent, const char *icon, lv_coord_t width, lv_coord_t height,
+                             lv_event_cb_t cb, void *user_data)
+{
+    lv_obj_t *btn = lv_btn_create(parent);
+    lv_obj_set_size(btn, width, height);
+    lv_obj_set_style_bg_color(btn, ZV_COLOR_BG_PANEL, 0);
+    lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(btn, 2, 0);
+    lv_obj_set_style_border_color(btn, ZV_COLOR_BORDER, 0);
+    lv_obj_set_style_radius(btn, 10, 0);
+    lv_obj_set_style_bg_color(btn, ZV_COLOR_BG_BUTTON_PRESSED, LV_STATE_PRESSED);
+    lv_obj_set_style_border_color(btn, ZV_COLOR_TERMINAL, LV_STATE_FOCUSED);
+
+    if (cb)
+        lv_obj_add_event_cb(btn, cb, LV_EVENT_CLICKED, user_data);
+
+    lv_obj_t *label = lv_label_create(btn);
+    lv_label_set_text(label, icon);
+    lv_obj_set_style_text_color(label, ZV_COLOR_TEXT_MAIN, 0);
+    lv_obj_clear_flag(label, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_center(label);
+
+    return btn;
+}
+
+lv_obj_t *create_transparent_flex_row(lv_obj_t *parent, lv_coord_t width, lv_coord_t height)
+{
+    lv_obj_t *row = lv_obj_create(parent);
+    lv_obj_set_size(row, width, height);
+    lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(row, 0, 0);
+    lv_obj_set_style_pad_all(row, 0, 0);
+    lv_obj_set_layout(row, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(row, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_clear_flag(row, LV_OBJ_FLAG_SCROLLABLE);
+
+    return row;
+}
+
 void rotate_icon_by_tag(lv_obj_t * btn, int32_t angle)
 {
     uint32_t i;

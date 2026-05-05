@@ -59,7 +59,6 @@ static void on_item_click(lv_event_t *e)
     if (!ctx || !ctx->list)
         return;
 
-    printf("selected item: %s \n", ctx->item.text);
     if (ctx->list->cb) {
         ctx->list->cb(ctx->list, &ctx->item, ctx->list->user_data);
     }
