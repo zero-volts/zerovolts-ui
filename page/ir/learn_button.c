@@ -1,4 +1,5 @@
 #include "page/ir/learn_button.h"
+#include "components/component_helper.h"
 #include "components/ui_theme.h"
 #include "components/nav.h"
 #include "config.h"
@@ -25,14 +26,6 @@ bool ir_learn_button_keyboard_is_visible(void)
         return false;
 
     return !lv_obj_has_flag(g_learn.keyboard, LV_OBJ_FLAG_HIDDEN);
-}
-
-static lv_obj_t *ir_create_section_label(lv_obj_t *parent, const char *text)
-{
-    lv_obj_t *label = lv_label_create(parent);
-    lv_label_set_text(label, text);
-    lv_obj_set_style_text_color(label, ZV_COLOR_TEXT_MAIN, 0);
-    return label;
 }
 
 static lv_obj_t *ir_create_input_box(lv_obj_t *parent, const char *placeholder, bool dropdown)
@@ -282,33 +275,16 @@ lv_obj_t *ir_learn_button_page_create(lv_obj_t *menu)
     lv_obj_set_flex_flow(root, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_style_pad_row(root, 10, 0);
 
-    ir_create_section_label(root, "Remote:");
+    create_section_label(root, "Remote:");
     
-    lv_obj_t *remote_list_container = lv_obj_create(root);
-    lv_obj_set_size(remote_list_container, LV_PCT(100), 45);
-    lv_obj_set_style_bg_opa(remote_list_container, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(remote_list_container, 0, 0);
-    lv_obj_set_style_pad_all(remote_list_container, 0, 0);
-    lv_obj_set_layout(remote_list_container, LV_LAYOUT_FLEX);
-    lv_obj_set_flex_flow(remote_list_container, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(remote_list_container, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_t *remote_list_container = create_transparent_flex_row(root, LV_PCT(100), 45);
 
     g_learn.remote_dropdown = ir_create_input_box(remote_list_container, "", true);
 
-    lv_obj_t *refresh_btn = lv_btn_create(remote_list_container);
-    lv_obj_set_size(refresh_btn, 45, 35);
-    lv_obj_set_style_bg_color(refresh_btn, ZV_COLOR_BG_PANEL, 0);
-    lv_obj_set_style_bg_opa(refresh_btn, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_width(refresh_btn, 2, 0);
-    lv_obj_set_style_border_color(refresh_btn, ZV_COLOR_BORDER, 0);
-    lv_obj_set_style_radius(refresh_btn, 10, 0);
-    lv_obj_add_event_cb(refresh_btn, learn_refresh_remotes_cb, LV_EVENT_CLICKED, NULL);
-
-    lv_obj_t *ic = lv_label_create(refresh_btn);
-    lv_label_set_text(ic, LV_SYMBOL_REFRESH);
-    lv_obj_set_style_text_color(ic, ZV_COLOR_TEXT_MAIN, 0);
+    create_icon_button(remote_list_container, LV_SYMBOL_REFRESH, 45, 35,
+                       learn_refresh_remotes_cb, NULL);
     
-    ir_create_section_label(root, "Button Name:");
+    create_section_label(root, "Button Name:");
     g_learn.button_input = ir_create_input_box(root, "KEY_VOLUMEUP", false);
     lv_obj_add_event_cb(g_learn.button_input, learn_button_input_event_cb, LV_EVENT_FOCUSED, &g_learn);
     lv_obj_add_event_cb(g_learn.button_input, learn_button_input_event_cb, LV_EVENT_DEFOCUSED, &g_learn);
@@ -324,14 +300,7 @@ lv_obj_t *ir_learn_button_page_create(lv_obj_t *menu)
 
     ir_create_status_box(root);
 
-    lv_obj_t *footer_row = lv_obj_create(root);
-    lv_obj_set_size(footer_row, LV_PCT(100), 50);
-    lv_obj_set_style_bg_opa(footer_row, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(footer_row, 0, 0);
-    lv_obj_set_style_pad_all(footer_row, 0, 0);
-    lv_obj_set_layout(footer_row, LV_LAYOUT_FLEX);
-    lv_obj_set_flex_flow(footer_row, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(footer_row, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_t *footer_row = create_transparent_flex_row(root, LV_PCT(100), 50);
 
     lv_obj_t *cancel_btn = lv_btn_create(footer_row);
     lv_obj_set_size(cancel_btn, LV_PCT(45), 40);

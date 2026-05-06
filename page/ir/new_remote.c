@@ -1,4 +1,5 @@
 #include "page/ir/new_remote.h"
+#include "components/component_helper.h"
 #include "components/ui_theme.h"
 #include "components/nav.h"
 #include "config.h"
@@ -26,14 +27,6 @@ bool ir_new_remote_keyboard_is_visible(void)
     return !lv_obj_has_flag(g_new_remote.keyboard, LV_OBJ_FLAG_HIDDEN);
 }
 
-static lv_obj_t *ir_create_section_label(lv_obj_t *parent, const char *text)
-{
-    lv_obj_t *label = lv_label_create(parent);
-    lv_label_set_text(label, text);
-    lv_obj_set_style_text_color(label, ZV_COLOR_TEXT_MAIN, 0);
-    return label;
-}
-
 static lv_obj_t *ir_create_chip_button(lv_obj_t *parent, const char *text)
 {
     lv_obj_t *btn = lv_btn_create(parent);
@@ -46,24 +39,6 @@ static lv_obj_t *ir_create_chip_button(lv_obj_t *parent, const char *text)
 
     lv_obj_t *label = lv_label_create(btn);
     lv_label_set_text(label, text);
-    lv_obj_set_style_text_color(label, ZV_COLOR_TEXT_MAIN, 0);
-    lv_obj_center(label);
-
-    return btn;
-}
-
-static lv_obj_t *ir_create_icon_button(lv_obj_t *parent, const char *icon)
-{
-    lv_obj_t *btn = lv_btn_create(parent);
-    lv_obj_set_size(btn, 68, 68);
-    lv_obj_set_style_bg_color(btn, ZV_COLOR_BG_PANEL, 0);
-    lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_width(btn, 2, 0);
-    lv_obj_set_style_border_color(btn, ZV_COLOR_BORDER, 0);
-    lv_obj_set_style_radius(btn, 10, 0);
-
-    lv_obj_t *label = lv_label_create(btn);
-    lv_label_set_text(label, icon);
     lv_obj_set_style_text_color(label, ZV_COLOR_TEXT_MAIN, 0);
     lv_obj_center(label);
 
@@ -221,7 +196,7 @@ lv_obj_t *ir_new_remote_page_create(lv_obj_t *menu)
     lv_obj_set_flex_flow(root, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_style_pad_row(root, 10, 0);
 
-    ir_create_section_label(root, "Remote Name:");
+    create_section_label(root, "Remote Name:");
 
     g_new_remote.name_input = lv_textarea_create(root);
     lv_obj_set_width(g_new_remote.name_input, LV_PCT(100));
@@ -241,7 +216,7 @@ lv_obj_t *ir_new_remote_page_create(lv_obj_t *menu)
     lv_obj_add_event_cb(g_new_remote.name_input, ir_name_input_event_cb, LV_EVENT_PRESSED, &g_new_remote);
     lv_obj_add_event_cb(g_new_remote.name_input, ir_name_input_event_cb, LV_EVENT_KEY, &g_new_remote);
 
-    ir_create_section_label(root, "Category:");
+    create_section_label(root, "Category:");
 
     lv_obj_t *category_row = lv_obj_create(root);
     lv_obj_set_size(category_row, LV_PCT(100), LV_SIZE_CONTENT);
@@ -257,7 +232,7 @@ lv_obj_t *ir_new_remote_page_create(lv_obj_t *menu)
     ir_create_chip_button(category_row, "Audio");
     ir_create_chip_button(category_row, "Custom");
 
-    ir_create_section_label(root, "Icon:");
+    create_section_label(root, "Icon:");
 
     lv_obj_t *icon_row = lv_obj_create(root);
     lv_obj_set_size(icon_row, LV_PCT(100), LV_SIZE_CONTENT);
@@ -268,10 +243,10 @@ lv_obj_t *ir_new_remote_page_create(lv_obj_t *menu)
     lv_obj_set_flex_flow(icon_row, LV_FLEX_FLOW_ROW);
     lv_obj_set_style_pad_column(icon_row, 10, 0);
 
-    ir_create_icon_button(icon_row, LV_SYMBOL_VIDEO);
-    ir_create_icon_button(icon_row, LV_SYMBOL_REFRESH);
-    ir_create_icon_button(icon_row, LV_SYMBOL_AUDIO);
-    ir_create_icon_button(icon_row, LV_SYMBOL_SETTINGS);
+    create_icon_button(icon_row, LV_SYMBOL_VIDEO, 68, 68, NULL, NULL);
+    create_icon_button(icon_row, LV_SYMBOL_REFRESH, 68, 68, NULL, NULL);
+    create_icon_button(icon_row, LV_SYMBOL_AUDIO, 68, 68, NULL, NULL);
+    create_icon_button(icon_row, LV_SYMBOL_SETTINGS, 68, 68, NULL, NULL);
 
     lv_obj_t *spacer = lv_obj_create(root);
     lv_obj_set_size(spacer, LV_PCT(100), 1);
@@ -279,14 +254,7 @@ lv_obj_t *ir_new_remote_page_create(lv_obj_t *menu)
     lv_obj_set_style_border_width(spacer, 0, 0);
     lv_obj_set_flex_grow(spacer, 1);
 
-    lv_obj_t *footer_row = lv_obj_create(root);
-    lv_obj_set_size(footer_row, LV_PCT(100), LV_SIZE_CONTENT);
-    lv_obj_set_style_bg_opa(footer_row, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(footer_row, 0, 0);
-    lv_obj_set_style_pad_all(footer_row, 0, 0);
-    lv_obj_set_layout(footer_row, LV_LAYOUT_FLEX);
-    lv_obj_set_flex_flow(footer_row, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(footer_row, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_t *footer_row = create_transparent_flex_row(root, LV_PCT(100), LV_SIZE_CONTENT);
 
     lv_obj_t *cancel_btn = lv_btn_create(footer_row);
     lv_obj_set_size(cancel_btn, LV_PCT(45), 40);

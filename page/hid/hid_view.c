@@ -1,14 +1,10 @@
 #include "page/hid/hid_view.h"
+#include "components/list/ui_list.h"
 
 #include <stdlib.h>
 #include <string.h>
 
 #include "components/ui_theme.h"
-
-typedef struct {
-    hid_view *view;
-    char *path;
-} hid_item_ctx;
 
 static void set_status(const char *msg, lv_color_t color, hid_view *self)
 {
@@ -35,64 +31,22 @@ static void hid_set_selected_label(hid_view *self)
     lv_label_set_text(self->selected_lbl, "Selected: (none)");
 }
 
-static void clear_list(lv_obj_t *list)
+static void hid_script_item_clicked(ui_list *list, const list_item_t *item, void *user_data)
 {
-    if (!list)
+    (void)list;
+
+    hid_view *self = (hid_view *)user_data;
+    if (!self || !item || !item->raw_value)
         return;
 
-    lv_obj_clean(list);
-}
-
-static void hid_script_item_clicked(lv_event_t *e)
-{
-    hid_item_ctx *ctx = (hid_item_ctx *)lv_event_get_user_data(e);
-    if (!ctx || !ctx->view || !ctx->path)
-        return;
-
-    hid_status_t rc = hid_controller_set_selected_script(&ctx->view->controller, ctx->path);
+    hid_status_t rc = hid_controller_set_selected_script(&self->controller, item->raw_value);
     if (rc != HID_OK) {
-        set_status(hid_controller_last_error(), lv_color_hex(0xFF5A5A), ctx->view);
+        set_status(hid_controller_last_error(), ZV_COLOR_ERROR, self);
         return;
     }
 
-    hid_set_selected_label(ctx->view);
-    set_status("Script selected.", ZV_COLOR_TEXT_MAIN, ctx->view);
-}
-
-static void hid_btn_delete_cb(lv_event_t *e)
-{
-    hid_item_ctx *ctx = (hid_item_ctx *)lv_event_get_user_data(e);
-    if (!ctx)
-        return;
-
-    free(ctx->path);
-    free(ctx);
-}
-
-static void add_script_button(hid_view *view, const char *name, const char *path)
-{
-    if (!view || !view->list || !name || !path)
-        return;
-
-    lv_obj_t *btn = lv_list_add_button(view->list, NULL, name);
-    lv_obj_set_style_bg_color(btn, ZV_COLOR_BG_PANEL, 0);
-    lv_obj_set_style_text_color(btn, ZV_COLOR_TEXT_MAIN, 0);
-
-    char *heap_path = strdup(path);
-    if (!heap_path)
-        return;
-
-    hid_item_ctx *ctx = (hid_item_ctx *)malloc(sizeof(*ctx));
-    if (!ctx) {
-        free(heap_path);
-        return;
-    }
-
-    ctx->view = view;
-    ctx->path = heap_path;
-
-    lv_obj_add_event_cb(btn, hid_script_item_clicked, LV_EVENT_CLICKED, ctx);
-    lv_obj_add_event_cb(btn, hid_btn_delete_cb, LV_EVENT_DELETE, ctx);
+    hid_set_selected_label(self);
+    set_status("Script selected.", ZV_COLOR_TEXT_MAIN, self);
 }
 
 static void refresh_list_impl(hid_view *self)
@@ -100,19 +54,31 @@ static void refresh_list_impl(hid_view *self)
     if (!self)
         return;
 
-    clear_list(self->list);
+    clean_list(self->list);
 
-    hid_script_list list;
-    hid_status_t rc = hid_controller_list_scripts(&self->controller, &list);
+    hid_script_list scripts;
+    hid_status_t rc = hid_controller_list_scripts(&self->controller, &scripts);
     if (rc != HID_OK) {
-        set_status(hid_controller_last_error(), lv_color_hex(0xFF5A5A), self);
+        set_status(hid_controller_last_error(), ZV_COLOR_ERROR, self);
         return;
     }
 
-    for (size_t i = 0; i < list.count; i++)
-        add_script_button(self, list.scripts[i].name, list.scripts[i].path);
+    for (size_t i = 0; i < scripts.count; i++) {
+        list_item_t item = {
+            .text = scripts.scripts[i].name,
+            .left_badge = {
+                .label = LV_SYMBOL_FILE,
+                .type = BADGE_TEXT_TYPE,
+                .text_color = ZV_COLOR_ACCENT,
+                .has_text_color = true,
+            },
+            .raw_value = scripts.scripts[i].path,
+        };
 
-    hid_controller_free_script_list(&list);
+        add_item(self->list, &item);
+    }
+
+    hid_controller_free_script_list(&scripts);
 }
 
 static void hid_refresh_btn_cb(lv_event_t *e)
@@ -133,7 +99,7 @@ static void hid_toggle_cb(lv_event_t *e)
     if (rc != HID_OK)
     {
         lv_obj_clear_state(sw, LV_STATE_CHECKED);
-        set_status(hid_controller_last_error(), lv_color_hex(0xFF5A5A), self);
+        set_status(hid_controller_last_error(), ZV_COLOR_ERROR, self);
         return;
     }
 
@@ -196,16 +162,8 @@ static hid_view *hid_page_create(hid_view *self, lv_obj_t *menu, const zv_config
     lv_label_set_text(icon, LV_SYMBOL_REFRESH);
     lv_obj_set_style_text_color(icon, ZV_COLOR_TEXT_MAIN, 0);
 
-    self->list = lv_list_create(self->base.root);
-    lv_obj_set_width(self->list, LV_PCT(100));
-    lv_obj_set_style_bg_color(self->list, ZV_COLOR_BG_PANEL, 0);
-    lv_obj_set_style_radius(self->list, 5, 0);
-    lv_obj_set_style_pad_all(self->list, 5, 0);
-    lv_obj_set_style_pad_row(self->list, 10, 0);
-    lv_obj_set_scroll_dir(self->list, LV_DIR_VER);
-    lv_obj_set_scrollbar_mode(self->list, LV_SCROLLBAR_MODE_AUTO);
-    lv_obj_clear_flag(self->list, LV_OBJ_FLAG_SCROLL_ELASTIC);
-    lv_obj_clear_flag(self->list, LV_OBJ_FLAG_SCROLL_MOMENTUM);
+    self->list = create_list(self->base.root, 100, 80);
+    set_event_data(self->list, hid_script_item_clicked, self);
 
     hid_set_selected_label(self);
     refresh_list_impl(self);

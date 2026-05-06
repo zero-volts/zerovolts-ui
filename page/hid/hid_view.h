@@ -5,6 +5,7 @@
 #include "config.h"
 #include "page/base_view.h"
 #include "page/hid/hid_controller.h"
+#include "components/list/ui_list.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -13,7 +14,7 @@ extern "C" {
 typedef struct {
     base_view base;
 
-    lv_obj_t *list;
+    ui_list *list;
     lv_obj_t *status;
     lv_obj_t *toggle;
     lv_obj_t *selected_lbl;
