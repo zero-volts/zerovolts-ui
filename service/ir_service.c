@@ -250,10 +250,10 @@ ir_status_t ir_service_init(const ir_context *ctx)
     set_last_error(NULL);
 
     snprintf(context.tx_dev, sizeof(context.tx_dev), "%s",
-             (ctx->tx_dev && ctx->tx_dev[0]) ? ctx->tx_dev : IR_DEFAULT_TX_DEV);
+             ctx->tx_dev[0] ? ctx->tx_dev : IR_DEFAULT_TX_DEV);
 
     snprintf(context.rx_dev, sizeof(context.rx_dev), "%s",
-             (ctx->rx_dev && ctx->rx_dev[0]) ? ctx->rx_dev : IR_DEFAULT_RX_DEV);
+             ctx->rx_dev[0] ? ctx->rx_dev : IR_DEFAULT_RX_DEV);
 
     context.timeout_ms = ctx->timeout_ms > 0 ? ctx->timeout_ms : IR_DEFAULT_TIMEOUT_MS;
     context.backend = (ctx->backend && ctx->backend[0]) ? ctx->backend : BACKEND_TYPE_IRCTL;

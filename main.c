@@ -24,6 +24,8 @@
 #include "page/ir/new_remote.h"
 #include "page/bt/bt_view.h"
 #include "page/base_view.h"
+#include "page/sub_ghz/sub_ghz_view.h"
+#include "page/sub_ghz/sub_ghz_controller.h"
 #include "config.h"
 #include "service/uart_service.h"
 #include "utils/error_handler.h"
@@ -70,7 +72,16 @@ const zv_config *setup_config()
         size_t size = strlen(exe_dir) + strlen(app_config_path) + 1;
 
         char config_path[PATH_MAX];
-        snprintf(config_path, size, "%s%s", exe_dir, app_config_path);
+        if (size > sizeof(config_path)) {
+            log_error("Config path too long: %s%s\n", exe_dir, app_config_path);
+            return NULL;
+        }
+
+        int written = snprintf(config_path, sizeof(config_path), "%s%s", exe_dir, app_config_path);
+        if (written < 0 || (size_t)written >= sizeof(config_path)) {
+            log_error("Config path truncated: %s%s\n", exe_dir, app_config_path);
+            return NULL;
+        }
 
         log_debug("config_path=%s\n", config_path);
 
@@ -78,7 +89,12 @@ const zv_config *setup_config()
         config_load();
 
         char project_root[PATH_MAX];
-        snprintf(project_root, sizeof(project_root), "%s/..", exe_dir);
+        written = snprintf(project_root, sizeof(project_root), "%s/..", exe_dir);
+        if (written < 0 || (size_t)written >= sizeof(project_root)) {
+            log_error("Project root path too long: %s/..\n", exe_dir);
+            return NULL;
+        }
+
         config_resolve_paths(project_root);
     }
 
@@ -248,6 +264,8 @@ int main(void)
     lv_obj_set_flex_flow(scr, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_style_pad_row(scr, 0, 0);
 
+    // Initializing bluethoot controller
+
     ir_remote_ctx ir_cfg;
     memset(&ir_cfg, 0, sizeof(ir_cfg));
     ir_cfg.remotes_root = (char *)config->ir.remotes_path;
@@ -261,6 +279,7 @@ int main(void)
         return -1;
     }
 
+    // Initializing bluethoot controller
     uart_config_t uart_cfg;
     memset(&uart_cfg, 0, sizeof(uart_cfg));
     snprintf(uart_cfg.device, sizeof(uart_cfg.device), "%s", config->uart.device);
@@ -309,6 +328,12 @@ int main(void)
             .label = "Bluetooth",
             .icon = LV_SYMBOL_BLUETOOTH,
             .create_page = bt_page_create,
+            .rotate_icon_90 = false,
+        },
+        {
+            .label = "Sub-GHz",
+            .icon = LV_SYMBOL_GPS,
+            .create_page = subghz_view_create,
             .rotate_icon_90 = false,
         }
     };

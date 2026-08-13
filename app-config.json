@@ -1,5 +1,5 @@
 {
-	"version":	"0.3",
+	"version":	"0.4",
 	"hid":	{
 		"script_selected_path":	"",
 		"script_list_path":	"data/badusb/",
@@ -16,8 +16,13 @@
 	"display":	{
 		"fb_device":	"/dev/fb0"
 	},
-	"uart": {
-		"device": "/dev/ttyAMA5",
-		"baudrate": 115200
+	"uart":	{
+		"device":	"/dev/ttyAMA5",
+		"baudrate":	115200
+	},
+	"subghhz": {
+		"default_freq": 433,
+		"frequencies": [315,433,869],
+		"signals_path": "data/subghz/signals"
 	}
 }

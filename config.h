@@ -14,6 +14,12 @@ typedef struct {
 } uart_config_t;
 
 typedef struct {
+    int default_freq;
+    int frequencies[4];
+	char signals_path[512];
+} subghz_config_t;
+
+typedef struct {
     char version[16];
     struct {
         bool is_enabled;
@@ -35,6 +41,7 @@ typedef struct {
     } display;
 
     uart_config_t uart;
+    subghz_config_t subghz;
 } zv_config;
 
 int initialize_config(const char *path_config);

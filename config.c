@@ -9,6 +9,9 @@
 static char config_path[PATH_MAX];
 static char project_root[PATH_MAX];
 static zv_config _config;
+static const int default_frequencies[4] = {
+    315, 433, 869, 0
+};
 
 void config_set_defaults(void)
 {
@@ -28,6 +31,10 @@ void config_set_defaults(void)
 
     snprintf(_config.uart.device, sizeof(_config.uart.device), "%s", "/dev/ttyAMA5");
     _config.uart.baudrate = 115200;
+
+    _config.subghz.default_freq = 433,
+    _config.subghz.signals_path[0] = '\0',
+    memcpy(_config.subghz.frequencies, default_frequencies, sizeof(_config.subghz.frequencies));
 }
 
 int initialize_config(const char *path_config)
@@ -74,7 +81,32 @@ static int json_get_int(cJSON *obj, const char *key, int fallback)
     cJSON *v = cJSON_GetObjectItemCaseSensitive(obj, key);
     if (cJSON_IsNumber(v))
         return v->valueint;
+
     return fallback;
+}
+
+static bool json_get_int_array(cJSON *obj, const char *key, int *out, size_t output_size, const int *fallback)
+{
+    cJSON *array = cJSON_GetObjectItemCaseSensitive(obj, key);
+    if (!cJSON_IsArray(array))
+        return false;
+
+    memcpy(out, fallback, output_size * sizeof(out));
+   
+    size_t count = (size_t)cJSON_GetArraySize(array);
+    if (count > output_size)
+        count = output_size;
+        
+    for (size_t i; i < count; i++)
+    {
+        const cJSON *item = cJSON_GetArrayItem(array, (int)i);
+        if (cJSON_IsNumber(item))
+            return false;
+        
+        out[i] = item->valueint;
+    }
+
+    return true;
 }
 
 static const char *strip_project_root(const char *path)
@@ -167,6 +199,16 @@ static void json_to_cfg(cJSON *root)
         json_get_string(uart, "device", _config.uart.device, _config.uart.device, sizeof(_config.uart.device));
         _config.uart.baudrate = json_get_int(uart, "baudrate", _config.uart.baudrate);
     }
+
+    cJSON *subghz = cJSON_GetObjectItemCaseSensitive(root, "subghz");
+    if (cJSON_IsObject(subghz))
+    {
+        json_get_int(subghz, "default_freq", 433);
+        json_get_string(subghz, "signals_path", _config.subghz.signals_path, _config.subghz.signals_path,
+            sizeof(_config.subghz.signals_path));
+
+        json_get_int_array(subghz, "frequencies", _config.subghz.frequencies, 4, default_frequencies);
+    }
 }
 
 int config_load()
@@ -236,20 +278,32 @@ void config_resolve_paths(const char *root)
     if (!root || !root[0])
         return;
 
-    snprintf(project_root, sizeof(project_root), "%s", root);
+    int written = snprintf(project_root, sizeof(project_root), "%s", root);
+    if (written < 0 || (size_t)written >= sizeof(project_root))
+        return;
 
     // If path starts with '/', it's already absolute — leave it alone.
     // Otherwise, prepend project_root to make it absolute.
     if (_config.ir.remotes_path[0] && _config.ir.remotes_path[0] != '/') {
-        char tmp[512];
-        snprintf(tmp, sizeof(tmp), "%s/%s", root, _config.ir.remotes_path);
-        snprintf(_config.ir.remotes_path, sizeof(_config.ir.remotes_path), "%s", tmp);
+        size_t root_len = strlen(root);
+        size_t path_len = strlen(_config.ir.remotes_path);
+        if (root_len < sizeof(_config.ir.remotes_path) &&
+            path_len < sizeof(_config.ir.remotes_path) - root_len - 1) {
+            memmove(_config.ir.remotes_path + root_len + 1, _config.ir.remotes_path, path_len + 1);
+            memcpy(_config.ir.remotes_path, root, root_len);
+            _config.ir.remotes_path[root_len] = '/';
+        }
     }
 
     if (_config.hid.list_path[0] && _config.hid.list_path[0] != '/') {
-        char tmp[512];
-        snprintf(tmp, sizeof(tmp), "%s/%s", root, _config.hid.list_path);
-        snprintf(_config.hid.list_path, sizeof(_config.hid.list_path), "%s", tmp);
+        size_t root_len = strlen(root);
+        size_t path_len = strlen(_config.hid.list_path);
+        if (root_len < sizeof(_config.hid.list_path) &&
+            path_len < sizeof(_config.hid.list_path) - root_len - 1) {
+            memmove(_config.hid.list_path + root_len + 1, _config.hid.list_path, path_len + 1);
+            memcpy(_config.hid.list_path, root, root_len);
+            _config.hid.list_path[root_len] = '/';
+        }
     }
 }
 

@@ -6,7 +6,6 @@
 #include <stdio.h>
 #include <string.h>
 
-static char g_last_error[256];
 typedef struct {
     file_callback callback;
     void *user_data;
