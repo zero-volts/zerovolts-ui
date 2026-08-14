@@ -43,6 +43,7 @@ SRC := \
 	utils/file.c \
 	utils/string_utils.c \
 	utils/cJSON.c \
+	utils/parser.c \
 	../tactile_switch/gpio_buttons.c
 
 

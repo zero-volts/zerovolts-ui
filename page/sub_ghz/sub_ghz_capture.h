@@ -2,6 +2,7 @@
 #define SUBGHZ_CAPTURE_H
 
 #include "lvgl.h"
+#include "types.h"
 
 #ifdef __cplusplus
 extern "C" {

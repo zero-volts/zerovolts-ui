@@ -4,6 +4,8 @@
 extern "C" {
 #endif
 
+#include <stdint.h>
+
 #define UNKNOWN_NAME "Unknown"
 #define BT_ALLOWED_MAX_DEVICES 20
 #define BT_MAX_SERVICES 20
@@ -51,6 +53,13 @@ typedef enum {
     BT_CONN_LOST,
     BT_CONN_DISCONNECTED
 } bt_conn_status_t;
+
+typedef struct {
+    uint16_t seq;
+    uint16_t chunks;
+    uint16_t count;
+    int32_t timings[32];
+} subghz_data_chunk_t;
 
 #ifdef __cplusplus
 }

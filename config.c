@@ -148,6 +148,8 @@ static cJSON *cfg_to_json(void)
     cJSON_AddStringToObject(uart, "device", _config.uart.device);
     cJSON_AddNumberToObject(uart, "baudrate", _config.uart.baudrate);
 
+    cJSON *subghz = cJSON_AddObjectToObject(root, "subghz");
+
     return root;
 }
 

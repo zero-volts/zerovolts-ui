@@ -227,6 +227,7 @@ lv_obj_t *ir_new_remote_page_create(lv_obj_t *menu)
     lv_obj_set_flex_flow(category_row, LV_FLEX_FLOW_ROW);
     lv_obj_set_style_pad_column(category_row, 10, 0);
 
+    // TODO: ocupar control ya creado "ui_pills"
     ir_create_chip_button(category_row, "TV");
     ir_create_chip_button(category_row, "AC");
     ir_create_chip_button(category_row, "Audio");
