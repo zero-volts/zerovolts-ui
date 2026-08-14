@@ -206,6 +206,17 @@ void pills_clear(ui_pills *pills)
     pills->active = -1;
 }
 
+void pills_change_flex_flow(ui_pills *pills, lv_flex_flow_t new_flow)
+{
+    lv_obj_set_flex_flow(pills->container, new_flow);
+}
+
+void pills_change_scroll_mode(ui_pills *pills, lv_scrollbar_mode_t new_mode)
+{
+    lv_obj_add_flag(pills->container, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollbar_mode(pills->container, new_mode);
+}
+
 void destroy_pills(ui_pills *pills)
 {
     if (!pills)
