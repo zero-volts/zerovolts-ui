@@ -14,9 +14,9 @@ typedef struct  {
     int option_index;
     int value;
     char *name;
-} frecuency_t;
+} frequency_t;
 
-static frecuency_t frecuencies[] = {
+static frequency_t frequencies[] = {
     {0, 315, "315 MHz"},
     {1, 433920000, "433.92 MHz"},
     {2, 868, "868 MHz"},
@@ -24,8 +24,8 @@ static frecuency_t frecuencies[] = {
 };
 
 typedef struct {
-    int selected_frecuency;
-    ui_pills *frecuency_pills;
+    int selected_frequency;
+    ui_pills *frequency_pills;
     lv_obj_t *chart;
 } subghz_capture_ctx;
 
@@ -49,7 +49,6 @@ static void add_data(subghz_data_chunk_t *data)
 
     a[(s + 1) % p] = LV_CHART_POINT_NONE;
     a[(s + 2) % p] = LV_CHART_POINT_NONE;
-    a[(s + 2) % p] = LV_CHART_POINT_NONE;
 
     lv_chart_refresh(local_context.chart);
 }
@@ -66,15 +65,15 @@ static void capture_handler(ui_status_t status, subghz_data_chunk_t *data)
 
 static void subghz_capture_handler(lv_event_t *e)
 {
-    subghz_start_capture(frecuencies[local_context.selected_frecuency].value, DEFAULT_CAPTURE_TIMEFRAME_MS);
+    subghz_start_capture(frequencies[local_context.selected_frequency].value, DEFAULT_CAPTURE_TIMEFRAME_MS);
 }
 
-static void on_frecuency_change(ui_pills *pills, int index, const char *label, void *user_data)
+static void on_frequency_change(ui_pills *pills, int index, const char *label, void *user_data)
 {
-    local_context.selected_frecuency = index;
+    local_context.selected_frequency = index;
 }
 
-static void create_frecuency_panel(lv_obj_t *parent)
+static void create_frequency_panel(lv_obj_t *parent)
 {
     lv_obj_t *panel = lv_obj_create(parent);
     
@@ -86,21 +85,21 @@ static void create_frecuency_panel(lv_obj_t *parent)
     lv_obj_set_flex_flow(panel, LV_FLEX_FLOW_ROW);
     lv_obj_set_style_pad_column(panel, 10, 0);
 
-    if (local_context.frecuency_pills == NULL)
+    if (local_context.frequency_pills == NULL)
     {
-        local_context.frecuency_pills = create_pills(panel);
-        pills_change_flex_flow(local_context.frecuency_pills, LV_FLEX_FLOW_ROW);
-        pills_change_scroll_mode(local_context.frecuency_pills, LV_SCROLLBAR_MODE_AUTO);
+        local_context.frequency_pills = create_pills(panel);
+        pills_change_flex_flow(local_context.frequency_pills, LV_FLEX_FLOW_ROW);
+        pills_change_scroll_mode(local_context.frequency_pills, LV_SCROLLBAR_MODE_AUTO);
     }
 
-    size_t count = sizeof(frecuencies) / sizeof(frecuencies[0]);
+    size_t count = sizeof(frequencies) / sizeof(frequencies[0]);
     for (size_t i = 0; i< count; i++ )
     {
-        pills_add(local_context.frecuency_pills, frecuencies[i].name);
+        pills_add(local_context.frequency_pills, frequencies[i].name);
     }
 
-    pills_set_active(local_context.frecuency_pills, 0);
-    pills_set_event_cb(local_context.frecuency_pills, on_frecuency_change, NULL);
+    pills_set_active(local_context.frequency_pills, 0);
+    pills_set_event_cb(local_context.frequency_pills, on_frequency_change, NULL);
 }
 
 static void create_signal_chart(lv_obj_t *parent)
@@ -141,7 +140,6 @@ static void create_capture_button(lv_obj_t *parent)
     lv_obj_t *capture_label = lv_label_create(capture_btn);
     lv_label_set_text(capture_label, "Start Capture");
     lv_obj_set_style_text_color(capture_label, ZV_COLOR_TEXT_MAIN, 0);
-    lv_obj_set_style_text_font(capture_label, &lv_font_montserrat_10, 0);
     lv_obj_center(capture_label);
 }
 
@@ -160,8 +158,9 @@ lv_obj_t *subghz_capture_page_create(lv_obj_t *menu)
     lv_obj_set_layout(root, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(root, LV_FLEX_FLOW_COLUMN);
 
-    create_section_label(root, "FRECUENCY");
-    create_frecuency_panel(root);
+    lv_obj_t *freq_lbl = create_section_label(root, "FREQUENCY");
+    lv_obj_set_style_text_font(freq_lbl, &lv_font_montserrat_10, 0);
+    create_frequency_panel(root);
     create_signal_chart(root);
     create_capture_button(root);
     

@@ -14,7 +14,7 @@
 #define UART_SUBGHZ_TAG_ID "SUBGHZ_TAG_CONTROLLER"
 
 typedef struct {
-    int selected_frecuency;
+    int selected_frequency;
 } subghz_ctx;
 
 static subghz_ctx local_ctx;
@@ -98,14 +98,14 @@ uart_status_t subghz_controller_init(const subghz_config_t *config,
 
     add_event_callback(event_handler, UART_SUBGHZ_TAG_ID);
 
-    local_ctx.selected_frecuency = config->default_freq;
+    local_ctx.selected_frequency = config->default_freq;
 
     return UART_OK;
 }
 
 uart_status_t subghz_start_capture(int frequency, int time_frame_ms)
 {
-    int freq = frequency < local_ctx.selected_frecuency ? local_ctx.selected_frecuency : frequency;
+    int freq = frequency < local_ctx.selected_frequency ? local_ctx.selected_frequency : frequency;
     uart_status_t uart_rc = uart_send_formatted_line("%s|%d|%d", SUBGHZ_COMMAND_REQ_CAPTURE, freq, time_frame_ms);
     if (uart_rc != UART_OK)
     {
