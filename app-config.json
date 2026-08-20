@@ -21,7 +21,6 @@
 		"baudrate":	115200
 	},
 	"subghz": {
-		"frequencies": [315,433,869],
 		"signals_path": "data/subghz/signals"
 	}
 }

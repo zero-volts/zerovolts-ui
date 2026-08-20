@@ -30,9 +30,7 @@ static subghz_view *subghz_page_create(subghz_view *self, lv_obj_t *menu, const 
     self->base.set_flex_layout(&self->base, LV_FLEX_FLOW_COLUMN, 5, 0);
 
     memset(&self->config, 0, sizeof(self->config));
-    self->config.default_freq = cfg->subghz.default_freq;
     sprintf(self->config.signals_path, cfg->subghz.signals_path);
-    memcpy(self->config.frequencies, cfg->subghz.frequencies, 4);
 
     if (subghz_controller_init(&self->config, &cfg->uart) != UART_OK)
         return NULL;

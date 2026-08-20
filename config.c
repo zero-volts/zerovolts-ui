@@ -32,9 +32,7 @@ void config_set_defaults(void)
     snprintf(_config.uart.device, sizeof(_config.uart.device), "%s", "/dev/ttyAMA5");
     _config.uart.baudrate = 115200;
 
-    _config.subghz.default_freq = 433,
-    _config.subghz.signals_path[0] = '\0',
-    memcpy(_config.subghz.frequencies, default_frequencies, sizeof(_config.subghz.frequencies));
+    _config.subghz.signals_path[0] = '\0';    
 }
 
 int initialize_config(const char *path_config)
@@ -149,6 +147,7 @@ static cJSON *cfg_to_json(void)
     cJSON_AddNumberToObject(uart, "baudrate", _config.uart.baudrate);
 
     cJSON *subghz = cJSON_AddObjectToObject(root, "subghz");
+    cJSON_AddStringToObject(subghz, "signals_path", _config.subghz.signals_path);
 
     return root;
 }
@@ -205,11 +204,8 @@ static void json_to_cfg(cJSON *root)
     cJSON *subghz = cJSON_GetObjectItemCaseSensitive(root, "subghz");
     if (cJSON_IsObject(subghz))
     {
-        json_get_int(subghz, "default_freq", 433);
         json_get_string(subghz, "signals_path", _config.subghz.signals_path, _config.subghz.signals_path,
             sizeof(_config.subghz.signals_path));
-
-        json_get_int_array(subghz, "frequencies", _config.subghz.frequencies, 4, default_frequencies);
     }
 }
 

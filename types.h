@@ -40,7 +40,8 @@ typedef struct {
 typedef enum {
     UI_IDLE = 0,
     UI_LOADING,
-    UI_DONE
+    UI_DONE,
+    UI_ERROR
 } ui_status_t;
 
 typedef enum {

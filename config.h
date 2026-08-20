@@ -14,8 +14,6 @@ typedef struct {
 } uart_config_t;
 
 typedef struct {
-    int default_freq;
-    int frequencies[4];
 	char signals_path[512];
 } subghz_config_t;
 
