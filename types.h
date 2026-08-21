@@ -12,6 +12,10 @@ extern "C" {
 #define BT_MAX_CHARS_PER_SERVICE 16
 #define BT_UUID_STR_LEN 37
 
+#define SUBGHZ_ALLOWED_MAX_SESSIONS 5
+#define SUBGHZ_DATA_CHUNK_MAX_VALUES 32
+#define SUBGHZ_CAPTURE_MAX_TIMINGS 256
+
 typedef struct {
     char name[32];
     char mac[18];
@@ -56,6 +60,7 @@ typedef enum {
 } bt_conn_status_t;
 
 typedef struct {
+    uint64_t capture_id;
     uint16_t seq;
     uint16_t chunks;
     uint16_t count;

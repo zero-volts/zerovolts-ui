@@ -6,14 +6,14 @@
 #include <stdio.h>
 
 #include "types.h"
+#include "app_context.h"
 #include "utils/parser.h"
 #include "utils/logger.h"
 #include "utils/error_handler.h"
 #include "service/uart_commands.h"
 
 #define UART_SUBGHZ_TAG_ID "SUBGHZ_TAG_CONTROLLER"
-#define DATA_CHUNK_MAX_VALUES 32
-#define DATA_TIMING_BUFFER DATA_CHUNK_MAX_VALUES * 10
+#define DATA_TIMING_BUFFER SUBGHZ_DATA_CHUNK_MAX_VALUES * 10
 
 static data_capture_handler capture_handler = NULL;
 
@@ -21,6 +21,11 @@ static bool parse_capture_data(const char *buffer, subghz_data_chunk_t *chunk)
 {    
     char tmp_value[16];
     char timing_buffer[DATA_TIMING_BUFFER];
+
+    if(!get_field_value(buffer, "capture_id", tmp_value, sizeof(tmp_value)) )
+        return false;
+
+    chunk->capture_id = strtoul(tmp_value, NULL, 10);
 
     if(!get_field_value(buffer, "seq", tmp_value, sizeof(tmp_value)) )
         return false;    
@@ -37,26 +42,26 @@ static bool parse_capture_data(const char *buffer, subghz_data_chunk_t *chunk)
 
     chunk->count = strtoul(tmp_value, NULL, 10);
 
-    if (chunk->count > DATA_CHUNK_MAX_VALUES)
+    if (chunk->count > SUBGHZ_DATA_CHUNK_MAX_VALUES)
     {
         log_error("wrong data chunks for parse_capture_data %u\n", chunk->count);
         return false;
     }
 
-    if(get_field_value(buffer, "timings", timing_buffer, sizeof(timing_buffer)) )
+    if(!get_field_value(buffer, "timings", timing_buffer, sizeof(timing_buffer)) )
+        return false;
+
+    char *saveptr;
+    char *token = strtok_r(timing_buffer, ",", &saveptr);
+
+    uint16_t timing_idx = 0;
+    while (token != NULL)
     {
-        char *saveptr;
-        char *token = strtok_r(timing_buffer, ",", &saveptr);
+        if (timing_idx >= chunk->count  || timing_idx >= SUBGHZ_DATA_CHUNK_MAX_VALUES)
+            break;
 
-        uint16_t timing_idx = 0;
-        while (token != NULL)
-        {
-            if (timing_idx >= chunk->count  || timing_idx >= DATA_CHUNK_MAX_VALUES)
-                break;
-
-            chunk->timings[timing_idx++] = (int32_t)strtol(token, NULL, 10);
-            token = strtok_r(NULL, ",", &saveptr);
-        }
+        chunk->timings[timing_idx++] = (int32_t)strtol(token, NULL, 10);
+        token = strtok_r(NULL, ",", &saveptr);
     }
 
     return true;
@@ -78,6 +83,18 @@ static void event_handler(const char *tag_id, char *buffer)
 
         if (strstr(buffer, SUBGHZ_COMMAND_RES_CAPTURE_DONE) != NULL) 
         {
+            char tmp_value[21];
+            if(!get_field_value(buffer, "capture_id", tmp_value, sizeof(tmp_value)) )
+                return;
+
+            uint64_t session_id = strtoull(tmp_value, NULL, 10);
+            if (!subghz_set_session_completed(session_id))
+            {
+                capture_handler(UI_ERROR, NULL);
+                log_warning("event_handler Can't complete the session : %" PRIu64 "", session_id);
+                return;
+            }
+
             capture_handler(UI_DONE, NULL);  
             return;
         }
@@ -98,6 +115,7 @@ static void event_handler(const char *tag_id, char *buffer)
                 return;
             }
 
+            subghz_add_session_chunk(chunk);
             event_arg.data = &chunk;
             capture_handler(UI_LOADING, &event_arg);
             return;
