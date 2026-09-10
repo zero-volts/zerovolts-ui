@@ -11,6 +11,7 @@
 #include "components/component_helper.h"
 #include "components/ui_loading_btn.h"
 #include "page/sub_ghz/sub_ghz_controller.h"
+#include "service/subghz/subghz_service.h"
 
 #define DEFAULT_CAPTURE_TIMEFRAME_MS 30000 // 30seg
 
@@ -188,8 +189,8 @@ static void subghz_capture_handler(lv_event_t *e)
     loading_button_set_text(local_ctx.capture_btn, "Capturing");
     loading_button_set_loading(local_ctx.capture_btn, true);
 
-    uart_status_t result = subghz_start_capture(frequencies[local_ctx.selected_frequency].value, DEFAULT_CAPTURE_TIMEFRAME_MS);
-    if (result != UART_OK)
+    subghz_status_t result = subghz_controller_start_capture(frequencies[local_ctx.selected_frequency].value, DEFAULT_CAPTURE_TIMEFRAME_MS);
+    if (result != SUBGHZ_OK)
     {
         loading_button_set_text(local_ctx.capture_btn, "Start Capture");
         loading_button_set_loading(local_ctx.capture_btn, false);
@@ -281,8 +282,7 @@ lv_obj_t *subghz_capture_page_create(lv_obj_t *menu)
     create_signal_chart(root);
     create_capture_button(root);
     
-
-    subghz_set_capture_cb(capture_handler);
+    subghz_controller_set_capture_cb(capture_handler);
 
     return page;
 }

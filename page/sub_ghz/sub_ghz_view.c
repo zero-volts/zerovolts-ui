@@ -8,7 +8,7 @@
 #include "components/nav.h"
 #include "components/ui_theme.h"
 #include "components/list/ui_list.h"
-
+#include "service/subghz/subghz_service.h"
 
 static void handler(ui_list *list, const list_item_t *item, void *user_data)
 {
@@ -32,7 +32,7 @@ static subghz_view *subghz_page_create(subghz_view *self, lv_obj_t *menu, const 
     memset(&self->config, 0, sizeof(self->config));
     sprintf(self->config.signals_path, cfg->subghz.signals_path);
 
-    if (subghz_controller_init(&self->config, &cfg->uart) != UART_OK)
+    if (subghz_controller_init(cfg) != SUBGHZ_OK)
         return NULL;
 
     lv_obj_t *capture_page = subghz_capture_page_create(menu);

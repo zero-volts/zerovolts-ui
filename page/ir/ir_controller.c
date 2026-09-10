@@ -163,7 +163,7 @@ static void handle_raw_filelist(const file_desc *description, void *obj_target)
 static ir_status_t create_remote_directory(const char *remote_name, char *out_sanitized_name,
     size_t out_sanitized_size, char *out_remote_directory, size_t out_remote_directory_size)
 {
-     if (!zv_sanitize_name(remote_name, out_sanitized_name, out_sanitized_size) ||
+    if (!zv_sanitize_name(remote_name, out_sanitized_name, out_sanitized_size) ||
         zv_has_whitespace(remote_name)) {
         return IR_ERR_INVALID;
     }

@@ -40,6 +40,7 @@ int bt_context_devices_length(void);
 
 void subghz_add_session_chunk(const subghz_data_chunk_t chunk);
 bool subghz_set_session_completed(uint64_t session_id);
+subghz_capture_session_t *subghz_get_session_by(uint64_t session_id);
 
 #ifdef __cplusplus
 }

@@ -155,8 +155,6 @@ void subghz_add_session_chunk(const subghz_data_chunk_t chunk)
         return;
     }
 
-   
-
     subghz_capture_session_t *session_found = subghz_find_session(chunk.capture_id);
     if (!session_found)
     {
@@ -217,4 +215,13 @@ bool subghz_set_session_completed(uint64_t session_id)
     session_found->completed = true;
 
     return true;
+}
+
+subghz_capture_session_t *subghz_get_session_by(uint64_t session_id)
+{
+    subghz_capture_session_t *session_found = subghz_find_session(session_id);
+    if (session_found == NULL)
+        return NULL;
+
+    return session_found;
 }
