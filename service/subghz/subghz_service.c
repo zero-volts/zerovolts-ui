@@ -24,13 +24,13 @@ static service_context ctx;
 
 static bool parse_capture_data(const char *buffer, subghz_data_chunk_t *chunk)
 {
-    char tmp_value[16];
+    char tmp_value[21];
     char timing_buffer[DATA_TIMING_BUFFER];
 
     if(!get_field_value(buffer, "capture_id", tmp_value, sizeof(tmp_value)) )
         return false;
 
-    chunk->capture_id = strtoul(tmp_value, NULL, 10);
+    chunk->capture_id = strtoull(tmp_value, NULL, 10);
 
     if(!get_field_value(buffer, "seq", tmp_value, sizeof(tmp_value)) )
         return false;
@@ -103,6 +103,25 @@ static void event_handler(const char *tag_id, char *buffer)
             return;
 
         uint64_t session_id = strtoull(tmp_value, NULL, 10);
+        subghz_capture_session_t *session = subghz_get_session_by(session_id);
+        char *end = NULL;
+        if (!session || !get_field_value(buffer, "freq", tmp_value, sizeof(tmp_value)))
+        {
+            event.type = SUBGHZ_EVENT_CAPTURE_ERROR;
+            snprintf(event.message, sizeof(event.message), "Captura incompleta o sin frecuencia");
+            ctx.service_handler(&event);
+            return;
+        }
+        unsigned long long frequency = strtoull(tmp_value, &end, 10);
+        if (!tmp_value[0] || *end || frequency == 0 || frequency > UINT32_MAX)
+        {
+            event.type = SUBGHZ_EVENT_CAPTURE_ERROR;
+            snprintf(event.message, sizeof(event.message), "Frecuencia de captura invalida");
+            ctx.service_handler(&event);
+            return;
+        }
+        session->frequency = (uint32_t)frequency;
+
         if (!subghz_set_session_completed(session_id))
         {
             event.type = SUBGHZ_EVENT_CAPTURE_ERROR;
@@ -144,6 +163,7 @@ static void event_handler(const char *tag_id, char *buffer)
         get_field_value(buffer, "reason", err_message, sizeof(err_message));
 
         event.type = SUBGHZ_EVENT_CAPTURE_ERROR;
+        snprintf(event.message, sizeof(event.message), "%s", err_message);
         ctx.service_handler(&event);
         return;
     }
@@ -164,7 +184,8 @@ subghz_status_t subghz_service_init(const zv_config *config)
     }
 
     add_event_callback(event_handler, UART_SUBGHZ_TAG_ID);
-    subghz_file_create_root_path(config->subghz.signals_path);
+    if (!subghz_file_create_root_path(config->subghz.signals_path))
+        return SUBGHZ_ERR_IO;
     snprintf(ctx.files_directory, sizeof(ctx.files_directory), "%s", config->subghz.signals_path);
 
     return SUBGHZ_OK;
@@ -197,9 +218,15 @@ subghz_status_t subghz_service_save(subghz_capture_session_t *session)
     time_t timestamp = time(NULL);
     char file_name_path[512];
 
-    snprintf(file_name_path, sizeof(file_name_path), "%s/%lu_%ld.sub", ctx.files_directory, session->capture_id, (long)timestamp);
+    int written = snprintf(file_name_path, sizeof(file_name_path), "%s/%" PRIu64 "_%ld.sub",
+                           ctx.files_directory, session->capture_id, (long)timestamp);
+    if (written < 0 || (size_t)written >= sizeof(file_name_path))
+        return SUBGHZ_ERR_IO;
 
-    subghz_file_create(file_name_path, session);
-
+    if (!subghz_file_create(file_name_path, session))
+    {
+        log_error("Unable to save Sub-GHz capture: %s", file_name_path);
+        return SUBGHZ_ERR_IO;
+    }
     return SUBGHZ_OK;
 }

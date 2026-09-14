@@ -21,8 +21,14 @@ static void event_handler(subghz_service_event_t *event)
                 break;
             case SUBGHZ_EVENT_CAPTURE_READY:
 
-                subghz_service_save((subghz_capture_session_t *)event->data);
-                capture_handler(UI_DONE, NULL);
+                if (subghz_service_save((subghz_capture_session_t *)event->data) != SUBGHZ_OK)
+                {
+                    event_arg.message = "No se pudo guardar la captura Sub-GHz";
+                    capture_handler(UI_ERROR, &event_arg);
+                }
+                else
+                    capture_handler(UI_DONE, NULL);
+                    
                 break;
             case SUBGHZ_EVENT_CAPTURE_DATA:
 

@@ -40,6 +40,8 @@ SRC := \
 	service/hid_service.c \
 	service/ir_service.c \
 	service/uart_service.c \
+	service/subghz/subghz_service.c \
+	service/subghz/subghz_file.c \
 	utils/file.c \
 	utils/string_utils.c \
 	utils/cJSON.c \
