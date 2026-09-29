@@ -220,13 +220,15 @@ subghz_status_t subghz_service_save(subghz_capture_session_t *session)
 
     int written = snprintf(file_name_path, sizeof(file_name_path), "%s/%" PRIu64 "_%ld.sub",
                            ctx.files_directory, session->capture_id, (long)timestamp);
+
     if (written < 0 || (size_t)written >= sizeof(file_name_path))
         return SUBGHZ_ERR_IO;
 
-    if (!subghz_file_create(file_name_path, session))
+    if (!subghz_file_create(file_name_path, session, FuriHalSubGhzPresetOok270Async))
     {
         log_error("Unable to save Sub-GHz capture: %s", file_name_path);
         return SUBGHZ_ERR_IO;
     }
+
     return SUBGHZ_OK;
 }
