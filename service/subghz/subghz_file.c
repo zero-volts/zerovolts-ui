@@ -44,7 +44,7 @@ bool subghz_file_create(const char *file_name_path, subghz_capture_session_t *se
         session->count > SUBGHZ_CAPTURE_MAX_TIMINGS)
         return false;
 
-    char *preset_str = NULL;
+    const char *preset_str = NULL;
     for (size_t i = 0; i < sizeof(flipper_presets) / sizeof(flipper_presets[0]); i++)
     {
         if (preset == flipper_presets[i].preset) 

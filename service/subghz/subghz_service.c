@@ -210,7 +210,7 @@ void subghz_service_add_event_callback(subghz_service_handler new_cb)
     ctx.service_handler = new_cb;
 }
 
-subghz_status_t subghz_service_save(subghz_capture_session_t *session)
+subghz_status_t subghz_service_save(subghz_capture_session_t *session, const char *file_name)
 {
     if (session == NULL)
         return SUBGHZ_ERR_IO;
@@ -218,8 +218,14 @@ subghz_status_t subghz_service_save(subghz_capture_session_t *session)
     time_t timestamp = time(NULL);
     char file_name_path[512];
 
-    int written = snprintf(file_name_path, sizeof(file_name_path), "%s/%" PRIu64 "_%ld.sub",
-                           ctx.files_directory, session->capture_id, (long)timestamp);
+    int written = 0;
+    if (file_name == NULL)
+    {
+        written = snprintf(file_name_path, sizeof(file_name_path), "%s/%" PRIu64 "_%ld.sub",
+            ctx.files_directory, session->capture_id, (long)timestamp);
+    }
+    else 
+        written = snprintf(file_name_path, sizeof(file_name_path), "%s.sub", file_name);
 
     if (written < 0 || (size_t)written >= sizeof(file_name_path))
         return SUBGHZ_ERR_IO;

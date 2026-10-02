@@ -225,3 +225,28 @@ subghz_capture_session_t *subghz_get_session_by(uint64_t session_id)
 
     return session_found;
 }
+
+bool subghz_remove_session_by(uint64_t session_id)
+{
+    subghz_sessions *sessions = ctx.sessions;
+    for (int index = 0; index < sessions->current_sessions_amount; index++)
+    {
+        if (sessions->sessions[index].capture_id != session_id)
+            continue;
+
+        int remaining = (sessions->current_sessions_amount - 1) - index;
+        if (remaining > 0)
+        {
+            memmove(&sessions->sessions[index], 
+                &sessions->sessions[index + 1], 
+                (size_t)remaining * sizeof(sessions->sessions[0]) );
+        }
+
+        sessions->current_sessions_amount--;
+        memset( &sessions->sessions[sessions->current_sessions_amount], 0, sizeof(sessions->sessions[0]) );
+
+        return true;
+    }
+
+    return false;
+}

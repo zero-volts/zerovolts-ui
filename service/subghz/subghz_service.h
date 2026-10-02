@@ -39,7 +39,7 @@ typedef void (*subghz_service_handler)(subghz_service_event_t *event);
 subghz_status_t subghz_service_init(const zv_config *config);
 subghz_status_t subghz_service_start_capture(uint32_t frequency, uint32_t time_frame_ms);
 void subghz_service_add_event_callback(subghz_service_handler new_cb);
-subghz_status_t subghz_service_save(subghz_capture_session_t *session);
+subghz_status_t subghz_service_save(subghz_capture_session_t *session, const char *file_name_path);
 
 #ifdef __cplusplus
 }

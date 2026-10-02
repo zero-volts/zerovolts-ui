@@ -21,13 +21,8 @@ static void event_handler(subghz_service_event_t *event)
                 break;
             case SUBGHZ_EVENT_CAPTURE_READY:
 
-                if (subghz_service_save((subghz_capture_session_t *)event->data) != SUBGHZ_OK)
-                {
-                    event_arg.message = "No se pudo guardar la captura Sub-GHz";
-                    capture_handler(UI_ERROR, &event_arg);
-                }
-                else
-                    capture_handler(UI_DONE, NULL);
+                event_arg.session_id = ((subghz_capture_session_t *)event->data)->capture_id;
+                capture_handler(UI_DONE, &event_arg);
                     
                 break;
             case SUBGHZ_EVENT_CAPTURE_DATA:
@@ -80,4 +75,23 @@ subghz_status_t subghz_controller_start_capture(uint32_t frequency, uint32_t tim
     }
 
     return SUBGHZ_OK;
+}
+
+subghz_status_t subghz_controller_save_data(subghz_capture_session_t *session, const char *file_name)
+{
+    if (!session)
+        return SUBGHZ_ERR_INVALID;
+
+    uint64_t session_id = session->capture_id;
+    subghz_status_t result = subghz_service_save(session, file_name);
+    if (result != SUBGHZ_OK)
+        return result;
+
+    subghz_remove_session_by(session_id);
+    return SUBGHZ_OK;
+}
+
+bool subghz_controller_discard_session( uint64_t session_id)
+{
+    return subghz_remove_session_by(session_id);
 }
