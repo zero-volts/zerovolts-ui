@@ -67,10 +67,10 @@ int write_entire_file(const char *path, const char *data, size_t len)
         return -1;
 
     size_t n = fwrite(data, 1, len, f);
-    fflush(f);
-    fclose(f);
+    int flush_result = fflush(f);
+    int close_result = fclose(f);
 
-    if(n != len) 
+    if(n != len || flush_result != 0 || close_result != 0)
     {
         remove(tmp);
         return -2;
