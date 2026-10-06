@@ -16,7 +16,6 @@ SRC := \
 	components/nav.c \
 	components/list/ui_list.c \
 	components/ui_pills.c \
-	components/ui_loading_btn.c \
 	components/ui_info_panel.c \
 	components/ui_panel.c \
 	components/text_input/ui_text_input.c \
