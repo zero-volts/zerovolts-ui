@@ -1,7 +1,7 @@
 #include "bt_device_detail.h"
 #include "bt_controller.h"
 #include "components/ui_info_panel.h"
-#include "components/ui_loading_btn.h"
+#include "components/button/ui_button.h"
 #include "components/ui_pills.h"
 #include "components/ui_theme.h"
 #include "bt_uuid_registry.h"
@@ -22,7 +22,7 @@ typedef struct {
     lv_obj_t *services_placeholder;
 
     lv_obj_t *status_label;
-    ui_loading_button *connect_btn;
+    ui_button *connect_btn;
 } view_ctx;
 
 static view_ctx own_ctx;
@@ -122,12 +122,12 @@ static void update_btn_state(bt_conn_status_t s)
         return;
 
     bool loading = (s == BT_CONN_CONNECTING || s == BT_CONN_DISCOVERING);
-    loading_button_set_loading(own_ctx.connect_btn, loading);
+    ui_button_set_loading(own_ctx.connect_btn, loading);
 
     if (s == BT_CONN_CONNECTED || s == BT_CONN_READY) {
-        loading_button_set_text(own_ctx.connect_btn, "Disconnect");
+        ui_button_set_text(own_ctx.connect_btn, "Disconnect");
     } else {
-        loading_button_set_text(own_ctx.connect_btn, "Connect");
+        ui_button_set_text(own_ctx.connect_btn, "Connect");
     }
 }
 
@@ -146,7 +146,7 @@ static void on_conn_event(bt_conn_status_t status, const char *info)
         rebuild_services_list();
 }
 
-static void on_connect_click(lv_event_t *e)
+static void on_connect_click(event_data_btn *e)
 {
     (void)e;
 
@@ -244,8 +244,8 @@ lv_obj_t *bt_device_detail_page_create(lv_obj_t *menu)
     lv_label_set_text(own_ctx.status_label, status_text(BT_CONN_IDLE));
     lv_obj_set_style_text_color(own_ctx.status_label, ZV_COLOR_TERMINAL, 0);
 
-    own_ctx.connect_btn = create_loading_btn(action_row, 100, 40, "Connect");
-    loading_set_event_cb(own_ctx.connect_btn, on_connect_click, own_ctx.connect_btn);
+    own_ctx.connect_btn = ui_button_create(action_row, 100, 40, "Connect");
+    ui_button_set_on_click(own_ctx.connect_btn, on_connect_click, own_ctx.connect_btn);
 
     create_section_title(root, "SERVICES");
 

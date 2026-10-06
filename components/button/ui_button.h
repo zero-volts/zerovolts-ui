@@ -12,14 +12,18 @@ typedef struct {
 } event_data_btn;
 
 typedef struct ui_button ui_button;
-typedef void (*ui_btton_on_click)(event_data_btn *event);
+typedef void (*ui_button_on_click)(event_data_btn *event);
 
 ui_button *ui_button_create(lv_obj_t *parent, int width, int height, const char *text);
 ui_button *ui_icon_button_create(lv_obj_t *parent, int width, int height, const char *icon);
-void ui_button_set_on_click(ui_button *button, ui_btton_on_click callback, void *user_data);
+void ui_button_set_on_click(ui_button *button, ui_button_on_click callback, void *user_data);
+void ui_button_set_text(ui_button *button, const char *text);
+void ui_button_set_loading(ui_button *button, bool loading);
+lv_obj_t *ui_button_get_obj(ui_button *button);
 void ui_button_hide(ui_button *button, bool hide);
 void ui_button_enable(ui_button *button, bool enable);
 void ui_button_destroy(ui_button *button);
+
 
 #ifdef __cplusplus
 }

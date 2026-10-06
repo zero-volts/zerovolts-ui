@@ -1,7 +1,7 @@
 #include "bt_scanner.h"
 #include "components/ui_theme.h"
 #include "components/list/ui_list.h"
-#include "components/ui_loading_btn.h"
+#include "components/button/ui_button.h"
 #include "components/ui_pills.h"
 #include "bt_device_detail.h"
 #include "bt_controller.h"
@@ -12,7 +12,7 @@
 #include <string.h>
 
 static ui_list *scanner_list = NULL;
-static ui_loading_button *scan_btn = NULL;
+static ui_button *scan_btn = NULL;
 static lv_obj_t *lb_devices_amount = NULL;
 static lv_obj_t *device_detail_page = NULL;
 static ui_pills *filter_pills = NULL;
@@ -83,12 +83,12 @@ static void handler_devices(device_t *device, ui_status_t status)
     if (scanner_list == NULL)
         return;
 
-    if (status == UI_LOADING) {
-        loading_button_set_loading(scan_btn, true);
-    }
+    if (status == UI_LOADING)
+        ui_button_set_loading(scan_btn, true);
 
-    if (status == UI_DONE) {
-        loading_button_set_loading(scan_btn, false);
+    if (status == UI_DONE)
+    {
+        ui_button_set_loading(scan_btn, false);
         // Reapply current filter so Near re-sorts and any drift gets corrected.
         on_filter_change(NULL, pills_get_active(filter_pills), NULL, NULL);
         return;
@@ -112,10 +112,10 @@ static void handler_devices(device_t *device, ui_status_t status)
     lv_label_set_text(lb_devices_amount, device_text);
 }
 
-static void handler_scan_btn(lv_event_t *e)
+static void handler_scan_btn(event_data_btn *e)
 {
     (void)e;
-    loading_button_set_loading(scan_btn, true);
+    ui_button_set_loading(scan_btn, true);
     clean_list(scanner_list);
     bt_controller_reset_devices();
 
@@ -144,8 +144,8 @@ static void create_scanner_panel(lv_obj_t *parent)
     lv_label_set_text(lb_devices_amount, "Devices: 0");
     lv_obj_set_style_text_color(lb_devices_amount, ZV_COLOR_TERMINAL, 0);
 
-    scan_btn = create_loading_btn(scan_btn_container, 77, 40, "Scan");
-    loading_set_event_cb(scan_btn, handler_scan_btn, NULL);
+    scan_btn = ui_button_create(scan_btn_container, 77, 40, "Scan");
+    ui_button_set_on_click(scan_btn, handler_scan_btn, NULL);
 }
 
 static void on_filter_change(ui_pills *pills, int index, const char *label, void *user_data)

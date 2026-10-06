@@ -11,7 +11,6 @@
 #include "components/dropdown/ui_dropdown.h"
 #include "components/component_helper.h"
 #include "components/button/ui_button.h"
-#include "components/ui_loading_btn.h"
 #include "page/sub_ghz/sub_ghz_controller.h"
 #include "service/subghz/subghz_service.h"
 #include "app_context.h"
@@ -57,7 +56,7 @@ typedef struct {
     // UI componentes
     ui_pills *frequency_pills;
     lv_obj_t *chart;
-    ui_loading_button *capture_btn;
+    ui_button *capture_btn;
     ui_button *save_btn;
 
     lv_obj_t *status_lbl;
@@ -166,12 +165,12 @@ static void capture_handler(ui_status_t status, subghz_event_arg *event)
     if (status == UI_ERROR)
     {
         const char *message = event && event->message ? event->message : STR_UNKWNOWN_ERROR;
-        
+
         log_error("capture_handler: %s\n", message);
         lv_label_set_text(local_ctx.status_lbl, message);
 
-        loading_button_set_text(local_ctx.capture_btn, STR_CAPTURE_BUTTON);
-        loading_button_set_loading(local_ctx.capture_btn, false);
+        ui_button_set_text(local_ctx.capture_btn, STR_CAPTURE_BUTTON);
+        ui_button_set_loading(local_ctx.capture_btn, false);
         ui_button_enable(local_ctx.save_btn, false);
 
         return;
@@ -182,8 +181,8 @@ static void capture_handler(ui_status_t status, subghz_event_arg *event)
         local_ctx.sessions_ended = event->session_id;
 
         lv_label_set_text(local_ctx.status_lbl, STR_STATUS_CAPTURE_READY);
-        loading_button_set_text(local_ctx.capture_btn, STR_CAPTURE_BUTTON);
-        loading_button_set_loading(local_ctx.capture_btn, false);
+        ui_button_set_text(local_ctx.capture_btn, STR_CAPTURE_BUTTON);
+        ui_button_set_loading(local_ctx.capture_btn, false);
 
         ui_button_hide(local_ctx.discard_btn, false);
         ui_button_enable(local_ctx.save_btn, true);
@@ -220,7 +219,7 @@ static void subghz_discard_capture_handler(event_data_btn *e)
     local_ctx.sessions_ended = 0;
     ui_button_enable(local_ctx.save_btn, false);
     ui_button_hide(local_ctx.discard_btn, true);
-    
+
     lv_label_set_text(local_ctx.status_lbl, STR_STATUS_INITIAL);
 
     lv_chart_series_t *serie = lv_chart_get_series_next(local_ctx.chart, NULL);
@@ -231,20 +230,20 @@ static void subghz_discard_capture_handler(event_data_btn *e)
     reset_chart_capture(serie, max_points);
 }
 
-static void subghz_start_capture_handler(lv_event_t *e)
+static void subghz_start_capture_handler(event_data_btn *e)
 {
     subghz_discard_capture_handler(NULL);
 
-    loading_button_set_text(local_ctx.capture_btn, STR_CAPTURING_BUTTON);
-    loading_button_set_loading(local_ctx.capture_btn, true);
+    ui_button_set_text(local_ctx.capture_btn, STR_CAPTURING_BUTTON);
+    ui_button_set_loading(local_ctx.capture_btn, true);
 
     lv_label_set_text(local_ctx.status_lbl, STR_STATUS_CAPTURE_WAITING);
 
     subghz_status_t result = subghz_controller_start_capture(frequencies[local_ctx.selected_frequency].value, DEFAULT_CAPTURE_TIMEFRAME_MS);
     if (result != SUBGHZ_OK)
     {
-        loading_button_set_text(local_ctx.capture_btn, STR_CAPTURE_BUTTON);
-        loading_button_set_loading(local_ctx.capture_btn, false);
+        ui_button_set_text(local_ctx.capture_btn, STR_CAPTURE_BUTTON);
+        ui_button_set_loading(local_ctx.capture_btn, false);
         log_error("Unable to start Sub-GHz capture");
     }
 }
@@ -333,7 +332,7 @@ static void create_action_panel(lv_obj_t *parent)
     local_ctx.status_lbl = create_section_label(panel, STR_STATUS_INITIAL);
     local_ctx.discard_btn = ui_button_create(panel,  LV_PCT(100), 50, "Discard");
     ui_button_set_on_click(local_ctx.discard_btn, subghz_discard_capture_handler, NULL);
-    ui_button_hide(local_ctx.discard_btn, true);        
+    ui_button_hide(local_ctx.discard_btn, true);
 }
 
 static void create_bottom_panel(lv_obj_t *parent)
@@ -347,8 +346,8 @@ static void create_bottom_panel(lv_obj_t *parent)
     lv_obj_set_flex_flow(bottom_panel, LV_FLEX_FLOW_ROW);
     lv_obj_set_style_pad_column(bottom_panel, 10, 0);
 
-    local_ctx.capture_btn = create_loading_btn(bottom_panel,  LV_PCT(48), 50, STR_CAPTURE_BUTTON);
-    loading_set_event_cb(local_ctx.capture_btn, subghz_start_capture_handler, NULL);
+    local_ctx.capture_btn = ui_button_create(bottom_panel,  LV_PCT(48), 50, STR_CAPTURE_BUTTON);
+    ui_button_set_on_click(local_ctx.capture_btn, subghz_start_capture_handler, NULL);
 
     local_ctx.save_btn = ui_button_create(bottom_panel, LV_PCT(48), 50, STR_SAVE_BUTTON);
     ui_button_set_on_click(local_ctx.save_btn, subghz_save_capture_handler, NULL);
@@ -371,7 +370,7 @@ lv_obj_t *subghz_capture_page_create(lv_obj_t *menu)
 
     create_frequency_panel(root);
     create_signal_chart(root);
-    create_action_panel(root);  
+    create_action_panel(root);
     create_bottom_panel(root);
 
     subghz_controller_set_capture_cb(capture_handler);
