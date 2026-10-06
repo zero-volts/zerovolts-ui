@@ -169,6 +169,7 @@ static void load_remote_dropdown(void)
     }
 
     dropdown_set_selected_item(g_send_ui.dropdown_remotes, 0);
+    g_send_ui.remote_selected_position = 0;
 
     ir_controller_free_remote_list(&remotes);
 

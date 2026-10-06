@@ -211,8 +211,29 @@ static void capture_handler(ui_status_t status, subghz_event_arg *event)
     printf("\n");
 }
 
-static void subghz_capture_handler(lv_event_t *e)
+static void subghz_discard_capture_handler(lv_event_t *e)
 {
+    (void)e;
+    subghz_controller_discard_session(local_ctx.sessions_ended);
+
+    local_ctx.sessions_ended = 0;
+    lv_obj_add_state(local_ctx.save_btn, LV_STATE_DISABLED);
+    lv_obj_add_flag(local_ctx.discard_btn, LV_OBJ_FLAG_HIDDEN);
+
+    lv_label_set_text(local_ctx.status_lbl, STR_STATUS_INITIAL);
+
+    lv_chart_series_t *serie = lv_chart_get_series_next(local_ctx.chart, NULL);
+    if (!serie)
+        return;
+
+    uint32_t max_points = lv_chart_get_point_count(local_ctx.chart);
+    reset_chart_capture(serie, max_points);
+}
+
+static void subghz_start_capture_handler(lv_event_t *e)
+{
+    subghz_discard_capture_handler(e);
+
     loading_button_set_text(local_ctx.capture_btn, STR_CAPTURING_BUTTON);
     loading_button_set_loading(local_ctx.capture_btn, true);
 
@@ -241,25 +262,6 @@ static void subghz_save_capture_handler(lv_event_t *e)
     local_ctx.sessions_ended = 0;
     lv_obj_add_state(local_ctx.save_btn, LV_STATE_DISABLED);
     lv_obj_add_flag(local_ctx.discard_btn, LV_OBJ_FLAG_HIDDEN);
-
-    lv_chart_series_t *serie = lv_chart_get_series_next(local_ctx.chart, NULL);
-    if (!serie)
-        return;
-
-    uint32_t max_points = lv_chart_get_point_count(local_ctx.chart);
-    reset_chart_capture(serie, max_points);
-}
-
-static void subghz_discard_capture_handler(lv_event_t *e)
-{
-    (void)e;
-    subghz_controller_discard_session(local_ctx.sessions_ended);
-
-    local_ctx.sessions_ended = 0;
-    lv_obj_add_state(local_ctx.save_btn, LV_STATE_DISABLED);
-    lv_obj_add_flag(local_ctx.discard_btn, LV_OBJ_FLAG_HIDDEN);
-
-    lv_label_set_text(local_ctx.status_lbl, STR_STATUS_INITIAL);
 
     lv_chart_series_t *serie = lv_chart_get_series_next(local_ctx.chart, NULL);
     if (!serie)
@@ -346,7 +348,7 @@ static void create_bottom_panel(lv_obj_t *parent)
     lv_obj_set_style_pad_column(bottom_panel, 10, 0);
 
     local_ctx.capture_btn = create_loading_btn(bottom_panel,  LV_PCT(48), 50, STR_CAPTURE_BUTTON);
-    loading_set_event_cb(local_ctx.capture_btn, subghz_capture_handler, NULL);
+    loading_set_event_cb(local_ctx.capture_btn, subghz_start_capture_handler, NULL);
 
     local_ctx.save_btn = create_btn(bottom_panel, STR_SAVE_BUTTON, LV_PCT(48), 50);
     lv_obj_add_event_cb(local_ctx.save_btn, subghz_save_capture_handler, LV_EVENT_CLICKED, NULL);

@@ -11,8 +11,6 @@ lv_obj_t *find_first_element_child(lv_obj_t *parent, const lv_obj_class_t * clas
 lv_obj_t *create_square_main_button(lv_obj_t *parent, const char *text, const char *icon, lv_event_cb_t cb, void *user_data);
 lv_obj_t *create_btn(lv_obj_t *parent, const char *text, int width, int height);
 lv_obj_t *create_section_label(lv_obj_t *parent, const char *text);
-lv_obj_t *create_icon_button(lv_obj_t *parent, const char *icon, lv_coord_t width, lv_coord_t height,
-                             lv_event_cb_t cb, void *user_data);
 lv_obj_t *create_transparent_flex_row(lv_obj_t *parent, lv_coord_t width, lv_coord_t height);
 
 void rotate_icon_by_tag(lv_obj_t * btn, int32_t angle);

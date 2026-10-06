@@ -13,6 +13,26 @@ struct ui_dropdown {
     void *user_data;
 };
 
+static void dropdown_release_items(ui_dropdown *dropdown)
+{
+    for (int i = 0; i < dropdown->item_count; i++)
+        free((void *)dropdown->items[i].text);
+
+    free(dropdown->items);
+    dropdown->items = NULL;
+    dropdown->item_count = 0;
+}
+
+static void dropdown_delete_handler(lv_event_t *e)
+{
+    ui_dropdown *dropdown = (ui_dropdown *)lv_event_get_user_data(e);
+    if (!dropdown)
+        return;
+
+    dropdown_release_items(dropdown);
+    free(dropdown);
+}
+
 static void dropdown_changed_cb(lv_event_t *e)
 {
     ui_dropdown *self = (ui_dropdown *)lv_event_get_user_data(e);
@@ -28,8 +48,16 @@ static void dropdown_changed_cb(lv_event_t *e)
 ui_dropdown *dropdown_create(lv_obj_t *parent, int width, int height)
 {
     ui_dropdown *dropdown_box = (ui_dropdown *)calloc(1, sizeof(ui_dropdown));
+    if (!dropdown_box)
+        return NULL;
 
     lv_obj_t *obj = lv_dropdown_create(parent);
+    if (!obj)
+    {
+        free(dropdown_box);
+        return NULL;
+    }
+
     lv_dropdown_clear_options(obj);
 
     lv_obj_set_width(obj, width);
@@ -64,7 +92,7 @@ void dropdown_set_on_change_cb(ui_dropdown *dropdown, ui_dropdown_item_change_cb
 
 dropdown_item_t *dropdown_get_item(ui_dropdown *dropdown, int position)
 {
-    if ((dropdown->item_count - 1) < position)
+    if (!dropdown || position < 0 || position >= dropdown->item_count)
         return NULL;
 
     return &dropdown->items[position];
@@ -73,10 +101,6 @@ dropdown_item_t *dropdown_get_item(ui_dropdown *dropdown, int position)
 void dropdown_add_item(ui_dropdown *dropdown, const dropdown_item_t *item)
 {
     if (!dropdown || !item)
-        return;
-
-    dropdown_item_t *new_items = (dropdown_item_t *)realloc(dropdown->items, (dropdown->item_count + 1) * sizeof(*new_items));
-    if (new_items == NULL)
         return;
 
     if (!item->text)
@@ -92,11 +116,19 @@ void dropdown_add_item(ui_dropdown *dropdown, const dropdown_item_t *item)
 
     memcpy(text_copy, item->text, text_size);
 
+    dropdown_item_t item_copy = *item;
+    dropdown_item_t *new_items = (dropdown_item_t *)realloc(dropdown->items, (dropdown->item_count + 1) * sizeof(*new_items));
+    if (!new_items)
+    {
+        free(text_copy);
+        return;
+    }
+
     dropdown->items = new_items;
-    new_items[dropdown->item_count] = *item;
+    new_items[dropdown->item_count] = item_copy;
     new_items[dropdown->item_count].text = text_copy;
 
-    lv_dropdown_add_option(dropdown->dropdown, text_copy, item->position);
+    lv_dropdown_add_option(dropdown->dropdown, text_copy, item_copy.position);
 
     dropdown->item_count++;
 }
@@ -126,16 +158,11 @@ void dropdown_clean_items(ui_dropdown *dropdown)
 
     lv_dropdown_clear_options(dropdown->dropdown);
     
-    if (dropdown->items != NULL)
-    {
-        for (int i = 0; i< dropdown->item_count; i++)
-        {
-            free((void *)dropdown->items[i].text);
-        }
+    dropdown_release_items(dropdown);
+}
 
-        free(dropdown->items);
-        dropdown->items = NULL;
-    }
-
-    dropdown->item_count = 0;
+void dropdown_destroy(ui_dropdown *dropdown)
+{
+    if (dropdown)
+        lv_obj_delete(dropdown->dropdown);
 }

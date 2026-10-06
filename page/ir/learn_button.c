@@ -82,6 +82,8 @@ static void load_remote_dropdown(void)
     }
 
     dropdown_set_selected_item(g_learn.dropdown_remotes, 0);
+    g_learn.remote_selected_position = 0;
+    
     learn_set_status("Ready to capture.");
     log_debug("[IR][learn_ui] remotes loaded: %zu\n", remotes.count);
 
@@ -177,9 +179,14 @@ lv_obj_t *ir_learn_button_page_create(lv_obj_t *menu)
     ui_button *refresh_btn = ui_icon_button_create(remote_list_container, 45, 35, LV_SYMBOL_REFRESH);
     ui_button_set_on_click(refresh_btn, learn_refresh_remotes_cb, NULL);
     
-    
     create_section_label(root, "Button Name:");
-    g_learn.button_txt = ui_text_create(root, LV_PCT(82), 40, "KEY_VOLUMEUP");
+    const zv_config *cfg = config_get();
+    ui_text_input_options input_options = {
+        .use_on_screen_keyboard = cfg ? cfg->ir.use_on_screen_keyboard : true,
+        .one_line = true
+    };
+
+    g_learn.button_txt = ui_text_create_with_options(root, LV_PCT(82), 40, "KEY_VOLUMEUP", &input_options);
 
     lv_obj_t *hint = lv_label_create(root);
     lv_label_set_text(hint, "Point remote at receiver and press one button.");

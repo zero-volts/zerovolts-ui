@@ -15,7 +15,7 @@ struct ui_button {
 static void click_button_handler(lv_event_t *e)
 {
     ui_button *button = (ui_button *)lv_event_get_user_data(e);
-    if (!button) 
+    if (!button)
         return;
 
     if (button->on_click != NULL)
@@ -31,12 +31,21 @@ static void click_button_handler(lv_event_t *e)
 
 ui_button *ui_button_create(lv_obj_t *parent, int width, int height, const char *text)
 {
-    ui_button *button = (ui_button *)malloc(sizeof(ui_button));
+    ui_button *button = (ui_button *)calloc(1, sizeof(ui_button));
+    if (!button)
+        return NULL;
+
     button->id  = initial_button_id++;
     button->on_click = NULL;
     button->user_data = NULL;
 
     button->btn = lv_btn_create(parent);
+    if (!button->btn)
+    {
+        free(button);
+        return NULL;
+    }
+
     lv_obj_set_size(button->btn, width, height);
     lv_obj_set_style_bg_color(button->btn, ZV_COLOR_BG_PANEL, 0);
     lv_obj_set_style_bg_opa(button->btn, LV_OPA_COVER, 0);
@@ -60,7 +69,6 @@ ui_button *ui_icon_button_create(lv_obj_t *parent, int width, int height, const 
     return ui_button_create(parent, width, height, icon);
 }
 
-
 void ui_button_set_on_click(ui_button *button, ui_btton_on_click callback, void *user_data)
 {
     if (!button)
@@ -68,4 +76,10 @@ void ui_button_set_on_click(ui_button *button, ui_btton_on_click callback, void 
 
     button->on_click = callback;
     button->user_data = user_data;
+}
+
+void ui_button_destroy(ui_button *button)
+{
+    if (button)
+        lv_obj_delete(button->btn);
 }

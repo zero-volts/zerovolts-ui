@@ -1,7 +1,8 @@
 #include "page/ir/new_remote.h"
 
-#include "components/nav.h"
+#include "config.h"
 #include "utils/logger.h"
+#include "components/nav.h"
 #include "utils/string_utils.h"
 #include "components/ui_theme.h"
 #include "page/ir/ir_controller.h"
@@ -55,7 +56,7 @@ static void ir_create_remote_file(new_remote_ui_t *ui)
 static void create_button_handler(event_data_btn *event)
 {
     new_remote_ui_t *ui = (new_remote_ui_t *)event->user_data;
-    if (!ui) 
+    if (!ui)
         return;
 
     ir_create_remote_file(ui);
@@ -82,7 +83,13 @@ lv_obj_t *ir_new_remote_page_create(lv_obj_t *menu)
     create_section_label(root, "Remote Name:");
 
     // TODO: no olvidar liberar exte objeto cuando se destruya (en algun momento) la pantalla!
-    g_new_remote.name_input_text = ui_text_create(root, LV_PCT(100), 60, "Enter remote name");
+    const zv_config *cfg = config_get();
+    ui_text_input_options input_options = {
+        .use_on_screen_keyboard = cfg ? cfg->ir.use_on_screen_keyboard : true,
+        .one_line = true
+    };
+
+    g_new_remote.name_input_text = ui_text_create_with_options(root, LV_PCT(100), 60, "Enter remote name", &input_options);
 
     lv_obj_t *spacer = lv_obj_create(root);
     lv_obj_set_size(spacer, LV_PCT(100), 1);

@@ -7,7 +7,7 @@ struct ui_text_input {
     lv_obj_t *keyboard;
     lv_obj_t *active_textarea;
     bool use_on_screen_keyboard;
-    
+
     lv_obj_t *input;
 };
 
@@ -43,8 +43,37 @@ static void keyboard_event_handler(lv_event_t *e)
         return;
 
     lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_DELETE)
+    {
+        lv_group_t *group = lv_obj_get_group(text_input->keyboard);
+        if (group)
+            lv_group_set_editing(group, false);
+
+        text_input->keyboard = NULL;
+        text_input->active_textarea = NULL;
+
+        return;
+    }
+
     if (code == LV_EVENT_READY || code == LV_EVENT_CANCEL)
         keyboard_hide(text_input);
+}
+
+static void input_delete_handler(lv_event_t *e)
+{
+    ui_text_input *text_input = (ui_text_input *)lv_event_get_user_data(e);
+    if (!text_input)
+        return;
+
+    // Do not restore focus to a textarea that is being deleted.
+    text_input->active_textarea = NULL;
+    if (text_input->keyboard)
+    {
+        lv_keyboard_set_textarea(text_input->keyboard, NULL);
+        lv_obj_delete(text_input->keyboard);
+    }
+
+    free(text_input);
 }
 
 static void ui_input_handler(lv_event_t *e)
@@ -53,10 +82,10 @@ static void ui_input_handler(lv_event_t *e)
     lv_event_code_t code = lv_event_get_code(e);
     lv_obj_t *target = (lv_obj_t *)lv_event_get_target(e);
 
-    if (!text_input || !target) 
+    if (!text_input || !target)
         return;
 
-    if (code == LV_EVENT_KEY) 
+    if (code == LV_EVENT_KEY)
     {
         uint32_t key = lv_event_get_key(e);
         log_debug("ui_text_input::ui_input_handler key=%u\n", (unsigned)key);
@@ -72,10 +101,26 @@ static void ui_input_handler(lv_event_t *e)
 
 ui_text_input *ui_text_create(lv_obj_t *parent, int width, int height, const char *hint)
 {
-    ui_text_input *text_input = (ui_text_input *)malloc(sizeof(ui_text_input));
+    return ui_text_create_with_options(parent, width, height, hint, NULL);
+}
+
+ui_text_input *ui_text_create_with_options(lv_obj_t *parent, int width, int height,
+                                         const char *hint, const ui_text_input_options *options)
+{
+    ui_text_input *text_input = (ui_text_input *)calloc(1, sizeof(ui_text_input));
+    if (!text_input)
+        return NULL;
 
     text_input->input = lv_textarea_create(parent);
-    text_input->use_on_screen_keyboard = true;
+    if (!text_input->input)
+    {
+        free(text_input);
+        return NULL;
+    }
+
+    text_input->use_on_screen_keyboard = options ? options->use_on_screen_keyboard : true;
+    lv_obj_add_event_cb(text_input->input, input_delete_handler, LV_EVENT_DELETE, text_input);
+    lv_textarea_set_one_line(text_input->input, options ? options->one_line : false);
 
     lv_obj_set_size(text_input->input, width, height);
     lv_textarea_set_placeholder_text(text_input->input, hint);
@@ -93,16 +138,31 @@ ui_text_input *ui_text_create(lv_obj_t *parent, int width, int height, const cha
     lv_obj_add_event_cb(text_input->input, ui_input_handler, LV_EVENT_PRESSED, text_input);
     lv_obj_add_event_cb(text_input->input, ui_input_handler, LV_EVENT_KEY, text_input);
 
+    if (!text_input->use_on_screen_keyboard)
+        return text_input;
+
     // Creating the keyboard on top layer to avoid menu/page clipping issues.
     text_input->keyboard = lv_keyboard_create(lv_layer_top());
+    if (!text_input->keyboard)
+    {
+        lv_obj_delete(text_input->input);
+        return NULL;
+    }
     // TODO: calcular dinamicamente el ancho y alto de la pantalla.
     lv_obj_set_size(text_input->keyboard, lv_pct(100), 120);
     lv_obj_align(text_input->keyboard, LV_ALIGN_BOTTOM_MID, 0, 0);
     lv_obj_add_flag(text_input->keyboard, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_event_cb(text_input->keyboard, keyboard_event_handler, LV_EVENT_READY, text_input);
     lv_obj_add_event_cb(text_input->keyboard, keyboard_event_handler, LV_EVENT_CANCEL, text_input);
+    lv_obj_add_event_cb(text_input->keyboard, keyboard_event_handler, LV_EVENT_DELETE, text_input);
 
     return text_input;
+}
+
+void ui_text_destroy(ui_text_input *input_text)
+{
+    if (input_text)
+        lv_obj_delete(input_text->input);
 }
 
 const char *ui_text_get_text(ui_text_input *input_text)
@@ -112,7 +172,7 @@ const char *ui_text_get_text(ui_text_input *input_text)
         log_error("ui_text_input::ui_text_input_get_text input is NULL");
         return NULL;
     }
-        
+
     const char *text = lv_textarea_get_text(input_text->input);
     if (!text || !text[0])
         return NULL;

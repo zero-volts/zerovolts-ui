@@ -23,6 +23,7 @@ void dropdown_add_item(ui_dropdown *dropdown, const dropdown_item_t *item);
 void dropdown_set_items(ui_dropdown *dropdown, const dropdown_item_t *items, size_t amount);
 void dropdown_set_selected_item(ui_dropdown *dropdown, int selected_index);
 void dropdown_clean_items(ui_dropdown *dropdown);
+void dropdown_destroy(ui_dropdown *dropdown);
 
 
 #ifdef __cplusplus
