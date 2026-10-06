@@ -11,41 +11,14 @@ struct ui_text_input {
     lv_obj_t *input;
 };
 
-static void keyboard_hide(ui_text_input *ui)
-{
-    lv_group_t *group;
-    if (!ui || !ui->use_on_screen_keyboard || !ui->keyboard)
-        return;
-
-    log_debug("ui_text_input::keyboard_hide hidding keyboard");
-    group = lv_obj_get_group(ui->keyboard);
-    if (group)
-        lv_group_set_editing(group, false);
-
-    lv_obj_add_flag(ui->keyboard, LV_OBJ_FLAG_HIDDEN);
-    lv_keyboard_set_textarea(ui->keyboard, NULL);
-    if (group)
-        lv_group_remove_obj(ui->keyboard);
-
-    if (ui->active_textarea && group)
-        lv_group_focus_obj(ui->active_textarea);
-
-    ui->active_textarea = NULL;
-}
-
 static void keyboard_show(ui_text_input *ui, lv_obj_t *target)
 {
-    log_debug("ui_text_input::keyboard_show 1");
     lv_group_t *group;
     if (!ui || !target)
         return;
 
-    log_debug("ui_text_input::keyboard_show 2");
-
     if (!ui->use_on_screen_keyboard || !ui->keyboard)
         return;
-
-    log_debug("ui_text_input::keyboard_show");
     
     ui->active_textarea = target;
     lv_keyboard_set_textarea(ui->keyboard, target);
@@ -55,7 +28,6 @@ static void keyboard_show(ui_text_input *ui, lv_obj_t *target)
     group = lv_obj_get_group(target);
     if (group) 
     {
-        log_debug("ui_text_input::keyboard_show 4");
         if (!lv_obj_get_group(ui->keyboard))
             lv_group_add_obj(group, ui->keyboard);
 
@@ -66,7 +38,6 @@ static void keyboard_show(ui_text_input *ui, lv_obj_t *target)
 
 static void keyboard_event_handler(lv_event_t *e)
 {
-    log_debug("ui_text_input::keyboard_event_handler llego al evento del teclado en el componente nuevo");
     ui_text_input *text_input = (ui_text_input *)lv_event_get_user_data(e);
     if (!text_input) 
         return;
@@ -84,9 +55,6 @@ static void ui_input_handler(lv_event_t *e)
 
     if (!text_input || !target) 
         return;
-    
-    log_debug("ui_text_input::ui_input_handler event=%d focused=%d\n",
-           (int)code, lv_obj_has_state(target, LV_STATE_FOCUSED) ? 1 : 0);
 
     if (code == LV_EVENT_KEY) 
     {
@@ -150,6 +118,27 @@ const char *ui_text_get_text(ui_text_input *input_text)
         return NULL;
 
     return text;
+}
+
+void keyboard_hide(ui_text_input *ui)
+{
+    lv_group_t *group;
+    if (!ui || !ui->use_on_screen_keyboard || !ui->keyboard)
+        return;
+
+    group = lv_obj_get_group(ui->keyboard);
+    if (group)
+        lv_group_set_editing(group, false);
+
+    lv_obj_add_flag(ui->keyboard, LV_OBJ_FLAG_HIDDEN);
+    lv_keyboard_set_textarea(ui->keyboard, NULL);
+    if (group)
+        lv_group_remove_obj(ui->keyboard);
+
+    if (ui->active_textarea && group)
+        lv_group_focus_obj(ui->active_textarea);
+
+    ui->active_textarea = NULL;
 }
 
 void ui_text_clear(ui_text_input *input_text)

@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "utils/logger.h"
 #include "components/ui_theme.h"
 
 struct ui_dropdown {
@@ -61,6 +62,14 @@ void dropdown_set_on_change_cb(ui_dropdown *dropdown, ui_dropdown_item_change_cb
     dropdown->user_data = user_data;
 }
 
+dropdown_item_t *dropdown_get_item(ui_dropdown *dropdown, int position)
+{
+    if ((dropdown->item_count - 1) < position)
+        return NULL;
+
+    return &dropdown->items[position];
+}
+
 void dropdown_add_item(ui_dropdown *dropdown, const dropdown_item_t *item)
 {
     if (!dropdown || !item)
@@ -68,14 +77,26 @@ void dropdown_add_item(ui_dropdown *dropdown, const dropdown_item_t *item)
 
     dropdown_item_t *new_items = (dropdown_item_t *)realloc(dropdown->items, (dropdown->item_count + 1) * sizeof(*new_items));
     if (new_items == NULL)
+        return;
+
+    if (!item->text)
     {
+        log_error("[UI dropdown][dropdown_add_item] The item text is null!");
         return;
     }
 
+    size_t text_size = strlen(item->text) + 1;
+    char *text_copy = (char *)malloc(text_size);
+    if (!text_copy)
+        return;
+
+    memcpy(text_copy, item->text, text_size);
+
     dropdown->items = new_items;
     new_items[dropdown->item_count] = *item;
+    new_items[dropdown->item_count].text = text_copy;
 
-    lv_dropdown_add_option(dropdown->dropdown, item->text, item->position);
+    lv_dropdown_add_option(dropdown->dropdown, text_copy, item->position);
 
     dropdown->item_count++;
 }
@@ -93,14 +114,25 @@ void dropdown_set_items(ui_dropdown *dropdown, const dropdown_item_t *items, siz
     lv_dropdown_set_selected(dropdown->dropdown, 0);
 }
 
+void dropdown_set_selected_item(ui_dropdown *dropdown, int selected_index)
+{
+    lv_dropdown_set_selected(dropdown->dropdown, selected_index);
+}
+
 void dropdown_clean_items(ui_dropdown *dropdown)
 {
     if (!dropdown)
         return;
 
     lv_dropdown_clear_options(dropdown->dropdown);
+    
     if (dropdown->items != NULL)
     {
+        for (int i = 0; i< dropdown->item_count; i++)
+        {
+            free((void *)dropdown->items[i].text);
+        }
+
         free(dropdown->items);
         dropdown->items = NULL;
     }
