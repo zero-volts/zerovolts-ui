@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "components/ui_theme.h"
+#include "components/ui_panel.h"
 
 static void set_status(const char *msg, lv_color_t color, hid_view *self)
 {
@@ -118,20 +119,12 @@ static hid_view *hid_page_create(hid_view *self, lv_obj_t *menu, const zv_config
     lv_obj_set_style_pad_all(self->base.root, 8, 0);
     self->base.set_flex_layout(&self->base, LV_FLEX_FLOW_COLUMN, 5, 0);
 
-    lv_obj_t *enable_container = lv_obj_create(self->base.root);
-    lv_obj_set_size(enable_container, LV_PCT(100), 30);
-    lv_obj_set_style_bg_opa(enable_container, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(enable_container, 0, 0);
-    lv_obj_set_style_pad_all(enable_container, 0, 0);
-    lv_obj_set_layout(enable_container, LV_LAYOUT_FLEX);
-    lv_obj_set_flex_flow(enable_container, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(enable_container, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-
-    self->status = lv_label_create(enable_container);
-    lv_label_set_text(self->status, "Enable HID");
+    lv_obj_t *panel = ui_panel_create(self->base.root, LV_PCT(100), 40);
+    self->status = lv_label_create(panel);
+    lv_label_set_text(self->status, "HID Gadget");
     lv_obj_set_style_text_color(self->status, ZV_COLOR_TEXT_MAIN, 0);
 
-    self->toggle = lv_switch_create(enable_container);
+    self->toggle = lv_switch_create(panel);
     lv_obj_add_event_cb(self->toggle, hid_toggle_cb, LV_EVENT_VALUE_CHANGED, self);
 
     lv_obj_t *center_container = lv_obj_create(self->base.root);
@@ -163,6 +156,8 @@ static hid_view *hid_page_create(hid_view *self, lv_obj_t *menu, const zv_config
     lv_obj_set_style_text_color(icon, ZV_COLOR_TEXT_MAIN, 0);
 
     self->list = create_list(self->base.root, 100, 80);
+    set_list_border(self->list, false);
+    set_list_bg_color_op(self->list, LV_OPA_TRANSP);
     set_event_data(self->list, hid_script_item_clicked, self);
 
     hid_set_selected_label(self);

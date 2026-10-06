@@ -1,31 +1,30 @@
 #include "page/ir/new_remote.h"
-#include "components/component_helper.h"
-#include "components/ui_theme.h"
+
 #include "components/nav.h"
-#include "config.h"
-#include "page/ir/ir_controller.h"
+#include "utils/logger.h"
 #include "utils/string_utils.h"
+#include "components/ui_theme.h"
+#include "page/ir/ir_controller.h"
+#include "components/component_helper.h"
+#include "components/text_input/ui_text_input.h"
 
 #include <stdio.h>
 #include <string.h>
 
 typedef struct {
-    lv_obj_t *keyboard;
-    lv_obj_t *name_input;
+    ui_text_input *name_input_text;
     lv_obj_t *status_label;
-    lv_obj_t *active_textarea;
-    bool use_on_screen_keyboard;
 } new_remote_ui_t;
 
 static new_remote_ui_t g_new_remote;
 
-bool ir_new_remote_keyboard_is_visible(void)
-{
-    if (!g_new_remote.use_on_screen_keyboard || !g_new_remote.keyboard)
-        return false;
+// bool ir_new_remote_keyboard_is_visible(void)
+// {
+//     if (!g_new_remote.use_on_screen_keyboard || !g_new_remote.keyboard)
+//         return false;
 
-    return !lv_obj_has_flag(g_new_remote.keyboard, LV_OBJ_FLAG_HIDDEN);
-}
+//     return !lv_obj_has_flag(g_new_remote.keyboard, LV_OBJ_FLAG_HIDDEN);
+// }
 
 static lv_obj_t *ir_create_chip_button(lv_obj_t *parent, const char *text)
 {
@@ -45,100 +44,14 @@ static lv_obj_t *ir_create_chip_button(lv_obj_t *parent, const char *text)
     return btn;
 }
 
-static void ir_keyboard_hide(new_remote_ui_t *ui)
-{
-    lv_group_t *group;
-
-    if (!ui || !ui->use_on_screen_keyboard || !ui->keyboard)
-        return;
-
-    printf("[IR][new_remote] keyboard hide\n");
-    group = lv_obj_get_group(ui->keyboard);
-    if (group)
-        lv_group_set_editing(group, false);
-
-    lv_obj_add_flag(ui->keyboard, LV_OBJ_FLAG_HIDDEN);
-    lv_keyboard_set_textarea(ui->keyboard, NULL);
-    if (group)
-        lv_group_remove_obj(ui->keyboard);
-
-    if (ui->active_textarea && group)
-        lv_group_focus_obj(ui->active_textarea);
-
-    ui->active_textarea = NULL;
-}
-
-static void ir_keyboard_show(new_remote_ui_t *ui, lv_obj_t *ta)
-{
-    lv_group_t *group;
-
-    if (!ui || !ta)
-        return;
-
-    if (!ui->use_on_screen_keyboard || !ui->keyboard)
-        return;
-
-    printf("[IR][new_remote] keyboard show\n");
-    ui->active_textarea = ta;
-    lv_keyboard_set_textarea(ui->keyboard, ta);
-    lv_obj_clear_flag(ui->keyboard, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_move_foreground(ui->keyboard);
-
-    group = lv_obj_get_group(ta);
-    if (group) {
-        if (!lv_obj_get_group(ui->keyboard))
-            lv_group_add_obj(group, ui->keyboard);
-        lv_group_focus_obj(ui->keyboard);
-        lv_group_set_editing(group, true);
-    }
-}
-
-static void ir_keyboard_event_cb(lv_event_t *e)
-{
-    new_remote_ui_t *ui = (new_remote_ui_t *)lv_event_get_user_data(e);
-    if (!ui) 
-        return;
-
-    lv_event_code_t code = lv_event_get_code(e);
-    if (code == LV_EVENT_READY || code == LV_EVENT_CANCEL) {
-        ir_keyboard_hide(ui);
-    }
-}
-
-static void ir_name_input_event_cb(lv_event_t *e)
-{
-    new_remote_ui_t *ui = (new_remote_ui_t *)lv_event_get_user_data(e);
-    lv_event_code_t code = lv_event_get_code(e);
-    lv_obj_t *ta = (lv_obj_t *)lv_event_get_target(e);
-
-    if (!ui || !ta) 
-        return;
-
-    printf("[IR][new_remote] name_input event=%d focused=%d\n",
-           (int)code, lv_obj_has_state(ta, LV_STATE_FOCUSED) ? 1 : 0);
-
-    if (code == LV_EVENT_KEY) {
-        uint32_t key = lv_event_get_key(e);
-        printf("[IR][new_remote] key=%u\n", (unsigned)key);
-        if (key == LV_KEY_ENTER) {
-            ir_keyboard_show(ui, ta);
-        }
-        return;
-    }
-
-    if (code == LV_EVENT_CLICKED || code == LV_EVENT_PRESSED) {
-        ir_keyboard_show(ui, ta);
-    }
-}
-
 static void ir_create_remote_file(new_remote_ui_t *ui)
 {
     ir_status_t rc;
 
-    if (!ui || !ui->name_input || !ui->status_label)
+    if (!ui || !ui->name_input_text || !ui->status_label)
         return;
 
-    const char *name = lv_textarea_get_text(ui->name_input);
+    const char *name = ui_text_get_text(ui->name_input_text);
     if (!name || !name[0]) {
         lv_label_set_text(ui->status_label, "Enter a remote name first.");
         return;
@@ -154,7 +67,7 @@ static void ir_create_remote_file(new_remote_ui_t *ui)
     rc = ir_controller_create_remote(safe_name);
     if (rc == IR_OK) {
         lv_label_set_text(ui->status_label, "Remote created.");
-        lv_textarea_set_text(ui->name_input, "");
+        ui_text_clear(ui->name_input_text);
         return;
     }
 
@@ -173,14 +86,6 @@ static void ir_create_btn_cb(lv_event_t *e)
 lv_obj_t *ir_new_remote_page_create(lv_obj_t *menu)
 {
     memset(&g_new_remote, 0, sizeof(g_new_remote));
-    g_new_remote.use_on_screen_keyboard = true;
-
-    const zv_config *cfg = config_get();
-    if (cfg) {
-        g_new_remote.use_on_screen_keyboard = cfg->ir.use_on_screen_keyboard;
-    }
-    printf("[IR][new_remote] use_on_screen_keyboard=%d\n",
-           g_new_remote.use_on_screen_keyboard ? 1 : 0);
 
     lv_obj_t *page = lv_menu_page_create(menu, "New Remote");
     lv_obj_set_scrollbar_mode(page, LV_SCROLLBAR_MODE_OFF);
@@ -198,23 +103,8 @@ lv_obj_t *ir_new_remote_page_create(lv_obj_t *menu)
 
     create_section_label(root, "Remote Name:");
 
-    g_new_remote.name_input = lv_textarea_create(root);
-    lv_obj_set_width(g_new_remote.name_input, LV_PCT(100));
-    lv_obj_set_height(g_new_remote.name_input, 40);
-    lv_textarea_set_placeholder_text(g_new_remote.name_input, "Enter a name...");
-    lv_obj_set_style_bg_color(g_new_remote.name_input, ZV_COLOR_BG_PANEL, 0);
-    lv_obj_set_style_bg_opa(g_new_remote.name_input, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_width(g_new_remote.name_input, 2, 0);
-    lv_obj_set_style_border_color(g_new_remote.name_input, ZV_COLOR_BORDER, 0);
-    lv_obj_set_style_radius(g_new_remote.name_input, 10, 0);
-    lv_obj_set_style_text_color(g_new_remote.name_input, ZV_COLOR_TEXT_MAIN, 0);
-    lv_obj_set_style_text_color(g_new_remote.name_input, ZV_COLOR_TEXT_MUTED, LV_PART_TEXTAREA_PLACEHOLDER);
-    lv_obj_set_style_pad_left(g_new_remote.name_input, 10, 0);
-    lv_obj_add_event_cb(g_new_remote.name_input, ir_name_input_event_cb, LV_EVENT_FOCUSED, &g_new_remote);
-    lv_obj_add_event_cb(g_new_remote.name_input, ir_name_input_event_cb, LV_EVENT_DEFOCUSED, &g_new_remote);
-    lv_obj_add_event_cb(g_new_remote.name_input, ir_name_input_event_cb, LV_EVENT_CLICKED, &g_new_remote);
-    lv_obj_add_event_cb(g_new_remote.name_input, ir_name_input_event_cb, LV_EVENT_PRESSED, &g_new_remote);
-    lv_obj_add_event_cb(g_new_remote.name_input, ir_name_input_event_cb, LV_EVENT_KEY, &g_new_remote);
+    // TODO: no olvidar liberar exte objeto cuando se destruya (en algun momento) la pantalla!
+    g_new_remote.name_input_text = ui_text_create(root, LV_PCT(100), 60, "Enter remote name");
 
     create_section_label(root, "Category:");
 
@@ -288,16 +178,6 @@ lv_obj_t *ir_new_remote_page_create(lv_obj_t *menu)
     lv_label_set_text(g_new_remote.status_label, "");
     lv_obj_set_style_text_color(g_new_remote.status_label, ZV_COLOR_TEXT_MAIN, 0);
     lv_obj_set_width(g_new_remote.status_label, LV_PCT(100));
-
-    if (g_new_remote.use_on_screen_keyboard) {
-        /* Create keyboard on top layer to avoid menu/page clipping issues. */
-        g_new_remote.keyboard = lv_keyboard_create(lv_layer_top());
-        lv_obj_set_size(g_new_remote.keyboard, lv_pct(100), 120);
-        lv_obj_align(g_new_remote.keyboard, LV_ALIGN_BOTTOM_MID, 0, 0);
-        lv_obj_add_flag(g_new_remote.keyboard, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_event_cb(g_new_remote.keyboard, ir_keyboard_event_cb, LV_EVENT_READY, &g_new_remote);
-        lv_obj_add_event_cb(g_new_remote.keyboard, ir_keyboard_event_cb, LV_EVENT_CANCEL, &g_new_remote);
-    }
 
     return page;
 }

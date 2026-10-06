@@ -292,6 +292,14 @@ void set_list_bg_color(ui_list *list, lv_color_t color)
     lv_obj_set_style_bg_color(list->list, color, 0);
 }
 
+void set_list_bg_color_op(ui_list *list, lv_opa_t opacity)
+{
+     if (!list || !list->list)
+        return;
+
+    lv_obj_set_style_bg_opa(list->list, opacity, 0);
+}
+
 int item_length(ui_list *list)
 {
     return list->item_count;

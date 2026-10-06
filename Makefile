@@ -18,6 +18,8 @@ SRC := \
 	components/ui_pills.c \
 	components/ui_loading_btn.c \
 	components/ui_info_panel.c \
+	components/ui_panel.c \
+	components/text_input/ui_text_input.c \
 	components/dropdown/ui_dropdown.c \
 	page/base_view.c \
 	page/home_view.c \

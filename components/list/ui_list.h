@@ -52,6 +52,7 @@ lv_obj_t *add_item(ui_list *list, const list_item_t *item);
 void set_event_data(ui_list *list, ui_list_item_event_cb_t cb, void *user_data);
 void set_list_border(ui_list *list, bool enabled);
 void set_list_bg_color(ui_list *list, lv_color_t color);
+void set_list_bg_color_op(ui_list *list, lv_opa_t opacity);
 int item_length(ui_list *list);
 void clean_list(ui_list *list);
 void destroy_list(ui_list *list);
