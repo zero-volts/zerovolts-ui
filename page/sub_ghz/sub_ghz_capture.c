@@ -10,6 +10,7 @@
 #include "components/ui_pills.h"
 #include "components/dropdown/ui_dropdown.h"
 #include "components/component_helper.h"
+#include "components/button/ui_button.h"
 #include "components/ui_loading_btn.h"
 #include "page/sub_ghz/sub_ghz_controller.h"
 #include "service/subghz/subghz_service.h"
@@ -57,10 +58,10 @@ typedef struct {
     ui_pills *frequency_pills;
     lv_obj_t *chart;
     ui_loading_button *capture_btn;
-    lv_obj_t *save_btn;
+    ui_button *save_btn;
 
     lv_obj_t *status_lbl;
-    lv_obj_t *discard_btn;
+    ui_button *discard_btn;
 
     // chart variables
     int32_t x_accumulator;
@@ -171,7 +172,7 @@ static void capture_handler(ui_status_t status, subghz_event_arg *event)
 
         loading_button_set_text(local_ctx.capture_btn, STR_CAPTURE_BUTTON);
         loading_button_set_loading(local_ctx.capture_btn, false);
-        lv_obj_add_state(local_ctx.save_btn, LV_STATE_DISABLED);
+        ui_button_enable(local_ctx.save_btn, false);
 
         return;
     }
@@ -184,8 +185,8 @@ static void capture_handler(ui_status_t status, subghz_event_arg *event)
         loading_button_set_text(local_ctx.capture_btn, STR_CAPTURE_BUTTON);
         loading_button_set_loading(local_ctx.capture_btn, false);
 
-        lv_obj_remove_flag(local_ctx.discard_btn, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_remove_state(local_ctx.save_btn, LV_STATE_DISABLED);
+        ui_button_hide(local_ctx.discard_btn, false);
+        ui_button_enable(local_ctx.save_btn, true);
         return;
     }
 
@@ -211,15 +212,15 @@ static void capture_handler(ui_status_t status, subghz_event_arg *event)
     printf("\n");
 }
 
-static void subghz_discard_capture_handler(lv_event_t *e)
+static void subghz_discard_capture_handler(event_data_btn *e)
 {
     (void)e;
     subghz_controller_discard_session(local_ctx.sessions_ended);
 
     local_ctx.sessions_ended = 0;
-    lv_obj_add_state(local_ctx.save_btn, LV_STATE_DISABLED);
-    lv_obj_add_flag(local_ctx.discard_btn, LV_OBJ_FLAG_HIDDEN);
-
+    ui_button_enable(local_ctx.save_btn, false);
+    ui_button_hide(local_ctx.discard_btn, true);
+    
     lv_label_set_text(local_ctx.status_lbl, STR_STATUS_INITIAL);
 
     lv_chart_series_t *serie = lv_chart_get_series_next(local_ctx.chart, NULL);
@@ -232,7 +233,7 @@ static void subghz_discard_capture_handler(lv_event_t *e)
 
 static void subghz_start_capture_handler(lv_event_t *e)
 {
-    subghz_discard_capture_handler(e);
+    subghz_discard_capture_handler(NULL);
 
     loading_button_set_text(local_ctx.capture_btn, STR_CAPTURING_BUTTON);
     loading_button_set_loading(local_ctx.capture_btn, true);
@@ -248,7 +249,7 @@ static void subghz_start_capture_handler(lv_event_t *e)
     }
 }
 
-static void subghz_save_capture_handler(lv_event_t *e)
+static void subghz_save_capture_handler(event_data_btn *e)
 {
     (void)e;
 
@@ -260,8 +261,8 @@ static void subghz_save_capture_handler(lv_event_t *e)
     lv_label_set_text(local_ctx.status_lbl, STR_STATUS_INITIAL);
 
     local_ctx.sessions_ended = 0;
-    lv_obj_add_state(local_ctx.save_btn, LV_STATE_DISABLED);
-    lv_obj_add_flag(local_ctx.discard_btn, LV_OBJ_FLAG_HIDDEN);
+    ui_button_enable(local_ctx.save_btn, false);
+    ui_button_hide(local_ctx.discard_btn, true);
 
     lv_chart_series_t *serie = lv_chart_get_series_next(local_ctx.chart, NULL);
     if (!serie)
@@ -330,10 +331,9 @@ static void create_action_panel(lv_obj_t *parent)
     lv_obj_set_flex_flow(panel, LV_FLEX_FLOW_COLUMN);
 
     local_ctx.status_lbl = create_section_label(panel, STR_STATUS_INITIAL);
-    local_ctx.discard_btn = create_btn(panel, "Discard", LV_PCT(100), 50);
-    lv_obj_add_event_cb(local_ctx.discard_btn, subghz_discard_capture_handler, LV_EVENT_CLICKED, NULL);
-    lv_obj_add_flag(local_ctx.discard_btn, LV_OBJ_FLAG_HIDDEN);
-        
+    local_ctx.discard_btn = ui_button_create(panel,  LV_PCT(100), 50, "Discard");
+    ui_button_set_on_click(local_ctx.discard_btn, subghz_discard_capture_handler, NULL);
+    ui_button_hide(local_ctx.discard_btn, true);        
 }
 
 static void create_bottom_panel(lv_obj_t *parent)
@@ -350,8 +350,8 @@ static void create_bottom_panel(lv_obj_t *parent)
     local_ctx.capture_btn = create_loading_btn(bottom_panel,  LV_PCT(48), 50, STR_CAPTURE_BUTTON);
     loading_set_event_cb(local_ctx.capture_btn, subghz_start_capture_handler, NULL);
 
-    local_ctx.save_btn = create_btn(bottom_panel, STR_SAVE_BUTTON, LV_PCT(48), 50);
-    lv_obj_add_event_cb(local_ctx.save_btn, subghz_save_capture_handler, LV_EVENT_CLICKED, NULL);
+    local_ctx.save_btn = ui_button_create(bottom_panel, LV_PCT(48), 50, STR_SAVE_BUTTON);
+    ui_button_set_on_click(local_ctx.save_btn, subghz_save_capture_handler, NULL);
 }
 
 lv_obj_t *subghz_capture_page_create(lv_obj_t *menu)

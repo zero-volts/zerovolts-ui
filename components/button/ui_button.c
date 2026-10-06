@@ -78,6 +78,22 @@ void ui_button_set_on_click(ui_button *button, ui_btton_on_click callback, void 
     button->user_data = user_data;
 }
 
+void ui_button_hide(ui_button *button, bool hide)
+{
+    if (hide)
+        lv_obj_add_flag(button->btn, LV_OBJ_FLAG_HIDDEN);
+    else
+        lv_obj_remove_flag(button->btn, LV_OBJ_FLAG_HIDDEN);
+}
+
+void ui_button_enable(ui_button *button, bool enable)
+{
+    if (enable)
+        lv_obj_remove_state(button->btn, LV_STATE_DISABLED);
+    else
+        lv_obj_add_state(button->btn, LV_STATE_DISABLED);
+}
+
 void ui_button_destroy(ui_button *button)
 {
     if (button)
