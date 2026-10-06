@@ -3,52 +3,24 @@
 #include "components/ui_theme.h"
 #include "components/nav.h"
 #include "config.h"
+#include "utils/logger.h"
 #include "page/ir/ir_controller.h"
 #include "utils/string_utils.h"
+#include "components/button/ui_button.h"
+#include "components/dropdown/ui_dropdown.h"
+#include "components/text_input/ui_text_input.h"
 
 #include <stdio.h>
 #include <string.h>
 
 typedef struct {
-    lv_obj_t *keyboard;
-    lv_obj_t *remote_dropdown;
-    lv_obj_t *button_input;
+    ui_dropdown *dropdown_remotes;
+    int remote_selected_position;
+    ui_text_input *button_txt;
     lv_obj_t *status;
-    lv_obj_t *active_textarea;
-    bool use_on_screen_keyboard;
 } learn_ui_t;
 
 static learn_ui_t g_learn;
-
-bool ir_learn_button_keyboard_is_visible(void)
-{
-    if (!g_learn.use_on_screen_keyboard || !g_learn.keyboard)
-        return false;
-
-    return !lv_obj_has_flag(g_learn.keyboard, LV_OBJ_FLAG_HIDDEN);
-}
-
-static lv_obj_t *ir_create_input_box(lv_obj_t *parent, const char *placeholder, bool dropdown)
-{
-    lv_obj_t *obj = dropdown ? lv_dropdown_create(parent) : lv_textarea_create(parent);
-    lv_obj_set_width(obj, LV_PCT(82));
-    lv_obj_set_style_bg_color(obj, ZV_COLOR_BG_PANEL, 0);
-    lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_width(obj, 2, 0);
-    lv_obj_set_style_border_color(obj, ZV_COLOR_BORDER, 0);
-    lv_obj_set_style_radius(obj, 10, 0);
-    lv_obj_set_style_text_color(obj, ZV_COLOR_TEXT_MAIN, 0);
-
-    if (dropdown) {
-        lv_dropdown_set_options(obj, "");
-    } else {
-        lv_textarea_set_one_line(obj, true);
-        lv_textarea_set_placeholder_text(obj, placeholder);
-        lv_obj_set_style_text_color(obj, ZV_COLOR_TEXT_MUTED, LV_PART_TEXTAREA_PLACEHOLDER);
-    }
-
-    return obj;
-}
 
 static lv_obj_t *ir_create_status_box(lv_obj_t *parent)
 {
@@ -75,167 +47,85 @@ static void learn_set_status(const char *txt)
 {
     if (!g_learn.status)
         return;
+
     lv_label_set_text(g_learn.status, txt);
-}
-
-static void get_dropdown_text(lv_obj_t *dd, char *out, size_t out_sz)
-{
-    if (!dd || !out || out_sz == 0)
-        return;
-
-    out[0] = '\0';
-    lv_dropdown_get_selected_str(dd, out, out_sz);
 }
 
 static void load_remote_dropdown(void)
 {
     ir_remote_list remotes = {0};
-    char opts[2048];
-
-    if (!g_learn.remote_dropdown)
+    if (!g_learn.dropdown_remotes)
         return;
+    
+    log_debug("[IR][learn_ui] loading remotes...");
 
-    opts[0] = '\0';
-    printf("[IR][learn_ui] loading remotes...\n");
+    if (ir_controller_list_remotes(&remotes) != IR_OK || remotes.count == 0)
+    {
+        log_warning("[IR][learn_ui] no remotes available");
 
-    if (ir_controller_list_remotes(&remotes) != IR_OK || remotes.count == 0) {
-        printf("[IR][learn_ui] no remotes available\n");
-        lv_dropdown_set_options(g_learn.remote_dropdown, "");
+        dropdown_clean_items(g_learn.dropdown_remotes);
         learn_set_status("No remotes available. Create one first.");
         ir_controller_free_remote_list(&remotes);
+
         return;
     }
 
-    for (size_t i = 0; i < remotes.count; i++) {
-        strncat(opts, remotes.remotes[i].name, sizeof(opts) - strlen(opts) - 1);
-        if (i + 1 < remotes.count)
-            strncat(opts, "\n", sizeof(opts) - strlen(opts) - 1);
+    dropdown_clean_items(g_learn.dropdown_remotes);
+    for (size_t i = 0; i < remotes.count; i++)
+    {
+        dropdown_item_t item = {
+            .position = (int)i,
+            .text = remotes.remotes[i].name
+        };
+
+        dropdown_add_item(g_learn.dropdown_remotes, &item);
     }
 
-    lv_dropdown_set_options(g_learn.remote_dropdown, opts);
-    lv_dropdown_set_selected(g_learn.remote_dropdown, 0);
+    dropdown_set_selected_item(g_learn.dropdown_remotes, 0);
     learn_set_status("Ready to capture.");
-    printf("[IR][learn_ui] remotes loaded: %zu\n", remotes.count);
+    log_debug("[IR][learn_ui] remotes loaded: %zu\n", remotes.count);
 
     ir_controller_free_remote_list(&remotes);
 }
 
-static void learn_refresh_remotes_cb(lv_event_t *e)
+static void learn_refresh_remotes_cb(event_data_btn *e)
 {
     (void)e;
     load_remote_dropdown();
 }
 
-static void learn_keyboard_hide(learn_ui_t *ui)
+static void finish_button_handler(event_data_btn *event)
 {
-    lv_group_t *group;
-
-    if (!ui || !ui->use_on_screen_keyboard || !ui->keyboard)
+    dropdown_item_t *selected_item = dropdown_get_item(g_learn.dropdown_remotes, g_learn.remote_selected_position);
+    if (!selected_item)
         return;
 
-    group = lv_obj_get_group(ui->keyboard);
-    if (group)
-        lv_group_set_editing(group, false);
-
-    lv_obj_add_flag(ui->keyboard, LV_OBJ_FLAG_HIDDEN);
-    lv_keyboard_set_textarea(ui->keyboard, NULL);
-    if (group)
-        lv_group_remove_obj(ui->keyboard);
-
-    if (ui->active_textarea && group)
-        lv_group_focus_obj(ui->active_textarea);
-
-    ui->active_textarea = NULL;
-}
-
-static void learn_keyboard_show(learn_ui_t *ui, lv_obj_t *ta)
-{
-    lv_group_t *group;
-
-    if (!ui || !ta)
-        return;
-
-    if (!ui->use_on_screen_keyboard || !ui->keyboard)
-        return;
-
-    ui->active_textarea = ta;
-    lv_keyboard_set_textarea(ui->keyboard, ta);
-    lv_obj_clear_flag(ui->keyboard, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_move_foreground(ui->keyboard);
-
-    group = lv_obj_get_group(ta);
-    if (group) {
-        if (!lv_obj_get_group(ui->keyboard))
-            lv_group_add_obj(group, ui->keyboard);
-        lv_group_focus_obj(ui->keyboard);
-        lv_group_set_editing(group, true);
-    }
-}
-
-static void learn_keyboard_event_cb(lv_event_t *e)
-{
-    learn_ui_t *ui = (learn_ui_t *)lv_event_get_user_data(e);
-    lv_event_code_t code = lv_event_get_code(e);
-
-    if (!ui)
-        return;
-
-    if (code == LV_EVENT_READY || code == LV_EVENT_CANCEL)
-        learn_keyboard_hide(ui);
-}
-
-static void learn_button_input_event_cb(lv_event_t *e)
-{
-    learn_ui_t *ui = (learn_ui_t *)lv_event_get_user_data(e);
-    lv_event_code_t code = lv_event_get_code(e);
-    lv_obj_t *ta = (lv_obj_t *)lv_event_get_target(e);
-
-    if (!ui || !ta)
-        return;
-
-    if (code == LV_EVENT_KEY) {
-        uint32_t key = lv_event_get_key(e);
-        if (key == LV_KEY_ENTER)
-            learn_keyboard_show(ui, ta);
-        return;
-    }
-
-    if (code == LV_EVENT_CLICKED || code == LV_EVENT_PRESSED)
-        learn_keyboard_show(ui, ta);
-}
-
-static void learn_finish_cb(lv_event_t *e)
-{
-    char remote[IR_MAX_NAME];
-    char button[IR_MAX_NAME];
-    lv_obj_t *finish_btn = (lv_obj_t *)lv_event_get_target(e);
-
-    get_dropdown_text(g_learn.remote_dropdown, remote, sizeof(remote));
-    snprintf(button, sizeof(button), "%s", lv_textarea_get_text(g_learn.button_input));
-    zv_trim_inplace(button);
-    printf("[IR][learn_ui] finish pressed remote='%s' button='%s'\n", remote, button);
-
-    if (!remote[0]) {
+    const char *button_name = ui_text_get_text(g_learn.button_txt);
+    if (zv_is_empty(selected_item->text))
+    {
         learn_set_status("Select a remote first.");
         return;
     }
 
-    if (!button[0]) {
+    // zv_trim_inplace(button_name);
+    if (zv_is_empty(button_name))
+    {
         learn_set_status("Enter button name (e.g. KEY_POWER).");
         return;
     }
 
-    learn_keyboard_hide(&g_learn);
-    if (finish_btn)
-        lv_group_focus_obj(finish_btn);
+    log_debug("[IR][learn_ui] finish pressed remote='%s' button='%s'\n", selected_item->text, button_name);
+
+    keyboard_hide(g_learn.button_txt);
 
     learn_set_status("Recording signal... Press remote now.");
     lv_refr_now(NULL);
 
-    ir_status_t rc = ir_controller_learn_button(remote, button);
-    printf("[IR][learn_ui] learn result rc=%d err='%s'\n", (int)rc, ir_controller_last_error());
+    ir_status_t rc = ir_controller_learn_button(selected_item->text, button_name);
+    log_debug("[IR][learn_ui] learn result rc=%d err='%s'\n", (int)rc, ir_controller_last_error());
     
-    if (rc == IR_OK) {
+    if (rc == IR_OK)
+    {
         learn_set_status("Signal captured and stored.");
         return;
     }
@@ -243,13 +133,21 @@ static void learn_finish_cb(lv_event_t *e)
     learn_set_status(ir_controller_last_error());
 }
 
-static void learn_cancel_cb(lv_event_t *e)
+static void learn_cancel_cb(event_data_btn *event)
 {
-    (void)e;
-    learn_keyboard_hide(&g_learn);
-    if (g_learn.button_input)
-        lv_textarea_set_text(g_learn.button_input, "");
+    (void)event;
+    if (!g_learn.button_txt)
+        return;
+
+    keyboard_hide(g_learn.button_txt);
+    ui_text_clear(g_learn.button_txt);
+
     learn_set_status("Capture canceled.");
+}
+
+static void remote_on_change_handler(dropdown_item_t *item, void *user_data)
+{
+    g_learn.remote_selected_position = item->position;   
 }
 
 lv_obj_t *ir_learn_button_page_create(lv_obj_t *menu)
@@ -258,11 +156,6 @@ lv_obj_t *ir_learn_button_page_create(lv_obj_t *menu)
     lv_obj_set_scrollbar_mode(page, LV_SCROLLBAR_MODE_OFF);
 
     memset(&g_learn, 0, sizeof(g_learn));
-    g_learn.use_on_screen_keyboard = true;
-
-    const zv_config *cfg = config_get();
-    if (cfg)
-        g_learn.use_on_screen_keyboard = cfg->ir.use_on_screen_keyboard;
 
     lv_obj_t *root = lv_obj_create(page);
     lv_obj_set_size(root, LV_PCT(100), LV_PCT(100));
@@ -276,21 +169,17 @@ lv_obj_t *ir_learn_button_page_create(lv_obj_t *menu)
     lv_obj_set_style_pad_row(root, 10, 0);
 
     create_section_label(root, "Remote:");
-    
     lv_obj_t *remote_list_container = create_transparent_flex_row(root, LV_PCT(100), 45);
 
-    g_learn.remote_dropdown = ir_create_input_box(remote_list_container, "", true);
+    g_learn.dropdown_remotes = dropdown_create(remote_list_container, LV_PCT(82), LV_SIZE_CONTENT);
+    dropdown_set_on_change_cb(g_learn.dropdown_remotes, remote_on_change_handler, NULL);
 
-    create_icon_button(remote_list_container, LV_SYMBOL_REFRESH, 45, 35,
-                       learn_refresh_remotes_cb, NULL);
+    ui_button *refresh_btn = ui_icon_button_create(remote_list_container, 45, 35, LV_SYMBOL_REFRESH);
+    ui_button_set_on_click(refresh_btn, learn_refresh_remotes_cb, NULL);
+    
     
     create_section_label(root, "Button Name:");
-    g_learn.button_input = ir_create_input_box(root, "KEY_VOLUMEUP", false);
-    lv_obj_add_event_cb(g_learn.button_input, learn_button_input_event_cb, LV_EVENT_FOCUSED, &g_learn);
-    lv_obj_add_event_cb(g_learn.button_input, learn_button_input_event_cb, LV_EVENT_DEFOCUSED, &g_learn);
-    lv_obj_add_event_cb(g_learn.button_input, learn_button_input_event_cb, LV_EVENT_CLICKED, &g_learn);
-    lv_obj_add_event_cb(g_learn.button_input, learn_button_input_event_cb, LV_EVENT_PRESSED, &g_learn);
-    lv_obj_add_event_cb(g_learn.button_input, learn_button_input_event_cb, LV_EVENT_KEY, &g_learn);
+    g_learn.button_txt = ui_text_create(root, LV_PCT(82), 40, "KEY_VOLUMEUP");
 
     lv_obj_t *hint = lv_label_create(root);
     lv_label_set_text(hint, "Point remote at receiver and press one button.");
@@ -302,42 +191,11 @@ lv_obj_t *ir_learn_button_page_create(lv_obj_t *menu)
 
     lv_obj_t *footer_row = create_transparent_flex_row(root, LV_PCT(100), 50);
 
-    lv_obj_t *cancel_btn = lv_btn_create(footer_row);
-    lv_obj_set_size(cancel_btn, LV_PCT(45), 40);
-    lv_obj_set_style_bg_color(cancel_btn, ZV_COLOR_BG_PANEL, 0);
-    lv_obj_set_style_bg_opa(cancel_btn, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_width(cancel_btn, 2, 0);
-    lv_obj_set_style_border_color(cancel_btn, ZV_COLOR_BORDER, 0);
-    lv_obj_set_style_radius(cancel_btn, 12, 0);
-    lv_obj_add_event_cb(cancel_btn, learn_cancel_cb, LV_EVENT_CLICKED, NULL);
+    ui_button *cancel_btn = ui_button_create(footer_row,  LV_PCT(45), 40, "Cancel");
+    ui_button_set_on_click(cancel_btn, learn_cancel_cb, NULL);
 
-    lv_obj_t *cancel_label = lv_label_create(cancel_btn);
-    lv_label_set_text(cancel_label, "Cancel");
-    lv_obj_set_style_text_color(cancel_label, ZV_COLOR_TEXT_MAIN, 0);
-    lv_obj_center(cancel_label);
-
-    lv_obj_t *finish_btn = lv_btn_create(footer_row);
-    lv_obj_set_size(finish_btn, LV_PCT(45), 40);
-    lv_obj_set_style_bg_color(finish_btn, ZV_COLOR_BG_PANEL, 0);
-    lv_obj_set_style_bg_opa(finish_btn, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_width(finish_btn, 2, 0);
-    lv_obj_set_style_border_color(finish_btn, ZV_COLOR_BORDER, 0);
-    lv_obj_set_style_radius(finish_btn, 12, 0);
-    lv_obj_add_event_cb(finish_btn, learn_finish_cb, LV_EVENT_CLICKED, NULL);
-
-    lv_obj_t *finish_label = lv_label_create(finish_btn);
-    lv_label_set_text(finish_label, "Finish");
-    lv_obj_set_style_text_color(finish_label, ZV_COLOR_TEXT_MAIN, 0);
-    lv_obj_center(finish_label);
-
-    if (g_learn.use_on_screen_keyboard) {
-        g_learn.keyboard = lv_keyboard_create(lv_layer_top());
-        lv_obj_set_size(g_learn.keyboard, lv_pct(100), 120);
-        lv_obj_align(g_learn.keyboard, LV_ALIGN_BOTTOM_MID, 0, 0);
-        lv_obj_add_flag(g_learn.keyboard, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_event_cb(g_learn.keyboard, learn_keyboard_event_cb, LV_EVENT_READY, &g_learn);
-        lv_obj_add_event_cb(g_learn.keyboard, learn_keyboard_event_cb, LV_EVENT_CANCEL, &g_learn);
-    }
+    ui_button *finish_btn = ui_button_create(footer_row, LV_PCT(45), 40, "Finish");
+    ui_button_set_on_click(finish_btn, finish_button_handler, NULL);
 
     load_remote_dropdown();
 
