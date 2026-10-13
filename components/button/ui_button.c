@@ -39,7 +39,8 @@ static void click_button_handler(lv_event_t *e)
     {
         event_data_btn event = {
             .btn_id = button->id,
-            .user_data = button->user_data
+            .user_data = button->user_data,
+            .lv_event = e
         };
 
         button->on_click(&event);
@@ -67,16 +68,15 @@ ui_button *ui_button_create(lv_obj_t *parent, int width, int height, const char 
     lv_obj_add_event_cb(button->btn, button_delete_handler, LV_EVENT_DELETE, button);
 
     lv_obj_set_size(button->btn, width, height);
-    lv_obj_set_style_bg_color(button->btn, ZV_COLOR_BG_PANEL, 0);
+    lv_obj_set_style_bg_color(button->btn, COLOR_BG_PANEL, 0);
     lv_obj_set_style_bg_opa(button->btn, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_width(button->btn, 2, 0);
-    lv_obj_set_style_border_color(button->btn, ZV_COLOR_BORDER, 0);
-    lv_obj_set_style_radius(button->btn, 12, 0);
+    lv_obj_set_style_border_width(button->btn, 1, 0);
+    lv_obj_set_style_border_color(button->btn, COLOR_BORDER, 0);
+    lv_obj_set_style_radius(button->btn, UI_RADIUS, 0);
     lv_obj_add_event_cb(button->btn, click_button_handler, LV_EVENT_CLICKED, button);
     lv_obj_set_layout(button->btn, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(button->btn, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(button->btn, LV_FLEX_ALIGN_CENTER,
-                         LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_flex_align(button->btn, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_column(button->btn, 6, 0);
 
     button->label = lv_label_create(button->btn);
@@ -87,7 +87,7 @@ ui_button *ui_button_create(lv_obj_t *parent, int width, int height, const char 
     }
 
     lv_label_set_text(button->label, text ? text : "");
-    lv_obj_set_style_text_color(button->label, ZV_COLOR_TEXT_MAIN, 0);
+    lv_obj_set_style_text_color(button->label, COLOR_TEXT, 0);
     lv_obj_clear_flag(button->label, LV_OBJ_FLAG_CLICKABLE);
 
     return button;
@@ -160,6 +160,30 @@ void ui_button_set_loading(ui_button *button, bool loading)
     }
 
     update_disabled_state(button);
+}
+
+void ui_button_set_action_style(ui_button *button, action_style_type_t style)
+{
+    switch (style)
+    {
+        case Warning:
+            lv_obj_set_style_bg_color(button->btn, COLOR_ACTION_ORANGE_BG, LV_PART_MAIN);
+            lv_obj_set_style_border_color(button->btn, COLOR_ACTION_ORANGE, LV_PART_MAIN);
+            lv_obj_set_style_text_color(button->btn, COLOR_ACTION_ORANGE, LV_PART_MAIN);
+            break;
+        case Success:
+            lv_obj_set_style_bg_color(button->btn, COLOR_ACTION_GREEN_BG, LV_PART_MAIN);
+            lv_obj_set_style_border_color(button->btn, COLOR_ACTION_GREEN, LV_PART_MAIN);
+            lv_obj_set_style_text_color(button->btn, COLOR_ACTION_GREEN, LV_PART_MAIN);
+            break;
+        case Error:
+            lv_obj_set_style_bg_color(button->btn, COLOR_ERROR, LV_PART_MAIN);
+            lv_obj_set_style_border_color(button->btn, COLOR_ERROR, LV_PART_MAIN);
+            break;
+        
+        default:
+            break;
+    }
 }
 
 lv_obj_t *ui_button_get_obj(ui_button *button)

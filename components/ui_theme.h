@@ -3,35 +3,33 @@
 
 #include "lvgl.h"
 
-// Backgrounds
-#define ZV_COLOR_BG_MAIN            lv_color_hex(0x0C1117)
-#define ZV_COLOR_BG_PANEL           lv_color_hex(0x151D26)
-#define ZV_COLOR_BG_CARD            lv_color_hex(0x1A2430)
-#define ZV_COLOR_BG_PRESSED         lv_color_hex(0x202E3B)
+#define COLOR_BG_MAIN              lv_color_hex(0x0A0E13)
+#define COLOR_BG_PANEL             lv_color_hex(0x0D1822)
+#define COLOR_BG_CARD              lv_color_hex(0x111C28)
+#define COLOR_BG_PRESSED           lv_color_hex(0x08101A)
+#define COLOR_BORDER               lv_color_hex(0x2A3340)
+#define COLOR_BORDER_FOCUS         lv_color_hex(0x00E676)
+#define COLOR_ACCENT               lv_color_hex(0x1E88E5)
+#define COLOR_ACCENT_DIM           lv_color_hex(0x0A1830)
+#define COLOR_TERMINAL             lv_color_hex(0x00E676)
 
-// Borders
-#define ZV_COLOR_BORDER             lv_color_hex(0x334150)
-#define ZV_COLOR_BORDER_FOCUS       lv_color_hex(0x56DCA1)
+#define COLOR_TEXT                 lv_color_hex(0xEDEDED)
+#define COLOR_TEXT_MID             lv_color_hex(0xB0B0B0)
+#define COLOR_TEXT_MUTED           lv_color_hex(0x7A8A9A)
 
-#define ZV_COLOR_ACCENT             lv_color_hex(0x8DBBD5)
-#define ZV_COLOR_ACCENT_DIM         lv_color_hex(0x192D3B)
+#define COLOR_SUCCESS              lv_color_hex(0x00E676)
+#define COLOR_WARNING              lv_color_hex(0xFFB300)
+#define COLOR_ERROR                lv_color_hex(0xEF5350)
 
-#define ZV_COLOR_TERMINAL           lv_color_hex(0x56DCA1)
+#define COLOR_ACTION_GREEN         lv_color_hex(0x00E676)
+#define COLOR_ACTION_GREEN_BG      lv_color_hex(0x002617)
+#define COLOR_ACTION_GREEN_HOVER   lv_color_hex(0x00452A)
+#define COLOR_ACTION_ORANGE        lv_color_hex(0xFFB04A)
+#define COLOR_ACTION_ORANGE_BG     lv_color_hex(0x2B1905)
+#define COLOR_ACTION_ORANGE_HOVER  lv_color_hex(0x4A2B08)
 
-// Text
-#define ZV_COLOR_TEXT_MAIN          lv_color_hex(0xE9EFF4)
-#define ZV_COLOR_TEXT_MID           lv_color_hex(0xBDC9D4)
-#define ZV_COLOR_TEXT_MUTED         lv_color_hex(0x92A3B3)
-
-// Status
-#define ZV_COLOR_SUCCESS            lv_color_hex(0x56DCA1)
-#define ZV_COLOR_WARNING            lv_color_hex(0xEFB56B)
-#define ZV_COLOR_ERROR              lv_color_hex(0xFF8188)
-
-#define ZV_COLOR_WHITE              ZV_COLOR_TEXT_MAIN
-#define ZV_COLOR_BLACK              ZV_COLOR_BG_MAIN
-#define ZV_COLOR_BUTTON             ZV_COLOR_ACCENT
-#define ZV_COLOR_BUTTON_TEXT        lv_color_hex(0xFFFFFF)
-#define ZV_COLOR_BG_BUTTON_PRESSED  ZV_COLOR_BG_PRESSED
+#define UI_RADIUS                  8
+#define UI_FOCUS_W                 3
+#define UI_MIN_TAP                 48
 
 #endif /* UI_THEME_H */

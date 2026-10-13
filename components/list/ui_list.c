@@ -77,15 +77,29 @@ static void on_item_delete(lv_event_t *e)
     }
 }
 
+static void on_list_delete(lv_event_t *e)
+{
+    free(lv_event_get_user_data(e));
+}
+
 ui_list *create_list(lv_obj_t *parent, int width, int height)
 {
     ui_list *list = (ui_list *)malloc(sizeof(ui_list));
 
+    if (!list)
+        return NULL;
+
     lv_obj_t *list_obj = lv_obj_create(parent);
+    if (!list_obj)
+    {
+        free(list);
+        return NULL;
+    }
+
     lv_obj_set_size(list_obj, LV_PCT(width), LV_PCT(height));
 
-    lv_obj_set_style_bg_color(list_obj, ZV_COLOR_BG_PANEL, 0);
-    lv_obj_set_style_border_color(list_obj, ZV_COLOR_BORDER, 0);
+    lv_obj_set_style_bg_color(list_obj, COLOR_BG_PANEL, 0);
+    lv_obj_set_style_border_color(list_obj, COLOR_BORDER, 0);
     lv_obj_set_style_border_width(list_obj, 1, 0);
     lv_obj_set_style_radius(list_obj, 5, 0);
     lv_obj_set_style_pad_all(list_obj, 5, 0);
@@ -100,6 +114,7 @@ ui_list *create_list(lv_obj_t *parent, int width, int height)
     lv_obj_clear_flag(list_obj, LV_OBJ_FLAG_SCROLL_ELASTIC);
     lv_obj_clear_flag(list_obj, LV_OBJ_FLAG_SCROLL_MOMENTUM);
 
+    lv_obj_add_event_cb(list_obj, on_list_delete, LV_EVENT_DELETE, list);
     list->list = list_obj;
     list->user_data = NULL;
     list->item_count = 0;
@@ -115,7 +130,7 @@ lv_obj_t *add_item(ui_list *list, const list_item_t *item)
 
     lv_obj_t *btn = lv_btn_create(list->list);
     lv_obj_clear_flag(btn, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_size(btn, LV_PCT(100), 50);
+    lv_obj_set_size(btn, LV_PCT(100), 60);
 
     ui_list_item_ctx_t *ctx = (ui_list_item_ctx_t *)malloc(sizeof(ui_list_item_ctx_t));
     if (!ctx)
@@ -160,13 +175,13 @@ lv_obj_t *add_item(ui_list *list, const list_item_t *item)
     lv_obj_add_event_cb(btn, on_item_click, LV_EVENT_CLICKED, ctx);
     lv_obj_add_event_cb(btn, on_item_delete, LV_EVENT_DELETE, ctx);
 
-    lv_obj_set_style_bg_color(btn, ZV_COLOR_BG_CARD, LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_color(btn, ZV_COLOR_BG_PRESSED, LV_STATE_PRESSED);
+    lv_obj_set_style_bg_color(btn, COLOR_BG_CARD, LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_color(btn, COLOR_BG_PANEL, LV_STATE_PRESSED);
     lv_obj_set_style_border_width(btn, 1, LV_STATE_DEFAULT);
-    lv_obj_set_style_border_color(btn, ZV_COLOR_BORDER, LV_STATE_DEFAULT);
-    lv_obj_set_style_border_color(btn, ZV_COLOR_BORDER_FOCUS, LV_STATE_FOCUSED);
-    lv_obj_set_style_border_color(btn, ZV_COLOR_TERMINAL, LV_STATE_PRESSED);
-    lv_obj_set_style_border_color(btn, ZV_COLOR_TERMINAL, LV_STATE_CHECKED);
+    lv_obj_set_style_border_color(btn, COLOR_BORDER, LV_STATE_DEFAULT);
+    lv_obj_set_style_border_color(btn, COLOR_ACCENT, LV_STATE_FOCUSED);
+    lv_obj_set_style_border_color(btn, COLOR_ACCENT, LV_STATE_PRESSED);
+    lv_obj_set_style_border_color(btn, COLOR_ACCENT, LV_STATE_CHECKED);
 
     lv_obj_t *content = lv_obj_create(btn);
     lv_obj_set_layout(content, LV_LAYOUT_FLEX);
@@ -204,7 +219,7 @@ lv_obj_t *add_item(ui_list *list, const list_item_t *item)
         lv_label_set_text(icon, item->left_badge.label);
         lv_color_t color = item->left_badge.has_text_color
                                ? item->left_badge.text_color
-                               : ZV_COLOR_ACCENT;
+                               : COLOR_ACCENT;
         lv_obj_set_style_text_color(icon, color, 0);
     }
 
@@ -225,7 +240,7 @@ lv_obj_t *add_item(ui_list *list, const list_item_t *item)
         lv_obj_clear_flag(lb_title, LV_OBJ_FLAG_CLICKABLE);
         lv_obj_set_width(lb_title, LV_PCT(100));
         lv_label_set_text(lb_title, item->text);
-        lv_obj_set_style_text_color(lb_title, ZV_COLOR_TEXT_MAIN, 0);
+        lv_obj_set_style_text_color(lb_title, COLOR_TEXT, 0);
         lv_obj_set_style_text_align(lb_title, LV_TEXT_ALIGN_LEFT, 0);
     }
 
@@ -235,12 +250,12 @@ lv_obj_t *add_item(ui_list *list, const list_item_t *item)
         lv_obj_clear_flag(lb_subtitle, LV_OBJ_FLAG_CLICKABLE);
         lv_obj_set_width(lb_subtitle, LV_PCT(100));
         lv_label_set_text(lb_subtitle, item->subtitle);
-        lv_obj_set_style_text_color(lb_subtitle, ZV_COLOR_TEXT_MUTED, 0);
+        lv_obj_set_style_text_color(lb_subtitle, COLOR_TEXT_MUTED, 0);
         lv_obj_set_style_text_align(lb_subtitle, LV_TEXT_ALIGN_LEFT, 0);
         lv_obj_set_style_text_font(lb_subtitle, &lv_font_montserrat_10, 0);
     }
 
-     if (item->right_badge.type == BADGE_IMG_TYPE)
+    if (item->right_badge.type == BADGE_IMG_TYPE)
     {
         obj_icon_t right_icon = item->right_badge.icon;
         if (right_icon.path != NULL && right_icon.path[0] != '\0')
@@ -261,7 +276,8 @@ lv_obj_t *add_item(ui_list *list, const list_item_t *item)
         lv_label_set_text(text, item->right_badge.label);
         lv_color_t color = item->right_badge.has_text_color
                                ? item->right_badge.text_color
-                               : ZV_COLOR_TEXT_MAIN;
+                               : COLOR_TEXT;
+
         lv_obj_set_style_text_color(text, color, 0);
         lv_obj_set_style_text_align(text, LV_TEXT_ALIGN_CENTER, 0);
     }
@@ -317,6 +333,8 @@ void clean_list(ui_list *list)
 
 void destroy_list(ui_list *list)
 {
-    clean_list(list);
-    free(list);
+    if (!list)
+        return;
+
+    lv_obj_delete(list->list);
 }

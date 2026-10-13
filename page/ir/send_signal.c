@@ -7,7 +7,7 @@
 #include "components/button/ui_button.h"
 #include "components/component_helper.h"
 #include "components/dropdown/ui_dropdown.h"
-#include "page/base_view.h"
+#include "page/zv_view.h"
 #include "utils/string_utils.h"
 
 #include <stdio.h>
@@ -15,7 +15,6 @@
 #include <string.h>
 
 typedef struct {
-    base_view base;
     ui_dropdown *dropdown_remotes;
     int remote_selected_position;
 
@@ -33,16 +32,16 @@ static lv_obj_t *ir_create_key_button(lv_obj_t *parent, const char *text)
 {
     lv_obj_t *btn = lv_btn_create(parent);
     lv_obj_set_size(btn, 90, 60);
-    lv_obj_set_style_bg_color(btn, ZV_COLOR_BG_PANEL, 0);
+    lv_obj_set_style_bg_color(btn, COLOR_BG_PANEL, 0);
     lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(btn, 2, 0);
-    lv_obj_set_style_border_color(btn, ZV_COLOR_BORDER, 0);
+    lv_obj_set_style_border_color(btn, COLOR_BORDER, 0);
     lv_obj_set_style_radius(btn, 12, 0);
 
     lv_obj_t *label = lv_label_create(btn);
     lv_label_set_text(label, text);
     lv_obj_clear_flag(label, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_set_style_text_color(label, ZV_COLOR_TEXT_MAIN, 0);
+    lv_obj_set_style_text_color(label, COLOR_TEXT, 0);
     lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_long_mode(label, LV_LABEL_LONG_WRAP);
     lv_obj_set_width(label, LV_PCT(100));
@@ -65,18 +64,20 @@ static void send_button_by_name(const char *button_name)
     if (!dropdown_item)
         return;
 
-    if (zv_is_empty(button_name) ) {
-        send_signal_status("Select remote and button.", ZV_COLOR_WARNING);
+    if (zv_is_empty(button_name) )
+    {
+        send_signal_status("Select remote and button.", COLOR_WARNING);
         return;
     }
 
     ir_status_t rc = ir_controller_send_button(dropdown_item->text, button_name);
-    if (rc == IR_OK) {
-        send_signal_status("Signal sent.", ZV_COLOR_ACCENT);
+    if (rc == IR_OK)
+    {
+        send_signal_status("Signal sent.", COLOR_ACCENT);
         return;
     }
 
-    send_signal_status(ir_controller_last_error(), ZV_COLOR_WARNING);
+    send_signal_status(ir_controller_last_error(), COLOR_WARNING);
 }
 
 static void send_grid_button_cb(lv_event_t *e)
@@ -84,7 +85,8 @@ static void send_grid_button_cb(lv_event_t *e)
     send_grid_button_ctx_t *ctx = (send_grid_button_ctx_t *)lv_event_get_user_data(e);
     const char *btn_name = ctx ? ctx->name : NULL;
 
-    if (!btn_name || !btn_name[0]) {
+    if (!btn_name || !btn_name[0])
+    {
         printf("send_grid_button_cb...sin nombre\n");
         return;
     }
@@ -111,7 +113,7 @@ static void rebuild_button_controls(const char *remote_name)
     ir_status_t rc = ir_controller_list_buttons(remote_name, &buttons);
     if (rc != IR_OK)
     {    
-        send_signal_status("No buttons for this remote.", ZV_COLOR_WARNING);
+        send_signal_status("No buttons for this remote.", COLOR_WARNING);
         return;
     }
 
@@ -129,9 +131,9 @@ static void rebuild_button_controls(const char *remote_name)
     }
 
     if (buttons.count == 0)
-        send_signal_status("No buttons learned yet.", ZV_COLOR_WARNING);
+        send_signal_status("No buttons learned yet.", COLOR_WARNING);
     else
-        send_signal_status("IDLE", ZV_COLOR_TEXT_MUTED);
+        send_signal_status("IDLE", COLOR_TEXT_MUTED);
 
     ir_controller_free_button_list(&buttons);
 }
@@ -152,7 +154,7 @@ static void load_remote_dropdown(void)
     if (rc != IR_OK || remotes.count == 0)
     {
         dropdown_clean_items(g_send_ui.dropdown_remotes);
-        send_signal_status("No remotes available.", ZV_COLOR_WARNING);
+        send_signal_status("No remotes available.", COLOR_WARNING);
         ir_controller_free_remote_list(&remotes);
         return;
     }
@@ -174,7 +176,8 @@ static void load_remote_dropdown(void)
     ir_controller_free_remote_list(&remotes);
 
     dropdown_item_t *default_item = dropdown_get_item(g_send_ui.dropdown_remotes, 0);
-    rebuild_button_controls(default_item->text);
+    if (default_item)
+        rebuild_button_controls(default_item->text);
 }
 
 static void send_refresh_remotes_cb(event_data_btn *e)
@@ -183,19 +186,28 @@ static void send_refresh_remotes_cb(event_data_btn *e)
     load_remote_dropdown();
 }
 
-lv_obj_t *ir_send_signal_page_create(lv_obj_t *menu)
+static void view_delete_cb(lv_event_t *e)
 {
-    base_view *view;
+    (void)e;
+    memset(&g_send_ui, 0, sizeof(g_send_ui));
+}
+
+zv_view_t *ir_send_signal_page_create(const zv_config *cfg)
+{
+    zv_view_t *view;
 
     memset(&g_send_ui, 0, sizeof(g_send_ui));
 
-    view = zv_view_create(&g_send_ui.base, menu, "Send Signal");
+    view = zv_view_new("Send Signal");
     if (!view)
         return NULL;
 
-    g_send_ui.base.set_flex_layout(&g_send_ui.base, LV_FLEX_FLOW_COLUMN, 12, 10);
+    (void)cfg;
+    lv_obj_add_event_cb(view->main_container, view_delete_cb, LV_EVENT_DELETE, NULL);
+    lv_obj_set_style_pad_all(view->content, 12, 0);
+    lv_obj_set_style_pad_row(view->content, 10, 0);
 
-    lv_obj_t *root = g_send_ui.base.root;
+    lv_obj_t *root = view->content;
     create_section_label(root, "Remote");
 
     lv_obj_t *remote_list_container = create_transparent_flex_row(root, LV_PCT(100), 45);
@@ -207,7 +219,7 @@ lv_obj_t *ir_send_signal_page_create(lv_obj_t *menu)
     ui_button_set_on_click(refresh_btn, send_refresh_remotes_cb, NULL);
 
     lv_obj_t *btn = create_section_label(root, "BUTTONS");
-    lv_obj_set_style_text_color(btn, ZV_COLOR_TERMINAL, 0);
+    lv_obj_set_style_text_color(btn, COLOR_TERMINAL, 0);
 
     g_send_ui.grid = lv_obj_create(root);
     lv_obj_set_size(g_send_ui.grid, LV_PCT(100), LV_PCT(50));
@@ -229,5 +241,5 @@ lv_obj_t *ir_send_signal_page_create(lv_obj_t *menu)
 
     load_remote_dropdown();
 
-    return g_send_ui.base.page;
+    return view;
 }

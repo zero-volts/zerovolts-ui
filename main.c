@@ -14,18 +14,14 @@
 #include "components/top_bar.h"
 #include "components/ui_theme.h"
 #include "components/component_helper.h"
-#include "components/nav.h"
+#include "page/navigation_page.h"
 #include "page/home_view.h"
 #include "page/hid/hid_view.h"
 #include "page/ir/ir.h"
-#include "page/ir/ir_controller.h"
-#include "page/bt/bt_controller.h"
 #include "page/ir/learn_button.h"
 #include "page/ir/new_remote.h"
 #include "page/bt/bt_view.h"
-#include "page/base_view.h"
 #include "page/sub_ghz/sub_ghz_view.h"
-#include "page/sub_ghz/sub_ghz_controller.h"
 #include "config.h"
 #include "service/uart_service.h"
 #include "utils/error_handler.h"
@@ -187,12 +183,12 @@ static void keypad_read(lv_indev_t * indev, lv_indev_data_t * data)
     data->state = LV_INDEV_STATE_RELEASED;
 }
 
-void setup_navigation_groups(lv_obj_t *menu, lv_obj_t *page)
+void setup_navigation_groups(lv_obj_t *page)
 {
     lv_group_t *group = lv_group_create();
     lv_group_set_wrap(group, true);
     zv_nav_set_group(group);
-    zv_nav_update_group(menu, page);
+    zv_nav_update_group(page);
 
     nav_btn = gpio_btn_init(NAV_GPIO);
     select_btn = gpio_btn_init(SELECT_GPIO);
@@ -201,26 +197,6 @@ void setup_navigation_groups(lv_obj_t *menu, lv_obj_t *page)
     lv_indev_set_type(keypad, LV_INDEV_TYPE_KEYPAD);
     lv_indev_set_read_cb(keypad, keypad_read);
     lv_indev_set_group(keypad, group);
-}
-
-void zv_menu_header_style(lv_obj_t *menu)
-{
-    lv_obj_t *header = lv_menu_get_main_header(menu);
-    lv_obj_t *title = find_first_element_child(header, &lv_label_class);
-
-    if(title) 
-        lv_obj_set_style_text_color(title, ZV_COLOR_TEXT_MAIN, 0);
-    
-    lv_obj_t *back_btn = find_first_element_child(header, &lv_button_class);
-    if(back_btn) 
-    {
-        lv_obj_set_size(back_btn, 30, 30);
-        lv_obj_set_style_radius(back_btn, 22, 0);
-
-        lv_obj_t *icon = lv_obj_get_child(back_btn, 0);
-        if(icon)
-            lv_obj_set_style_text_color(icon, ZV_COLOR_TEXT_MAIN, 0);
-    }
 }
 
 
@@ -264,33 +240,6 @@ int main(void)
     lv_obj_set_flex_flow(scr, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_style_pad_row(scr, 0, 0);
 
-    // Initializing bluethoot controller
-
-    ir_remote_ctx ir_cfg;
-    memset(&ir_cfg, 0, sizeof(ir_cfg));
-    ir_cfg.remotes_root = (char *)config->ir.remotes_path;
-    ir_cfg.ir_ctx.backend = config->ir.backend;
-    snprintf(ir_cfg.ir_ctx.tx_dev, sizeof(ir_cfg.ir_ctx.tx_dev), "%s", config->ir.tx_device);
-    snprintf(ir_cfg.ir_ctx.rx_dev, sizeof(ir_cfg.ir_ctx.rx_dev), "%s", config->ir.rx_device);
-    ir_cfg.ir_ctx.timeout_ms = config->ir.learn_timeout_ms;
-
-    if (ir_controller_init(&ir_cfg) != IR_OK) {
-        log_error("IR init failed: %s\n", ir_controller_last_error());
-        return -1;
-    }
-
-    // Initializing bluethoot controller
-    uart_config_t uart_cfg;
-    memset(&uart_cfg, 0, sizeof(uart_cfg));
-    snprintf(uart_cfg.device, sizeof(uart_cfg.device), "%s", config->uart.device);
-    uart_cfg.baudrate = config->uart.baudrate;
-
-    if (bt_controller_init(&uart_cfg) != UART_OK )
-    {
-        log_error("Bluetooth init failed\n");
-        return -1;
-    }
-
     /* -------- TOP BAR -------- */
 
     top_bar_t *top_bar = top_bar_create(scr);
@@ -299,81 +248,65 @@ int main(void)
     snprintf(version, sizeof(version), "v%s", config->version);
     top_bar_set_title(top_bar, version);
 
-    /* -------- MENU (remaining space) -------- */
-    lv_obj_t *menu = lv_menu_create(scr);
-    zv_menu_header_style(menu);
-    lv_obj_set_size(menu, LV_PCT(100), LV_PCT(100));
-    lv_obj_set_flex_grow(menu, 1);
-    lv_obj_set_style_pad_all(menu, 0, 0);
-    lv_obj_set_style_bg_color(menu, ZV_COLOR_BG_MAIN, 0);
-
-    lv_obj_clear_flag(menu, LV_OBJ_FLAG_SCROLLABLE);
-
-    /* -------- PAGES -------- */
+    /* -------- HOME (remaining space) -------- */
 
     static home_item home_items[] = {
         {
             .label = "Bad USB",
             .icon = LV_SYMBOL_USB,
-            .create_page = hid_view_create,
             .rotate_icon_90 = false,
+            .create_view = hid_view_create,
         },
         {
             .label = "Infrared",
             .icon = LV_SYMBOL_WIFI,
-            .create_page = ir_page_create,
             .rotate_icon_90 = true,
+            .create_view = ir_page_create,
         },
         {
-            .label = "Bluetooth",
+            .label = "Bluethoot",
             .icon = LV_SYMBOL_BLUETOOTH,
-            .create_page = bt_page_create,
             .rotate_icon_90 = false,
+            .create_view = bt_page_create,
         },
         {
             .label = "Sub-GHz",
             .icon = LV_SYMBOL_GPS,
-            .create_page = subghz_view_create,
             .rotate_icon_90 = false,
+            .create_view = subghz_view_create,
         }
     };
 
-    home_view home_view_obj;
-    home_view *home = home_view_create(&home_view_obj, menu, config, home_items,
-            sizeof(home_items) / sizeof(home_items[0]));
+    zv_view_t *home = home_view_create(home_items,
+            sizeof(home_items) / sizeof(home_items[0]), config);
 
     if (!home)
     {
-        log_error("home_view_create returned NULL (menu=%p config=%p items=%p count=%zu)\n",
-               (void *)menu, (void *)config, (void *)home_items,
+        log_error("home_view_create returned NULL (items=%p count=%zu)\n",
+               (void *)home_items,
                sizeof(home_items) / sizeof(home_items[0]));
         return -1;
     }
 
     lv_obj_t *home_page = get_page(home);
-    log_debug("home=%p home_page=%p menu=%p\n", (void *)home, (void *)home_page, (void *)menu);
+    log_debug("home=%p home_page=%p\n", (void *)home, (void *)home_page);
     if (!home_page) {
         log_error("get_page returned NULL\n");
         return -1;
     }
 
-    lv_menu_set_page(menu, home_page);
+    if (!zv_nav_push(home)) {
+        log_error("Could not register Home in navigation stack\n");
+        zv_view_destroy(home);
+        return -1;
+    }
 
-    setup_navigation_groups(menu, home_page);
-    lv_obj_t *last_page = lv_menu_get_cur_main_page(menu);
+    setup_navigation_groups(home_page);
     while (1)
     {
         lv_timer_handler();
 
         uart_process_loop();
-
-        lv_obj_t *cur_page = lv_menu_get_cur_main_page(menu);
-
-        if (cur_page && cur_page != last_page)
-        {
-            zv_nav_update_group(menu, cur_page);
-            last_page = cur_page;
-        }
 
         usleep(5000);
     }

@@ -1,39 +1,49 @@
 #include "bt_view.h"
+#include "bt_controller.h"
+#include "utils/logger.h"
 #include "bt_scanner.h"
 #include "components/ui_theme.h"
 #include "components/component_helper.h"
 #include "components/list/ui_list.h"
-#include "components/nav.h"
+#include "page/navigation_page.h"
 #include <stdio.h>
 
 static void handler(ui_list *list, const list_item_t *item, void *user_data)
 {
-    nav_ctx_t *ctx = (nav_ctx_t *)user_data;
-    if (!ctx || !ctx->menu || !ctx->page)
-        return;
-
-    lv_menu_set_page(ctx->menu, ctx->page);
-    zv_nav_update_group(ctx->menu, ctx->page);
+    (void)list;
+    (void)user_data;
+    zv_nav_open((const nav_ctx_t *)item->user_data);
 }
 
-lv_obj_t *bt_page_create(lv_obj_t *menu, const zv_config *cfg)
+zv_view_t *bt_page_create(const zv_config *cfg)
 {
-    lv_obj_t *page = lv_menu_page_create(menu, "Bluetooth");
-    lv_obj_set_scrollbar_mode(page, LV_SCROLLBAR_MODE_OFF);
+    if (!cfg)
+        return NULL;
 
-    (void)cfg;
+    uart_config_t uart_cfg = {};
+    snprintf(uart_cfg.device, sizeof(uart_cfg.device), "%s", cfg->uart.device);
+    uart_cfg.baudrate = cfg->uart.baudrate;
+    if (bt_controller_init(&uart_cfg) != UART_OK)
+    {
+        log_error("Bluetooth init failed\n");
+        return NULL;
+    }
 
-    lv_obj_t *scanner_page = bt_scanner_page_create(menu);
+    zv_view_t *view = zv_view_new("Bluetooth");
+    if (!view)
+        return NULL;
 
-    static nav_ctx_t nav_scanner;
+    nav_ctx_t nav_scanner = { bt_scanner_page_create, cfg };
+    ui_list *list = create_list(view->content, 100, 100);
+    if (!list)
+    {
+        zv_view_destroy(view);
+        return NULL;
+    }
 
-    nav_scanner.menu = menu;
-    nav_scanner.page = scanner_page;
-
-    ui_list *list = create_list(page, 100, 80);
     set_list_border(list, false);
-    set_list_bg_color(list, ZV_COLOR_BG_MAIN);
-    set_event_data(list, handler, &nav_scanner);
+    set_list_bg_color(list, COLOR_BG_MAIN);
+    set_event_data(list, handler, NULL);
 
     list_item_t item = {
         .text = "Scanner",
@@ -49,9 +59,11 @@ lv_obj_t *bt_page_create(lv_obj_t *menu, const zv_config *cfg)
                 }
             }
         },
+        .user_data = &nav_scanner,
+        .user_data_size = sizeof(nav_ctx_t),
     };
 
     add_item(list, &item);
 
-    return page;
+    return view;
 }

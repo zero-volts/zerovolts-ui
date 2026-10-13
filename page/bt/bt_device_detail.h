@@ -1,13 +1,14 @@
 #ifndef BT_DEVICE_DETAIL_H
 #define BT_DEVICE_DETAIL_H
 
-#include "lvgl.h"
+#include "page/zv_view.h"
+#include "config.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-lv_obj_t *bt_device_detail_page_create(lv_obj_t *menu);
+zv_view_t *bt_device_detail_page_create(const zv_config *cfg);
 void bt_device_detail_refresh(void);
 
 #ifdef __cplusplus

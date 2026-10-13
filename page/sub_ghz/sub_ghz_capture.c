@@ -29,8 +29,9 @@
 
 // STRINGS
 #define STR_UNKWNOWN_ERROR          "Unknown error"
-#define STR_SAVE_BUTTON             "Save"
+#define STR_SAVE_BUTTON             "Save..."
 #define STR_CAPTURE_BUTTON          "Capture"
+#define STR_LISTENING_BUTTON        "Listening..."
 #define STR_CAPTURING_BUTTON        "Capturing"
 #define STR_STATUS_INITIAL          "Start a capture pressing the capture\nbutton."
 #define STR_STATUS_CAPTURE_WAITING  "Waiting for signal... Press the remote \ncontrol"
@@ -43,15 +44,16 @@ typedef struct  {
 } frequency_t;
 
 static const dropdown_item_t frequencies[] = {
-    {0, 315000000U, "315 MHz"},
-    {1, 433920000U, "433.92 MHz"},
-    {2, 868000000U, "868 MHz"},
-    {3, 915000000U, "915 MHz"},
+    //{0, 315000000U, "315 MHz"},
+    {0, 433920000U, "433.92 MHz"},
+    // {2, 868000000U, "868 MHz"},
+    // {3, 915000000U, "915 MHz"},
 };
 
 typedef struct {
     int selected_frequency;
     uint64_t sessions_ended;
+    uint64_t capture_id;
 
     // UI componentes
     ui_pills *frequency_pills;
@@ -117,7 +119,6 @@ static void add_data(subghz_data_chunk_t *data)
     if (data->chunks == 0 || data->seq >= data->chunks)
         return;
 
-    /* Una nueva captura comienza con el chunk cero. */
     if (data->seq == 0)
     {
         // A new capture start, maybe another signal entered
@@ -162,6 +163,9 @@ static void add_data(subghz_data_chunk_t *data)
 
 static void capture_handler(ui_status_t status, subghz_event_arg *event)
 {
+    if (!local_ctx.status_lbl)
+        return;
+
     if (status == UI_ERROR)
     {
         const char *message = event && event->message ? event->message : STR_UNKWNOWN_ERROR;
@@ -176,7 +180,7 @@ static void capture_handler(ui_status_t status, subghz_event_arg *event)
         return;
     }
 
-    if (status == UI_DONE)
+    if (status == UI_DONE && event)
     {
         local_ctx.sessions_ended = event->session_id;
 
@@ -202,6 +206,7 @@ static void capture_handler(ui_status_t status, subghz_event_arg *event)
     }
 
     subghz_data_chunk_t *data = event->data;
+    local_ctx.capture_id = data->capture_id;
 
     printf("seq: %u\n", data->seq);
     printf("count: %u\n", data->count);
@@ -304,15 +309,15 @@ static void create_signal_chart(lv_obj_t *parent)
     local_ctx.chart = lv_chart_create(parent);
 
     lv_obj_set_size(local_ctx.chart, lv_pct(100), lv_pct(30));
-    lv_obj_set_style_bg_color(local_ctx.chart, ZV_COLOR_BG_PANEL, 0);
-    lv_obj_set_style_border_color(local_ctx.chart, ZV_COLOR_BORDER, 0);
+    lv_obj_set_style_bg_color(local_ctx.chart, COLOR_BG_PANEL, 0);
+    lv_obj_set_style_border_color(local_ctx.chart, COLOR_BORDER, 0);
     lv_obj_set_style_line_width(local_ctx.chart, 2, LV_PART_ITEMS);
     lv_obj_set_style_size(local_ctx.chart, 0, 0, LV_PART_INDICATOR);
     lv_chart_set_type(local_ctx.chart, LV_CHART_TYPE_SCATTER);
     lv_chart_set_update_mode(local_ctx.chart, LV_CHART_UPDATE_MODE_CIRCULAR);
     lv_chart_set_point_count(local_ctx.chart, CHART_MAX_POINTS);
 
-    lv_chart_add_series(local_ctx.chart, ZV_COLOR_TERMINAL, LV_CHART_AXIS_PRIMARY_Y);
+    lv_chart_add_series(local_ctx.chart,COLOR_TERMINAL, LV_CHART_AXIS_PRIMARY_Y);
 
     lv_chart_set_axis_range(local_ctx.chart, LV_CHART_AXIS_PRIMARY_Y, CHART_Y_MIN, CHART_Y_MAX);
     lv_chart_set_axis_range(local_ctx.chart, LV_CHART_AXIS_PRIMARY_X, 0, 1);
@@ -331,34 +336,45 @@ static void create_action_panel(lv_obj_t *parent)
 
     local_ctx.status_lbl = create_section_label(panel, STR_STATUS_INITIAL);
     local_ctx.discard_btn = ui_button_create(panel,  LV_PCT(100), 50, "Discard");
+    ui_button_set_action_style(local_ctx.discard_btn, Warning);
     ui_button_set_on_click(local_ctx.discard_btn, subghz_discard_capture_handler, NULL);
     ui_button_hide(local_ctx.discard_btn, true);
 }
 
 static void create_bottom_panel(lv_obj_t *parent)
 {
-    lv_obj_t *bottom_panel = lv_obj_create(parent);
-    lv_obj_set_size(bottom_panel, LV_PCT(100), LV_SIZE_CONTENT);
-    lv_obj_set_style_bg_opa(bottom_panel, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(bottom_panel, 0, 0);
-    lv_obj_set_style_pad_all(bottom_panel, 0, 0);
-    lv_obj_set_layout(bottom_panel, LV_LAYOUT_FLEX);
-    lv_obj_set_flex_flow(bottom_panel, LV_FLEX_FLOW_ROW);
-    lv_obj_set_style_pad_column(bottom_panel, 10, 0);
-
+    lv_obj_t *bottom_panel = helper_create_bottom_panel(parent);
+ 
     local_ctx.capture_btn = ui_button_create(bottom_panel,  LV_PCT(48), 50, STR_CAPTURE_BUTTON);
     ui_button_set_on_click(local_ctx.capture_btn, subghz_start_capture_handler, NULL);
+    ui_button_set_action_style(local_ctx.capture_btn, Success);
 
     local_ctx.save_btn = ui_button_create(bottom_panel, LV_PCT(48), 50, STR_SAVE_BUTTON);
     ui_button_set_on_click(local_ctx.save_btn, subghz_save_capture_handler, NULL);
+    ui_button_enable(local_ctx.save_btn, false);
 }
 
-lv_obj_t *subghz_capture_page_create(lv_obj_t *menu)
+static void view_delete_cb(lv_event_t *e)
 {
-    lv_obj_t *page = lv_menu_page_create(menu, "Signal Capture");
+    (void)e;
+    subghz_controller_set_capture_cb(NULL);
+    subghz_controller_discard_session(local_ctx.sessions_ended);
+    subghz_controller_discard_session(local_ctx.capture_id);
+    memset(&local_ctx, 0, sizeof(local_ctx));
+}
 
-    lv_obj_t *root = lv_obj_create(page);
-    lv_obj_set_size(root, LV_PCT(100), LV_PCT(100));
+zv_view_t *subghz_capture_page_create(const zv_config *cfg)
+{
+    (void)cfg;
+
+    memset(&local_ctx, 0, sizeof(local_ctx));
+    zv_view_t *view = zv_view_new("Signal Capture");
+    if (!view)
+        return NULL;
+
+    lv_obj_add_event_cb(view->main_container, view_delete_cb, LV_EVENT_DELETE, NULL);    
+
+    lv_obj_t *root = view->content;
     lv_obj_set_style_bg_opa(root, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(root, 0, 0);
     lv_obj_set_style_pad_all(root, 12, 0);
@@ -375,5 +391,5 @@ lv_obj_t *subghz_capture_page_create(lv_obj_t *menu)
 
     subghz_controller_set_capture_cb(capture_handler);
 
-    return page;
+    return view;
 }

@@ -1,13 +1,14 @@
 #ifndef BT_SCANNER_H
 #define BT_SCANNER_H
 
-#include "lvgl.h"
+#include "page/zv_view.h"
+#include "config.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-lv_obj_t *bt_scanner_page_create(lv_obj_t *menu);
+zv_view_t *bt_scanner_page_create(const zv_config *cfg);
 
 #ifdef __cplusplus
 }

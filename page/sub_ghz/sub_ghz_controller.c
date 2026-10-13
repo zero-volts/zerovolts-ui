@@ -31,12 +31,12 @@ static void event_handler(subghz_service_event_t *event)
                 capture_handler(UI_LOADING, &event_arg);
                 break;
             case SUBGHZ_EVENT_CAPTURE_ERROR:
-               event_arg = {
+               subghz_event_arg event_arg2 = {
                     .data = NULL,
                     .message = event->message
                 };
 
-                capture_handler(UI_ERROR, &event_arg);
+                capture_handler(UI_ERROR, &event_arg2);
                 break;
             default:
                 break;

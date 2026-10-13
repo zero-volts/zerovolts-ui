@@ -5,7 +5,7 @@
 #include "components/ui_pills.h"
 #include "bt_device_detail.h"
 #include "bt_controller.h"
-#include "components/nav.h"
+#include "page/navigation_page.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,16 +14,19 @@
 static ui_list *scanner_list = NULL;
 static ui_button *scan_btn = NULL;
 static lv_obj_t *lb_devices_amount = NULL;
-static lv_obj_t *device_detail_page = NULL;
+static lv_obj_t *scanner_root = NULL;
 static ui_pills *filter_pills = NULL;
 
 static void on_filter_change(ui_pills *pills, int index, const char *label, void *user_data);
 
 static lv_color_t rssi_color(int rssi)
 {
-    if (rssi >= -60) return ZV_COLOR_SUCCESS;
-    if (rssi >= -80) return ZV_COLOR_TEXT_MAIN;
-    return ZV_COLOR_WARNING;
+    if (rssi >= -60) 
+        return COLOR_SUCCESS;
+    if (rssi >= -80) 
+        return COLOR_TEXT;
+
+    return COLOR_WARNING;
 }
 
 static void handler(ui_list *list, const list_item_t *item, void *user_data)
@@ -32,13 +35,8 @@ static void handler(ui_list *list, const list_item_t *item, void *user_data)
 
     bt_controller_select_device((const device_t *)item->user_data);
 
-    nav_ctx_t *ctx = (nav_ctx_t *)user_data;
-    if (!ctx || !ctx->menu || !ctx->page)
-        return;
-
-    bt_device_detail_refresh();
-    lv_menu_set_page(ctx->menu, ctx->page);
-    zv_nav_update_group(ctx->menu, ctx->page);
+    nav_ctx_t ctx = { bt_device_detail_page_create, (const zv_config *)user_data };
+    zv_nav_open(&ctx);
 }
 
 static list_item_t create_list_item(device_t *device, char *rssi_buffer, size_t rssi_buffer_size)
@@ -110,6 +108,9 @@ static void handler_devices(device_t *device, ui_status_t status)
     int item_count = item_length(scanner_list);
     snprintf(device_text, sizeof(device_text), "Devices: %d", item_count);
     lv_label_set_text(lb_devices_amount, device_text);
+
+    if (scanner_root && !lv_obj_has_flag(scanner_root, LV_OBJ_FLAG_HIDDEN))
+        zv_nav_update_group(scanner_root);
 }
 
 static void handler_scan_btn(event_data_btn *e)
@@ -122,7 +123,8 @@ static void handler_scan_btn(event_data_btn *e)
     if (lb_devices_amount)
         lv_label_set_text(lb_devices_amount, "Devices: 0");
 
-    start_scan();
+    if (start_scan() != UART_OK)
+        ui_button_set_loading(scan_btn, false);
 }
 
 static void create_scanner_panel(lv_obj_t *parent)
@@ -142,9 +144,10 @@ static void create_scanner_panel(lv_obj_t *parent)
 
     lb_devices_amount = lv_label_create(scan_btn_container);
     lv_label_set_text(lb_devices_amount, "Devices: 0");
-    lv_obj_set_style_text_color(lb_devices_amount, ZV_COLOR_TERMINAL, 0);
+    lv_obj_set_style_text_color(lb_devices_amount, COLOR_TERMINAL, 0);
 
-    scan_btn = ui_button_create(scan_btn_container, 77, 40, "Scan");
+    scan_btn = ui_button_create(scan_btn_container, 80, 40, "Scan");
+    ui_button_set_action_style(scan_btn, Success);
     ui_button_set_on_click(scan_btn, handler_scan_btn, NULL);
 }
 
@@ -186,6 +189,8 @@ static void on_filter_change(ui_pills *pills, int index, const char *label, void
     char device_text[24];
     snprintf(device_text, sizeof(device_text), "Devices: %d", item_length(scanner_list));
     lv_label_set_text(lb_devices_amount, device_text);
+    if (scanner_root && !lv_obj_has_flag(scanner_root, LV_OBJ_FLAG_HIDDEN))
+        zv_nav_update_group(scanner_root);
 }
 
 static void create_filter_panel(lv_obj_t *parent)
@@ -198,14 +203,28 @@ static void create_filter_panel(lv_obj_t *parent)
     pills_set_event_cb(filter_pills, on_filter_change, NULL);
 }
 
-lv_obj_t *bt_scanner_page_create(lv_obj_t *menu)
+static void scanner_delete_cb(lv_event_t *e)
 {
-    lv_obj_t *page = lv_menu_page_create(menu, "BLE Scanner");
+    (void)e;
 
-    set_scanner_cb(handler_devices);
+    set_scanner_cb(NULL);
+    scanner_list = NULL;
+    scanner_root = NULL;
+    scan_btn = NULL;
+    filter_pills = NULL;
+    lb_devices_amount = NULL;
+    bt_controller_reset_devices();
+}
 
-    lv_obj_t *root = lv_obj_create(page);
-    lv_obj_set_size(root, LV_PCT(100), LV_PCT(100));
+zv_view_t *bt_scanner_page_create(const zv_config *cfg)
+{
+    zv_view_t *view = zv_view_new("BLE Scanner");
+    if (!view)
+        return NULL;
+
+    scanner_root = view->main_container;
+    lv_obj_add_event_cb(scanner_root, scanner_delete_cb, LV_EVENT_DELETE, NULL);
+    lv_obj_t *root = view->content;
     lv_obj_set_style_bg_opa(root, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(root, 0, 0);
     lv_obj_set_style_pad_all(root, 12, 0);
@@ -218,14 +237,15 @@ lv_obj_t *bt_scanner_page_create(lv_obj_t *menu)
     create_scanner_panel(root);
     create_filter_panel(root);
 
-    device_detail_page = bt_device_detail_page_create(menu);
-
-    static nav_ctx_t nav_detail;
-    nav_detail.menu = menu;
-    nav_detail.page = device_detail_page;
-
     scanner_list = create_list(root, 100, 70);
-    set_event_data(scanner_list, handler, &nav_detail);
+    if (!scanner_list)
+    {
+        zv_view_destroy(view);
+        return NULL;
+    }
 
-    return page;
+    set_event_data(scanner_list, handler, (void *)cfg);
+
+    set_scanner_cb(handler_devices);
+    return view;
 }

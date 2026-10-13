@@ -2,13 +2,14 @@
 #define IR_NEW_REMOTE_H
 
 #include <stdbool.h>
-#include "lvgl.h"
+#include "page/zv_view.h"
+#include "config.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-lv_obj_t *ir_new_remote_page_create(lv_obj_t *menu);
+zv_view_t *ir_new_remote_page_create(const zv_config *cfg);
 
 #ifdef __cplusplus
 }

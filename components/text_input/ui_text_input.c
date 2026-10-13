@@ -124,13 +124,13 @@ ui_text_input *ui_text_create_with_options(lv_obj_t *parent, int width, int heig
 
     lv_obj_set_size(text_input->input, width, height);
     lv_textarea_set_placeholder_text(text_input->input, hint);
-    lv_obj_set_style_bg_color(text_input->input, ZV_COLOR_BG_PANEL, 0);
+    lv_obj_set_style_bg_color(text_input->input, COLOR_BG_PANEL, 0);
     lv_obj_set_style_bg_opa(text_input->input, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(text_input->input, 2, 0);
-    lv_obj_set_style_border_color(text_input->input, ZV_COLOR_BORDER, 0);
+    lv_obj_set_style_border_color(text_input->input, COLOR_BORDER, 0);
     lv_obj_set_style_radius(text_input->input, 10, 0);
-    lv_obj_set_style_text_color(text_input->input, ZV_COLOR_TEXT_MAIN, 0);
-    lv_obj_set_style_text_color(text_input->input, ZV_COLOR_TEXT_MUTED, LV_PART_TEXTAREA_PLACEHOLDER);
+    lv_obj_set_style_text_color(text_input->input, COLOR_TEXT, 0);
+    lv_obj_set_style_text_color(text_input->input, COLOR_TEXT_MUTED, LV_PART_TEXTAREA_PLACEHOLDER);
     lv_obj_set_style_pad_left(text_input->input, 10, 0);
     lv_obj_add_event_cb(text_input->input, ui_input_handler, LV_EVENT_FOCUSED, text_input);
     lv_obj_add_event_cb(text_input->input, ui_input_handler, LV_EVENT_DEFOCUSED, text_input);

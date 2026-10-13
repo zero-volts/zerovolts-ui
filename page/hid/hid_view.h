@@ -3,7 +3,7 @@
 
 #include "lvgl.h"
 #include "config.h"
-#include "page/base_view.h"
+#include "page/zv_view.h"
 #include "page/hid/hid_controller.h"
 #include "components/list/ui_list.h"
 
@@ -12,7 +12,7 @@ extern "C" {
 #endif
 
 typedef struct {
-    base_view base;
+    zv_view_t *base;
 
     ui_list *list;
     lv_obj_t *status;
@@ -21,7 +21,7 @@ typedef struct {
     hid_controller controller;
 } hid_view;
 
-lv_obj_t *hid_view_create(lv_obj_t *menu, const zv_config *cfg);
+zv_view_t *hid_view_create(const zv_config *cfg);
 void hid_refresh_scripts(hid_view *self);
 const char *hid_get_selected_script(hid_view *self);
 

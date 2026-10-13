@@ -74,13 +74,13 @@ static void apply_default_styles(top_bar_t *bar)
 
     lv_obj_set_style_radius(bar->container, 0, 0);
 
-    lv_obj_set_style_bg_opa(bar->container, LV_OPA_COVER, 0);
-    lv_obj_set_style_bg_color(bar->container, ZV_COLOR_BG_PANEL, 0);
+    lv_obj_set_style_bg_opa(bar->container, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(bar->container, COLOR_BG_PANEL, LV_PART_MAIN);
 
     // Bottom border 
-    lv_obj_set_style_border_color(bar->container, ZV_COLOR_BORDER, 0);
+    lv_obj_set_style_border_color(bar->container, COLOR_BORDER, LV_PART_MAIN);
     lv_obj_set_style_border_width(bar->container, 1, 0);
-    lv_obj_set_style_border_side(bar->container, LV_BORDER_SIDE_BOTTOM, 0);
+    lv_obj_set_style_border_side(bar->container, LV_BORDER_SIDE_BOTTOM, LV_PART_MAIN);
 }
 
 top_bar_t *top_bar_create(lv_obj_t *parent)
@@ -112,7 +112,7 @@ top_bar_t *top_bar_create(lv_obj_t *parent)
     bar->title = lv_label_create(bar->container);
     lv_label_set_text(bar->title, "v0.1");
     lv_obj_set_style_text_font(bar->title, LV_FONT_DEFAULT, 0);
-    lv_obj_set_style_text_color(bar->title, ZV_COLOR_TERMINAL, 0);
+    lv_obj_set_style_text_color(bar->title, COLOR_TERMINAL, 0);
 
     lv_obj_t *right = lv_obj_create(bar->container);
     lv_obj_remove_style_all(right);
@@ -124,11 +124,11 @@ top_bar_t *top_bar_create(lv_obj_t *parent)
 
     bar->cpu_temp = lv_label_create(right);
     lv_label_set_text(bar->cpu_temp, "--.-°C");
-    lv_obj_set_style_text_color(bar->cpu_temp, ZV_COLOR_TEXT_MUTED, 0);
+    lv_obj_set_style_text_color(bar->cpu_temp, COLOR_TEXT_MUTED, 0);
 
     bar->clock = lv_label_create(right);
     lv_label_set_text(bar->clock, "--:--:--");
-    lv_obj_set_style_text_color(bar->clock, ZV_COLOR_TEXT_MID, 0);
+    lv_obj_set_style_text_color(bar->clock, COLOR_TEXT_MID, 0);
 
     // Internals + timer
     top_bar_internal_t *it = (top_bar_internal_t *)malloc(sizeof(top_bar_internal_t));

@@ -20,7 +20,7 @@
 		"device":	"/dev/ttyAMA5",
 		"baudrate":	115200
 	},
-	"subghz": {
-		"signals_path": "data/subghz/signals"
+	"subghz":	{
+		"signals_path":	"data/subghz/signals"
 	}
 }

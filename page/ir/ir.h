@@ -1,7 +1,7 @@
 #ifndef IR_H
 #define IR_H
 
-#include "lvgl.h"
+#include "page/zv_view.h"
 #include "config.h"
 
 #ifdef __cplusplus
@@ -9,7 +9,7 @@ extern "C" {
 #endif
 
 
-lv_obj_t *ir_page_create(lv_obj_t *menu, const zv_config *cfg);
+zv_view_t *ir_page_create(const zv_config *cfg);
 
 
 #ifdef __cplusplus

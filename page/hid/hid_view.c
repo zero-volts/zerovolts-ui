@@ -22,7 +22,8 @@ static void hid_set_selected_label(hid_view *self)
         return;
 
     const char *selected_script = hid_controller_selected_script(&self->controller);
-    if (selected_script[0]) {
+    if (selected_script[0])
+    {
         const char *base = strrchr(selected_script, '/');
         base = base ? base + 1 : selected_script;
         lv_label_set_text_fmt(self->selected_lbl, "Selected: %s", base);
@@ -41,13 +42,14 @@ static void hid_script_item_clicked(ui_list *list, const list_item_t *item, void
         return;
 
     hid_status_t rc = hid_controller_set_selected_script(&self->controller, item->raw_value);
-    if (rc != HID_OK) {
-        set_status(hid_controller_last_error(), ZV_COLOR_ERROR, self);
+    if (rc != HID_OK)
+    {
+        set_status(hid_controller_last_error(), COLOR_ERROR, self);
         return;
     }
 
     hid_set_selected_label(self);
-    set_status("Script selected.", ZV_COLOR_TEXT_MAIN, self);
+    set_status("Script selected.", COLOR_TEXT, self);
 }
 
 static void refresh_list_impl(hid_view *self)
@@ -59,8 +61,9 @@ static void refresh_list_impl(hid_view *self)
 
     hid_script_list scripts;
     hid_status_t rc = hid_controller_list_scripts(&self->controller, &scripts);
-    if (rc != HID_OK) {
-        set_status(hid_controller_last_error(), ZV_COLOR_ERROR, self);
+    if (rc != HID_OK)
+    {
+        set_status(hid_controller_last_error(), COLOR_ERROR, self);
         return;
     }
 
@@ -70,7 +73,7 @@ static void refresh_list_impl(hid_view *self)
             .left_badge = {
                 .label = LV_SYMBOL_FILE,
                 .type = BADGE_TEXT_TYPE,
-                .text_color = ZV_COLOR_ACCENT,
+                .text_color = COLOR_ACCENT,
                 .has_text_color = true,
             },
             .raw_value = scripts.scripts[i].path,
@@ -100,34 +103,47 @@ static void hid_toggle_cb(lv_event_t *e)
     if (rc != HID_OK)
     {
         lv_obj_clear_state(sw, LV_STATE_CHECKED);
-        set_status(hid_controller_last_error(), ZV_COLOR_ERROR, self);
+        set_status(hid_controller_last_error(), COLOR_ERROR, self);
         return;
     }
 
     hid_set_selected_label(self);
 }
 
-static hid_view *hid_page_create(hid_view *self, lv_obj_t *menu, const zv_config *cfg)
+static void hid_view_delete_cb(lv_event_t *e)
 {
-    base_view *view = zv_view_create(&self->base, menu, "HID / BadUSB");
-    if (!view)
-        return NULL;
+    hid_view *self = (hid_view *)lv_event_get_user_data(e);
+    free(self);
+}
 
+static hid_view *hid_page_create(hid_view *self, const zv_config *cfg)
+{
     if (hid_controller_init(&self->controller, cfg) != HID_OK)
         return NULL;
 
-    lv_obj_set_style_pad_all(self->base.root, 8, 0);
-    self->base.set_flex_layout(&self->base, LV_FLEX_FLOW_COLUMN, 5, 0);
+    self->base = zv_view_new("HID / BadUSB");
+    if (!self->base)
+        return NULL;
 
-    lv_obj_t *panel = ui_panel_create(self->base.root, LV_PCT(100), 40);
+    // The context lives as long as the view's object tree.
+    lv_obj_add_event_cb(self->base->main_container, hid_view_delete_cb,
+                        LV_EVENT_DELETE, self);
+    lv_obj_t *content = self->base->content;
+    lv_obj_set_layout(content, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(content, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_style_pad_all(content, 5, 0);
+    lv_obj_set_style_pad_row(content, 0, 0);
+    lv_obj_clear_flag(content, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t *panel = ui_panel_create(content, LV_PCT(100), 40);
     self->status = lv_label_create(panel);
     lv_label_set_text(self->status, "HID Gadget");
-    lv_obj_set_style_text_color(self->status, ZV_COLOR_TEXT_MAIN, 0);
+    lv_obj_set_style_text_color(self->status, COLOR_TEXT, 0);
 
     self->toggle = lv_switch_create(panel);
     lv_obj_add_event_cb(self->toggle, hid_toggle_cb, LV_EVENT_VALUE_CHANGED, self);
 
-    lv_obj_t *center_container = lv_obj_create(self->base.root);
+    lv_obj_t *center_container = lv_obj_create(content);
     lv_obj_set_size(center_container, LV_PCT(100), 45);
     lv_obj_set_style_bg_opa(center_container, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(center_container, 0, 0);
@@ -137,14 +153,14 @@ static hid_view *hid_page_create(hid_view *self, lv_obj_t *menu, const zv_config
     lv_obj_set_flex_align(center_container, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
     self->selected_lbl = lv_label_create(center_container);
-    lv_obj_set_style_text_color(self->selected_lbl, ZV_COLOR_TEXT_MAIN, 0);
+    lv_obj_set_style_text_color(self->selected_lbl, COLOR_TEXT, 0);
 
     lv_obj_t *refresh_btn = lv_btn_create(center_container);
     lv_obj_set_size(refresh_btn, 45, 35);
-    lv_obj_set_style_bg_color(refresh_btn, ZV_COLOR_BG_PANEL, 0);
+    lv_obj_set_style_bg_color(refresh_btn, COLOR_BG_PANEL, 0);
     lv_obj_set_style_bg_opa(refresh_btn, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(refresh_btn, 2, 0);
-    lv_obj_set_style_border_color(refresh_btn, ZV_COLOR_BORDER, 0);
+    lv_obj_set_style_border_color(refresh_btn, COLOR_BORDER, 0);
     lv_obj_set_style_radius(refresh_btn, 10, 0);
     lv_obj_add_event_cb(refresh_btn, hid_refresh_btn_cb, LV_EVENT_CLICKED, self);
     lv_obj_set_flex_flow(refresh_btn, LV_FLEX_FLOW_COLUMN);
@@ -153,9 +169,12 @@ static hid_view *hid_page_create(hid_view *self, lv_obj_t *menu, const zv_config
 
     lv_obj_t *icon = lv_label_create(refresh_btn);
     lv_label_set_text(icon, LV_SYMBOL_REFRESH);
-    lv_obj_set_style_text_color(icon, ZV_COLOR_TEXT_MAIN, 0);
+    lv_obj_set_style_text_color(icon, COLOR_TEXT, 0);
 
-    self->list = create_list(self->base.root, 100, 80);
+    self->list = create_list(content, 100, 80);
+    if (!self->list)
+        return NULL;
+
     set_list_border(self->list, false);
     set_list_bg_color_op(self->list, LV_OPA_TRANSP);
     set_event_data(self->list, hid_script_item_clicked, self);
@@ -167,20 +186,23 @@ static hid_view *hid_page_create(hid_view *self, lv_obj_t *menu, const zv_config
     return self;
 }
 
-lv_obj_t *hid_view_create(lv_obj_t *menu, const zv_config *cfg)
+zv_view_t *hid_view_create(const zv_config *cfg)
 {
-    hid_view *view = (hid_view *)malloc(sizeof(*view));
+    hid_view *view = (hid_view *)calloc(1, sizeof(*view));
     if (!view)
         return NULL;
 
-    hid_view *self = hid_page_create(view, menu, cfg);
+    hid_view *self = hid_page_create(view, cfg);
     if (!self)
     {
-        free(view);
+        if (view->base)
+            zv_view_destroy(view->base);
+        else
+            free(view);
         return NULL;
     }
 
-    return self->base.page;
+    return self->base;
 }
 
 void hid_refresh_scripts(hid_view *self)

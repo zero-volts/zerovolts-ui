@@ -40,6 +40,8 @@ static void dropdown_changed_cb(lv_event_t *e)
         return;
 
     uint32_t index = lv_dropdown_get_selected(self->dropdown);
+    if (index >= (uint32_t)self->item_count)
+        return;
 
     if (self->on_change != NULL)
         self->on_change(&self->items[index], self->user_data);
@@ -62,15 +64,16 @@ ui_dropdown *dropdown_create(lv_obj_t *parent, int width, int height)
 
     lv_obj_set_width(obj, width);
     lv_obj_set_height(obj, height);
-    lv_obj_set_style_bg_color(obj, ZV_COLOR_BG_PANEL, 0);
+    lv_obj_set_style_bg_color(obj, COLOR_BG_PANEL, 0);
     lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(obj, 2, 0);
-    lv_obj_set_style_border_color(obj, ZV_COLOR_BORDER, 0);
+    lv_obj_set_style_border_color(obj, COLOR_BORDER, 0);
     lv_obj_set_style_radius(obj, 10, 0);
-    lv_obj_set_style_text_color(obj, ZV_COLOR_TEXT_MAIN, 0);
+    lv_obj_set_style_text_color(obj, COLOR_TEXT, 0);
     lv_obj_set_style_pad_left(obj, 10, 0);
 
     lv_obj_add_event_cb(obj, dropdown_changed_cb, LV_EVENT_VALUE_CHANGED, dropdown_box);
+    lv_obj_add_event_cb(obj, dropdown_delete_handler, LV_EVENT_DELETE, dropdown_box);
 
     dropdown_box->dropdown = obj;
     dropdown_box->item_count = 0;

@@ -18,7 +18,7 @@ static void apply_divider_to_prev(ui_info_panel *panel)
         return;
 
     lv_obj_set_style_border_width(prev, 1, 0);
-    lv_obj_set_style_border_color(prev, ZV_COLOR_BORDER, 0);
+    lv_obj_set_style_border_color(prev, COLOR_BORDER, 0);
     lv_obj_set_style_border_side(prev, LV_BORDER_SIDE_BOTTOM, 0);
 }
 
@@ -49,7 +49,7 @@ static lv_obj_t *create_info_panel_row_base(ui_info_panel *panel, const char *la
 
     lv_obj_t *key = lv_label_create(row);
     lv_label_set_text(key, label ? label : "");
-    lv_obj_set_style_text_color(key, ZV_COLOR_TEXT_MUTED, 0);
+    lv_obj_set_style_text_color(key, COLOR_TEXT_MUTED, 0);
     lv_obj_set_style_text_font(key, &lv_font_montserrat_12, 0);
 
     panel->item_count += 1;
@@ -57,16 +57,31 @@ static lv_obj_t *create_info_panel_row_base(ui_info_panel *panel, const char *la
     return row;
 }
 
+static void info_panel_delete_cb(lv_event_t *e)
+{
+    free(lv_event_get_user_data(e));
+}
+
 ui_info_panel *create_info_panel(lv_obj_t *parent, int width, int height)
 {
     ui_info_panel *panel = (ui_info_panel *)malloc (sizeof (ui_info_panel));
+    if (!panel)
+        return NULL;
+
     lv_obj_t *root = lv_obj_create(parent);
+    if (!root)
+    {
+        free(panel);
+        return NULL;
+    }
+    
+    lv_obj_add_event_cb(root, info_panel_delete_cb, LV_EVENT_DELETE, panel);
     panel->main_layout = root;
 
     lv_obj_set_width(root, width);
     lv_obj_set_height(root, LV_SIZE_CONTENT);
-    lv_obj_set_style_bg_color(root, ZV_COLOR_BG_PANEL, 0);
-    lv_obj_set_style_border_color(root, ZV_COLOR_BORDER, 0);
+    lv_obj_set_style_bg_color(root, COLOR_BG_PANEL, 0);
+    lv_obj_set_style_border_color(root, COLOR_BORDER, 0);
     lv_obj_set_style_border_width(root, 1, 0);
     lv_obj_set_style_radius(root, 10, 0);
     lv_obj_set_style_pad_all(root, 5, 0);
@@ -95,7 +110,7 @@ void add_info_panel_item(ui_info_panel *panel, kv_item_t item)
     if (item.has_value_color)
         lv_obj_set_style_text_color(value, item.value_color, 0);
     else
-        lv_obj_set_style_text_color(value, ZV_COLOR_TEXT_MAIN, 0);
+        lv_obj_set_style_text_color(value, COLOR_TEXT, 0);
 }
 
 void add_info_panel_header(ui_info_panel *panel, const char *text, lv_color_t color)

@@ -1,7 +1,7 @@
 #include "page/ir/learn_button.h"
 #include "components/component_helper.h"
 #include "components/ui_theme.h"
-#include "components/nav.h"
+#include "page/navigation_page.h"
 #include "config.h"
 #include "utils/logger.h"
 #include "page/ir/ir_controller.h"
@@ -27,16 +27,16 @@ static lv_obj_t *ir_create_status_box(lv_obj_t *parent)
     lv_obj_t *panel = lv_obj_create(parent);
     lv_obj_set_width(panel, LV_PCT(100));
     lv_obj_set_height(panel, 60);
-    lv_obj_set_style_bg_color(panel, ZV_COLOR_BG_PANEL, 0);
+    lv_obj_set_style_bg_color(panel, COLOR_BG_PANEL, 0);
     lv_obj_set_style_bg_opa(panel, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(panel, 2, 0);
-    lv_obj_set_style_border_color(panel, ZV_COLOR_BORDER, 0);
+    lv_obj_set_style_border_color(panel, COLOR_BORDER, 0);
     lv_obj_set_style_radius(panel, 10, 0);
     lv_obj_set_style_pad_all(panel, 10, 0);
 
     g_learn.status = lv_label_create(panel);
     lv_label_set_text(g_learn.status, "Ready to capture.");
-    lv_obj_set_style_text_color(g_learn.status, ZV_COLOR_TEXT_MAIN, 0);
+    lv_obj_set_style_text_color(g_learn.status, COLOR_TEXT, 0);
     lv_label_set_long_mode(g_learn.status, LV_LABEL_LONG_WRAP);
     lv_obj_set_width(g_learn.status, LV_PCT(100));
 
@@ -152,15 +152,36 @@ static void remote_on_change_handler(dropdown_item_t *item, void *user_data)
     g_learn.remote_selected_position = item->position;   
 }
 
-lv_obj_t *ir_learn_button_page_create(lv_obj_t *menu)
+static void view_delete_cb(lv_event_t *e)
 {
-    lv_obj_t *page = lv_menu_page_create(menu, "Learn Button");
-    lv_obj_set_scrollbar_mode(page, LV_SCROLLBAR_MODE_OFF);
+    (void)e;
+    memset(&g_learn, 0, sizeof(g_learn));
+}
+
+static void create_bottom_panel(lv_obj_t *parent)
+{
+    lv_obj_t *bottom_panel = helper_create_bottom_panel(parent);
+ 
+    ui_button *cancel_btn = ui_button_create(bottom_panel,  LV_PCT(48), 50, "Cancel");
+    ui_button_set_on_click(cancel_btn, learn_cancel_cb, NULL);
+    ui_button_set_action_style(cancel_btn, Warning);
+
+    ui_button *finish_btn = ui_button_create(bottom_panel, LV_PCT(48), 50, "Finish");
+    ui_button_set_on_click(finish_btn, finish_button_handler, NULL);
+    ui_button_set_action_style(finish_btn, Success);
+}
+
+zv_view_t *ir_learn_button_page_create(const zv_config *cfg)
+{
+    zv_view_t *view = zv_view_new("Learn Button");
+    if (!view)
+        return NULL;
+
+    lv_obj_add_event_cb(view->main_container, view_delete_cb, LV_EVENT_DELETE, NULL);
 
     memset(&g_learn, 0, sizeof(g_learn));
 
-    lv_obj_t *root = lv_obj_create(page);
-    lv_obj_set_size(root, LV_PCT(100), LV_PCT(100));
+    lv_obj_t *root = view->content;
     lv_obj_set_style_bg_opa(root, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(root, 0, 0);
     lv_obj_set_style_pad_all(root, 12, 0);
@@ -180,31 +201,24 @@ lv_obj_t *ir_learn_button_page_create(lv_obj_t *menu)
     ui_button_set_on_click(refresh_btn, learn_refresh_remotes_cb, NULL);
     
     create_section_label(root, "Button Name:");
-    const zv_config *cfg = config_get();
     ui_text_input_options input_options = {
         .use_on_screen_keyboard = cfg ? cfg->ir.use_on_screen_keyboard : true,
         .one_line = true
     };
 
-    g_learn.button_txt = ui_text_create_with_options(root, LV_PCT(82), 40, "KEY_VOLUMEUP", &input_options);
+    g_learn.button_txt = ui_text_create_with_options(root, LV_PCT(100), 60, "KEY_VOLUMEUP", &input_options);
 
     lv_obj_t *hint = lv_label_create(root);
     lv_label_set_text(hint, "Point remote at receiver and press one button.");
-    lv_obj_set_style_text_color(hint, ZV_COLOR_TEXT_MAIN, 0);
+    lv_obj_set_style_text_color(hint, COLOR_TEXT, 0);
     lv_obj_set_style_text_align(hint, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_width(hint, LV_PCT(100));
 
     ir_create_status_box(root);
 
-    lv_obj_t *footer_row = create_transparent_flex_row(root, LV_PCT(100), 50);
-
-    ui_button *cancel_btn = ui_button_create(footer_row,  LV_PCT(45), 40, "Cancel");
-    ui_button_set_on_click(cancel_btn, learn_cancel_cb, NULL);
-
-    ui_button *finish_btn = ui_button_create(footer_row, LV_PCT(45), 40, "Finish");
-    ui_button_set_on_click(finish_btn, finish_button_handler, NULL);
+    create_bottom_panel(root);
 
     load_remote_dropdown();
 
-    return page;
+    return view;
 }

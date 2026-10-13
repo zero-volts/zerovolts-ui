@@ -12,7 +12,6 @@
 
 #define BT_BASE_UUID_TAIL "-0000-1000-8000-00805f9b34fb"
 
-static lv_obj_t *page_ref = NULL;
 static bool is_active = false;
 
 typedef struct {
@@ -66,14 +65,14 @@ static void render_service(lv_obj_t *parent, const bt_service_t *svc)
     else
         snprintf(header_text, sizeof(header_text), "%s", buf);
 
-    add_info_panel_header(panel, header_text, ZV_COLOR_ACCENT);
+    add_info_panel_header(panel, header_text, COLOR_ACCENT);
 
     for (int j = 0; j < svc->chars_count; j++)
     {
         const bt_characteristic_t *ch = &svc->chars[j];
 
         char ch_buf[BT_UUID_STR_LEN];
-    const char *ch_name = lookup_name(ch->uuid, ch_buf, sizeof(ch_buf));
+        const char *ch_name = lookup_name(ch->uuid, ch_buf, sizeof(ch_buf));
 
         char ch_label[80];
         if (ch_name)
@@ -111,7 +110,8 @@ static void rebuild_services_list(void)
     if (own_ctx.services_placeholder)
         lv_obj_add_flag(own_ctx.services_placeholder, LV_OBJ_FLAG_HIDDEN);
 
-    for (int i = 0; i < len; i++) {
+    for (int i = 0; i < len; i++)
+    {
         render_service(own_ctx.services_container, &svcs[i]);
     }
 }
@@ -124,11 +124,11 @@ static void update_btn_state(bt_conn_status_t s)
     bool loading = (s == BT_CONN_CONNECTING || s == BT_CONN_DISCOVERING);
     ui_button_set_loading(own_ctx.connect_btn, loading);
 
-    if (s == BT_CONN_CONNECTED || s == BT_CONN_READY) {
+    if (s == BT_CONN_CONNECTED || s == BT_CONN_READY)
         ui_button_set_text(own_ctx.connect_btn, "Disconnect");
-    } else {
+    else
         ui_button_set_text(own_ctx.connect_btn, "Connect");
-    }
+
 }
 
 static void on_conn_event(bt_conn_status_t status, const char *info)
@@ -165,56 +165,44 @@ static void on_connect_click(event_data_btn *e)
     bt_connect(dev);
 }
 
-static void on_page_changed(lv_event_t *e)
+static void detail_delete_cb(lv_event_t *e)
 {
-    lv_obj_t *menu = (lv_obj_t *)lv_event_get_target(e);
-    lv_obj_t *cur = lv_menu_get_cur_main_page(menu);
+    is_active = false;
+    set_conn_cb(NULL);
+    bt_conn_status_t status = bt_get_conn_status();
+    if (status == BT_CONN_CONNECTED || status == BT_CONN_READY ||
+        status == BT_CONN_CONNECTING || status == BT_CONN_DISCOVERING)
+        bt_disconnect();
 
-    if (cur == page_ref && !is_active) {
-        is_active = true;
-        return;
-    }
-
-    if (cur != page_ref && is_active) {
-        is_active = false;
-
-        bt_conn_status_t s = bt_get_conn_status();
-        if (s == BT_CONN_CONNECTED || s == BT_CONN_READY ||
-            s == BT_CONN_CONNECTING || s == BT_CONN_DISCOVERING) {
-            bt_disconnect();
-        }
-
-        bt_clear_discovery();
-        if (own_ctx.services_container) lv_obj_clean(own_ctx.services_container);
-        if (own_ctx.services_placeholder)
-            lv_obj_clear_flag(own_ctx.services_placeholder, LV_OBJ_FLAG_HIDDEN);
-        if (own_ctx.status_label) lv_label_set_text(own_ctx.status_label, status_text(BT_CONN_IDLE));
-        update_btn_state(BT_CONN_IDLE);
-    }
+    bt_clear_discovery();
+    memset(&own_ctx, 0, sizeof(own_ctx));
 }
 
 static lv_obj_t *create_section_title(lv_obj_t *parent, const char *text)
 {
     lv_obj_t *title = lv_label_create(parent);
     lv_label_set_text(title, text);
-    lv_obj_set_style_text_color(title, ZV_COLOR_TERMINAL, 0);
+    lv_obj_set_style_text_color(title, COLOR_TERMINAL, 0);
     lv_obj_set_style_text_font(title, &lv_font_montserrat_10, 0);
     lv_obj_set_style_text_letter_space(title, 2, 0);
     lv_obj_set_width(title, LV_PCT(100));
-    lv_obj_set_style_border_color(title, ZV_COLOR_BORDER, 0);
+    lv_obj_set_style_border_color(title, COLOR_BORDER, 0);
     lv_obj_set_style_border_width(title, 1, 0);
     lv_obj_set_style_border_side(title, LV_BORDER_SIDE_BOTTOM, 0);
     lv_obj_set_style_pad_bottom(title, 3, 0);
     return title;
 }
 
-lv_obj_t *bt_device_detail_page_create(lv_obj_t *menu)
+zv_view_t *bt_device_detail_page_create(const zv_config *cfg)
 {
-    lv_obj_t *page = lv_menu_page_create(menu, "BLE Device");
-    page_ref = page;
+    (void)cfg;
+    zv_view_t *view = zv_view_new("BLE Device");
+    if (!view)
+        return NULL;
 
-    lv_obj_t *root = lv_obj_create(page);
-    lv_obj_set_size(root, LV_PCT(100), LV_PCT(100));
+    memset(&own_ctx, 0, sizeof(own_ctx));
+
+    lv_obj_t *root = view->content;
     lv_obj_set_style_bg_opa(root, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(root, 0, 0);
     lv_obj_set_style_pad_all(root, 12, 0);
@@ -242,7 +230,7 @@ lv_obj_t *bt_device_detail_page_create(lv_obj_t *menu)
 
     own_ctx.status_label = lv_label_create(action_row);
     lv_label_set_text(own_ctx.status_label, status_text(BT_CONN_IDLE));
-    lv_obj_set_style_text_color(own_ctx.status_label, ZV_COLOR_TERMINAL, 0);
+    lv_obj_set_style_text_color(own_ctx.status_label, COLOR_TERMINAL, 0);
 
     own_ctx.connect_btn = ui_button_create(action_row, 100, 40, "Connect");
     ui_button_set_on_click(own_ctx.connect_btn, on_connect_click, own_ctx.connect_btn);
@@ -251,9 +239,8 @@ lv_obj_t *bt_device_detail_page_create(lv_obj_t *menu)
 
     own_ctx.services_placeholder = lv_label_create(root);
     lv_label_set_text(own_ctx.services_placeholder, "No services enumerated");
-    lv_obj_set_style_text_color(own_ctx.services_placeholder, ZV_COLOR_TEXT_MUTED, 0);
+    lv_obj_set_style_text_color(own_ctx.services_placeholder, COLOR_TEXT_MUTED, 0);
     lv_obj_set_style_text_font(own_ctx.services_placeholder, &lv_font_montserrat_10, 0);
-
 
     own_ctx.services_container = lv_obj_create(root);
     lv_obj_remove_style_all(own_ctx.services_container);
@@ -267,9 +254,11 @@ lv_obj_t *bt_device_detail_page_create(lv_obj_t *menu)
     lv_obj_set_flex_flow(own_ctx.services_container, LV_FLEX_FLOW_COLUMN);
 
     set_conn_cb(on_conn_event);
-    lv_obj_add_event_cb(menu, on_page_changed, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_obj_add_event_cb(view->main_container, detail_delete_cb, LV_EVENT_DELETE, NULL);
+    is_active = true;
+    bt_device_detail_refresh();
 
-    return page;
+    return view;
 }
 
 void bt_device_detail_refresh(void)
@@ -292,13 +281,15 @@ void bt_device_detail_refresh(void)
         {
             .label = "RSSI",
             .value = rssi_buffer,
-            .value_color = ZV_COLOR_TERMINAL,
+            .value_color = COLOR_TERMINAL,
             .has_value_color = true,
         },
     };
 
     for (size_t i = 0; i < sizeof(items) / sizeof(items[0]); i++)
+    {
         add_info_panel_item(own_ctx.device_info, items[i]);
+    }
 
     if (own_ctx.services_container) 
         lv_obj_clean(own_ctx.services_container);

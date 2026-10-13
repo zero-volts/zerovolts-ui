@@ -9,18 +9,18 @@ lv_obj_t *create_square_main_button(lv_obj_t *parent, const char *text, const ch
 {
     lv_obj_t *btn = lv_btn_create(parent);
     lv_obj_set_size(btn, LV_PCT(48), 100);
-    lv_obj_set_style_bg_color(btn, ZV_COLOR_BG_PANEL, 0);
+    lv_obj_set_style_bg_color(btn, COLOR_BG_CARD, 0);
     lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_width(btn, 2, 0);
-    lv_obj_set_style_border_color(btn, ZV_COLOR_BORDER, 0);
-    lv_obj_set_style_radius(btn, 10, 0);
+    lv_obj_set_style_border_width(btn, 1, 0);
+    lv_obj_set_style_border_color(btn, COLOR_BORDER, 0);
+    lv_obj_set_style_radius(btn, UI_RADIUS, 0);
 
     lv_obj_add_event_cb(btn, cb, LV_EVENT_CLICKED, user_data);
 
     // states
-    lv_obj_set_style_bg_color(btn, ZV_COLOR_BG_BUTTON_PRESSED, LV_STATE_PRESSED);
-    lv_obj_set_style_border_color(btn, ZV_COLOR_TERMINAL, LV_STATE_FOCUSED);
-    lv_obj_set_style_border_color(btn, ZV_COLOR_TERMINAL, LV_STATE_CHECKED);
+    lv_obj_set_style_bg_color(btn, COLOR_BG_PANEL, LV_STATE_PRESSED);
+    lv_obj_set_style_border_color(btn, COLOR_ACCENT, LV_STATE_FOCUSED);
+    lv_obj_set_style_border_color(btn, COLOR_ACCENT, LV_STATE_CHECKED);
 
     // Internal layout
     lv_obj_set_flex_flow(btn, LV_FLEX_FLOW_COLUMN);
@@ -29,12 +29,12 @@ lv_obj_t *create_square_main_button(lv_obj_t *parent, const char *text, const ch
 
     lv_obj_t *ic = lv_label_create(btn);
     lv_label_set_text(ic, icon);
-    lv_obj_set_style_text_color(ic, ZV_COLOR_TEXT_MAIN, 0);
+    lv_obj_set_style_text_color(ic, COLOR_TEXT, 0);
     lv_obj_set_user_data(ic, (void *)ICON_IDENTIFYER); // Use 100 as "TAG_ICONO"
 
     lv_obj_t *lb = lv_label_create(btn);
     lv_label_set_text(lb, text);
-    lv_obj_set_style_text_color(lb, ZV_COLOR_TEXT_MAIN, 0);
+    lv_obj_set_style_text_color(lb, COLOR_TEXT, 0);
 
     return btn;
 }
@@ -43,9 +43,25 @@ lv_obj_t *create_section_label(lv_obj_t *parent, const char *text)
 {
     lv_obj_t *label = lv_label_create(parent);
     lv_label_set_text(label, text);
-    lv_obj_set_style_text_color(label, ZV_COLOR_TEXT_MAIN, 0);
+    lv_obj_set_style_text_color(label, COLOR_TEXT, 0);
 
     return label;
+}
+
+lv_obj_t *helper_create_bottom_panel(lv_obj_t *parent)
+{
+    lv_obj_t *bottom_panel = lv_obj_create(parent);
+    lv_obj_set_size(bottom_panel, LV_PCT(100), LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(bottom_panel, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(bottom_panel, 0, 0);
+    lv_obj_set_style_pad_all(bottom_panel, 0, 0);
+    lv_obj_set_layout(bottom_panel, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(bottom_panel, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(bottom_panel, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_column(bottom_panel, 10, 0);
+    lv_obj_clear_flag(bottom_panel, LV_OBJ_FLAG_SCROLLABLE);
+
+    return bottom_panel;
 }
 
 lv_obj_t *create_transparent_flex_row(lv_obj_t *parent, lv_coord_t width, lv_coord_t height)
@@ -103,15 +119,4 @@ lv_obj_t *find_first_element_child(lv_obj_t *parent, const lv_obj_class_t *class
     }
 
     return NULL;
-}
-
-lv_obj_t *create_btn(lv_obj_t *parent, const char *text, int width, int height)
-{
-    lv_obj_t *btn = lv_btn_create(parent);
-    lv_obj_set_size(btn, width, height);
-
-    lv_obj_t *label = lv_label_create(btn);
-    lv_label_set_text(label, text);
-
-    return btn;
 }

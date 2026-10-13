@@ -1,6 +1,6 @@
 
 APP_TARGET := bin/zero-volts-ui
-CC := g++
+CC := gcc
 LVPORT := $(HOME)/git/lv_port_linux
 EXAMPLE_SRCS := $(wildcard examples/main_*.c)
 EXAMPLE_TARGETS := $(patsubst examples/main_%.c,bin/example-%,$(EXAMPLE_SRCS))
@@ -13,7 +13,6 @@ SRC := \
 	utils/logger.c \
 	components/top_bar.c \
 	components/component_helper.c \
-	components/nav.c \
 	components/list/ui_list.c \
 	components/ui_pills.c \
 	components/ui_info_panel.c \
@@ -21,8 +20,9 @@ SRC := \
 	components/text_input/ui_text_input.c \
 	components/button/ui_button.c \
 	components/dropdown/ui_dropdown.c \
-	page/base_view.c \
 	page/home_view.c \
+	page/zv_view.c \
+	page/navigation_page.c \
 	page/hid/hid_view.c \
 	page/hid/hid_controller.c \
 	page/ir/ir.c \
@@ -61,7 +61,7 @@ INCLUDES := \
 	-I$(LVPORT)/build
 
 CFLAGS := -DLV_CONF_INCLUDE_SIMPLE -Wall
-LDFLAGS := -lm -lpthread -ldl -lgpiod
+LDFLAGS := -lstdc++ -lm -lpthread -ldl -lgpiod
 
 LIBS := $(LVPORT)/build/lvgl/lib/liblvgl.a
 
@@ -87,7 +87,26 @@ endif
 	$(MAKE) bin/example-$(NAME)
 
 clean:
-	rm -f $(APP_TARGET) $(EXAMPLE_TARGETS)
+	rm -f $(APP_TARGET) $(EXAMPLE_TARGETS) bin/navigation-test bin/subghz-test
 
 run: $(APP_TARGET)
 	./$(APP_TARGET)
+
+# Uses real LVGL with UART mocked by the test; no display or GPIO required.
+NAV_TEST_SRC := $(filter-out main.c service/uart_service.c ../tactile_switch/gpio_buttons.c,$(SRC))
+.PHONY: test-navigation
+test-navigation: setup bin/navigation-test
+	./bin/navigation-test
+
+bin/navigation-test: tests/navigation_test.cpp $(NAV_TEST_SRC)
+	$(CC) tests/navigation_test.cpp $(NAV_TEST_SRC) -o $@ $(CFLAGS) $(INCLUDES) $(LIBS) -lm -lpthread
+
+SUBGHZ_TEST_SRC := app_context.c page/sub_ghz/sub_ghz_controller.c \
+	service/subghz/subghz_service.c service/subghz/subghz_file.c \
+	utils/file.c utils/string_utils.c utils/parser.c utils/error_handler.c utils/logger.c utils/cJSON.c
+.PHONY: test-subghz
+test-subghz: setup bin/subghz-test
+	./bin/subghz-test
+
+bin/subghz-test: tests/subghz_capture_test.cpp $(SUBGHZ_TEST_SRC)
+	$(CC) tests/subghz_capture_test.cpp $(SUBGHZ_TEST_SRC) -o $@ -I. -fsanitize=address,undefined -g

@@ -9,7 +9,7 @@ lv_obj_t *ui_panel_create(lv_obj_t *parent, int width, int height)
 
     lv_obj_set_style_radius(panel, 8, 0);
     lv_obj_set_style_border_width(panel, 2, 0);
-    lv_obj_set_style_border_color(panel, ZV_COLOR_BORDER, LV_PART_MAIN);
+    lv_obj_set_style_border_color(panel, COLOR_BORDER, LV_PART_MAIN);
 
     lv_obj_set_style_pad_hor(panel, 10, LV_PART_MAIN);
     lv_obj_set_style_pad_ver(panel, 25, LV_PART_MAIN);
