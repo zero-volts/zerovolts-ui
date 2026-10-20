@@ -16,7 +16,7 @@ static void zv_view_delete_event_cb(lv_event_t *e)
     free(lv_event_get_user_data(e));
 }
 
-static lv_obj_t *zv_view_create_header(lv_obj_t *parent, const char *title)
+static lv_obj_t *zv_view_create_header(zv_view_t *self, lv_obj_t *parent, const char *title)
 {
     lv_obj_t *header = lv_obj_create(parent);
     lv_obj_set_size(header, lv_pct(100), 45);
@@ -33,7 +33,7 @@ static lv_obj_t *zv_view_create_header(lv_obj_t *parent, const char *title)
     if (!zv_nav_is_empty())
     {
         ui_button *back_btn = ui_icon_button_create(header, LV_SIZE_CONTENT, LV_SIZE_CONTENT, LV_SYMBOL_LEFT);
-        ui_button_set_on_click(back_btn, zv_view_back_event, NULL);        
+        ui_button_set_on_click(back_btn, zv_view_back_event, self);  
     }
 
     lv_obj_t *title_label = lv_label_create(header);
@@ -70,7 +70,7 @@ zv_view_t *zv_view_new(const char *title)
 
     new_view->header = NULL;
     if (title != NULL)
-        new_view->header = zv_view_create_header(page, title);
+        new_view->header = zv_view_create_header(new_view, page, title);
 
     new_view->content = lv_obj_create(page);
     lv_obj_set_layout(new_view->content, LV_LAYOUT_FLEX);

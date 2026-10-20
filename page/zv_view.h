@@ -10,7 +10,7 @@ extern "C" {
 typedef struct zv_view_t {
     lv_obj_t *main_container;   // Main container in the screen is a lv_obj
     lv_obj_t *header;           // Optional: Topbar to show the title and back button
-    lv_obj_t *content; 
+    lv_obj_t *content;
 } zv_view_t;
 
 zv_view_t *zv_view_new(const char *title);

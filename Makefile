@@ -39,6 +39,7 @@ SRC := \
 	page/bt/bt_scanner.c \
 	page/sub_ghz/sub_ghz_view.c \
 	page/sub_ghz/sub_ghz_capture.c \
+	page/sub_ghz/sub_ghz_capture_save.c \
 	page/sub_ghz/sub_ghz_controller.c \
 	service/hid_service.c \
 	service/ir_service.c \

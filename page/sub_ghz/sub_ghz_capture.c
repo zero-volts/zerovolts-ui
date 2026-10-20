@@ -6,14 +6,17 @@
 #include <limits.h>
 
 #include "utils/logger.h"
+#include "types.h"
 #include "components/ui_theme.h"
 #include "components/ui_pills.h"
 #include "components/dropdown/ui_dropdown.h"
 #include "components/component_helper.h"
 #include "components/button/ui_button.h"
 #include "page/sub_ghz/sub_ghz_controller.h"
+#include "page/sub_ghz/sub_ghz_capture_save.h"
 #include "service/subghz/subghz_service.h"
 #include "app_context.h"
+#include "page/navigation_page.h"
 
 #define DEFAULT_CAPTURE_TIMEFRAME_MS 30000 // 30seg
 
@@ -253,14 +256,14 @@ static void subghz_start_capture_handler(event_data_btn *e)
     }
 }
 
-static void subghz_save_capture_handler(event_data_btn *e)
+static bool on_save_confirm_cb(const char *file_name)
 {
-    (void)e;
+    log_info("el nombre del archvio es: %s", file_name);
 
     subghz_capture_session_t *session = subghz_get_session_by(local_ctx.sessions_ended);
-    subghz_status_t result = subghz_controller_save_data(session, NULL);
+    subghz_status_t result = subghz_controller_save_data(session, file_name);
     if (result != SUBGHZ_OK)
-        return;
+        return false;
 
     lv_label_set_text(local_ctx.status_lbl, STR_STATUS_INITIAL);
 
@@ -270,10 +273,19 @@ static void subghz_save_capture_handler(event_data_btn *e)
 
     lv_chart_series_t *serie = lv_chart_get_series_next(local_ctx.chart, NULL);
     if (!serie)
-        return;
+        return true;
 
     uint32_t max_points = lv_chart_get_point_count(local_ctx.chart);
     reset_chart_capture(serie, max_points);
+
+    return true;
+}
+
+static void subghz_save_capture_handler(event_data_btn *e)
+{
+    zv_view_t *view = subghz_capture_save_create(on_save_confirm_cb);
+    if (view && !zv_nav_push(view))
+        zv_view_destroy(view);
 }
 
 static void on_dropdown_changes(dropdown_item_t *item, void *user_data)
