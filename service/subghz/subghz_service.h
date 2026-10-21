@@ -9,6 +9,7 @@ extern "C" {
 
 #include "config.h"
 #include "app_context.h"
+#include "utils/file.h"
 
 typedef enum {
     SUBGHZ_OK               = 0,
@@ -40,6 +41,7 @@ subghz_status_t subghz_service_init(const zv_config *config);
 subghz_status_t subghz_service_start_capture(uint32_t frequency, uint32_t time_frame_ms);
 void subghz_service_add_event_callback(subghz_service_handler new_cb);
 subghz_status_t subghz_service_save(subghz_capture_session_t *session, const char *file_name_path);
+subghz_status_t subghz_service_list_signals_cb(const char *signals_dir, file_callback callback, void *user_data);
 
 #ifdef __cplusplus
 }

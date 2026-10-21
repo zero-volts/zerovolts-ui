@@ -2,12 +2,95 @@
 
 #include <string.h>
 #include <inttypes.h>
+#include <stdlib.h>
 
 #include "types.h"
 #include "utils/logger.h"
 #include "utils/error_handler.h"
 
 static data_capture_handler capture_handler = NULL;
+
+typedef struct {
+    subghz_signal_list *list;
+    size_t capacity;
+    bool failed;
+} signal_list_builder;
+
+static void collect_signal(const file_desc *file, void *user_data)
+{
+    signal_list_builder *builder = (signal_list_builder *)user_data;
+    if (builder->failed)
+        return;
+
+    if (builder->list->count == builder->capacity)
+    {
+        if (builder->capacity > SIZE_MAX / 2 / sizeof(subghz_signal_item))
+        {
+            builder->failed = true;
+            return;
+        }
+
+        size_t capacity = builder->capacity ? builder->capacity * 2 : 8;
+        subghz_signal_item *signals = (subghz_signal_item *)realloc(builder->list->signals, capacity * sizeof(*signals));
+        if (!signals)
+        {
+            builder->failed = true;
+            return;
+        }
+
+        builder->list->signals = signals;
+        builder->capacity = capacity;
+    }
+
+    subghz_signal_item *item = &builder->list->signals[builder->list->count++];
+    snprintf(item->name, sizeof(item->name), "%s", file->file_name);
+    snprintf(item->path, sizeof(item->path), "%s", file->file_path);
+}
+
+const char *subghz_controller_last_error(void)
+{
+    return last_error();
+}
+
+void subghz_controller_free_signal_list(subghz_signal_list *list)
+{
+    if (!list)
+        return;
+
+    free(list->signals);
+    memset(list, 0, sizeof(*list));
+}
+
+subghz_status_t subghz_controller_list_signals(const char *signals_path, subghz_signal_list *out_list)
+{
+    if (!out_list)
+    {
+        set_last_error("Signal list is required.");
+        return SUBGHZ_ERR_INVALID;
+    }
+
+    memset(out_list, 0, sizeof(*out_list));
+    if (!signals_path || !signals_path[0])
+    {
+        set_last_error("Signals directory is not configured.");
+        return SUBGHZ_ERR_CONFIG;
+    }
+
+    signal_list_builder builder = { .list = out_list };
+    subghz_status_t result = subghz_service_list_signals_cb(signals_path, collect_signal, &builder);
+    if (result != SUBGHZ_OK || builder.failed)
+    {
+        subghz_controller_free_signal_list(out_list);
+        if (result != SUBGHZ_OK)
+            return result;
+
+        set_last_error("Not enough memory to build signal list.");
+        return SUBGHZ_ERR_IO;
+    }
+
+    set_last_error(NULL);
+    return SUBGHZ_OK;
+}
 
 static void event_handler(subghz_service_event_t *event)
 {

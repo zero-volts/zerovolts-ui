@@ -3,6 +3,7 @@
 #include "page/navigation_page.h"
 #include "components/ui_theme.h"
 #include "components/list/ui_list.h"
+#include "sub_ghz_replay.h"
 
 static void handler(ui_list *list, const list_item_t *item, void *user_data)
 {
@@ -21,6 +22,8 @@ zv_view_t *subghz_view_create(const zv_config *cfg)
         return NULL;
 
     nav_ctx_t nav_capture = { subghz_capture_page_create, cfg };
+    nav_ctx_t nav_replay_signal = { subghz_replay_create, cfg };
+
     ui_list *list = create_list(view->content, 100, 100);
     if (!list)
     {
@@ -31,13 +34,25 @@ zv_view_t *subghz_view_create(const zv_config *cfg)
     set_list_border(list, false);
     set_list_bg_color(list, COLOR_BG_MAIN);
     set_event_data(list, handler, NULL);
-    list_item_t item = {
-        .text = "Signal Capture",
-        .subtitle = "Record RF signal",
-        .user_data = &nav_capture,
-        .user_data_size = sizeof(nav_capture),
+    list_item_t items[] = {
+        {
+            .text = "Signal Capture",
+            .subtitle = "Record RF signal",
+            .user_data = &nav_capture,
+            .user_data_size = sizeof(nav_capture),
+        },
+        {
+            .text = "Signal Replay",
+            .subtitle = "retransmit saved signals",
+            .user_data = &nav_replay_signal,
+            .user_data_size = sizeof(nav_ctx_t),
+        }
     };
 
-    add_item(list, &item);
+    for (size_t i = 0; i < sizeof(items) / sizeof(items[0]); i++)
+    {
+        add_item(list, &items[i]);
+    }
+
     return view;
 }

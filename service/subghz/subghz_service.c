@@ -22,6 +22,39 @@ typedef struct {
 
 static service_context ctx;
 
+typedef struct {
+    file_callback callback;
+    void *user_data;
+} signal_list_ctx;
+
+static void list_signal_file(const file_desc *file, void *user_data)
+{
+    signal_list_ctx *list = (signal_list_ctx *)user_data;
+    if (file->is_file && file_has_extension(file->file_name, ".sub"))
+        list->callback(file, list->user_data);
+}
+
+subghz_status_t subghz_service_list_signals_cb(const char *signals_dir, file_callback callback, void *user_data)
+{
+    if (!signals_dir || !signals_dir[0] || !callback)
+    {
+        set_last_error("Signals directory and callback are required.");
+        return SUBGHZ_ERR_INVALID;
+    }
+
+    if (!file_is_directory(signals_dir))
+    {
+        set_last_error("Signals directory not found.");
+        return SUBGHZ_ERR_IO;
+    }
+
+    signal_list_ctx list = { .callback = callback, .user_data = user_data };
+    get_file_list(signals_dir, list_signal_file, &list);
+    set_last_error(NULL);
+
+    return SUBGHZ_OK;
+}
+
 static bool parse_capture_data(const char *buffer, subghz_data_chunk_t *chunk)
 {
     char tmp_value[21];

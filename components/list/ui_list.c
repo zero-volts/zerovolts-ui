@@ -103,7 +103,7 @@ ui_list *create_list(lv_obj_t *parent, int width, int height)
     lv_obj_set_style_border_width(list_obj, 1, 0);
     lv_obj_set_style_radius(list_obj, 5, 0);
     lv_obj_set_style_pad_all(list_obj, 5, 0);
-    lv_obj_set_style_pad_row(list_obj, 10, 0);
+    lv_obj_set_style_pad_row(list_obj, 8, 0);
 
     lv_obj_set_layout(list_obj, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(list_obj, LV_FLEX_FLOW_COLUMN);
