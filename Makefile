@@ -41,6 +41,7 @@ SRC := \
 	page/sub_ghz/sub_ghz_capture.c \
 	page/sub_ghz/sub_ghz_capture_save.c \
 	page/sub_ghz/sub_ghz_controller.c \
+	page/sub_ghz/sub_ghz_replay.c \
 	service/hid_service.c \
 	service/ir_service.c \
 	service/uart_service.c \
