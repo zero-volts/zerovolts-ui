@@ -1,3 +1,7 @@
+#ifndef _DEFAULT_SOURCE
+#define _DEFAULT_SOURCE
+#endif
+
 #include "uart_service.h"
 
 #include "utils/error_handler.h"
@@ -9,6 +13,8 @@
 #include <termios.h>
 #include <unistd.h>
 #include <stdarg.h>
+#include <stdbool.h>
+#include <time.h>
 
 #define MAX_HANDLERS 5
 #define TAG_MAX_LEN 32
@@ -24,10 +30,21 @@ static size_t uart_rx_len = 0;
 typedef struct {
     char tag[TAG_MAX_LEN];
     uart_event_cb callback;
+    uart_timeout_cb timeout_callback;
+    uint64_t response_started_ms;
+    uint64_t response_timeout_ms;
+    bool waiting_response;
 } event_t;
 
 static event_t events[MAX_HANDLERS];
 static int events_count = 0;
+
+static uint64_t monotonic_ms(void)
+{
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    return (uint64_t)now.tv_sec * 1000 + now.tv_nsec / 1000000;
+}
 
 static speed_t uart_get_speed(int baudrate)
 {
@@ -366,6 +383,20 @@ void uart_process_loop()
                 event.callback(event.tag, line);
         }
     }
+
+    // Also dispatch deadlines when no bytes arrive. Clear before invoking callbacks
+    for (int index = 0; index < events_count; index++)
+    {
+        event_t *event = &events[index];
+        if (!event->waiting_response)
+            continue;
+
+        if (monotonic_ms() - event->response_started_ms < event->response_timeout_ms)
+            continue;
+
+        event->waiting_response = false;
+        event->timeout_callback(event->tag);
+    }
 }
 
 void uart_service_close(void)
@@ -377,12 +408,17 @@ void uart_service_close(void)
     }
 
     uart_rx_len = 0;
+    for (int index = 0; index < events_count; index++)
+        events[index].waiting_response = false;
 
     log_info("[UART][service] uart closed");
 }
 
 static event_t *find_handler(const char *tag)
 {
+    if (!tag)
+        return NULL;
+
     for (int index = 0; index < events_count; index++)
     {
         const char *event_tag = events[index].tag;
@@ -391,6 +427,42 @@ static event_t *find_handler(const char *tag)
     }
 
     return NULL;
+}
+
+uart_status_t uart_set_timeout_callback(const char *tag_id, uart_timeout_cb callback)
+{
+    event_t *event = find_handler(tag_id);
+    if (!event || !callback)
+    {
+        set_last_error("UART timeout callback requires a registered handler and a valid callback.");
+        return UART_ERR_INVALID;
+    }
+
+    event->timeout_callback = callback;
+    return UART_OK;
+}
+
+uart_status_t uart_start_response_timeout(const char *tag_id, uint64_t timeout_ms)
+{
+    event_t *event = find_handler(tag_id);
+    if (!event || !event->timeout_callback || timeout_ms == 0)
+    {
+        set_last_error("UART response timeout requires a registered callback and a valid duration.");
+        return UART_ERR_INVALID;
+    }
+
+    event->response_started_ms = monotonic_ms();
+    event->response_timeout_ms = timeout_ms;
+    event->waiting_response = true;
+
+    return UART_OK;
+}
+
+void uart_cancel_response_timeout(const char *tag_id)
+{
+    event_t *event = find_handler(tag_id);
+    if (event)
+        event->waiting_response = false;
 }
 
 void add_event_callback(uart_event_cb new_cb, const char *tag_id)

@@ -5,6 +5,7 @@
 #include <inttypes.h>
 
 #include "utils/file.h"
+#include "utils/string_utils.h"
 #include "utils/logger.h"
 
 #define RAW_LINE_PER_LINE 512
@@ -23,7 +24,6 @@ static const subghz_flipper_preset flipper_presets[] = {
     {FuriHalSubGhzPreset2FSKDev476Async, "FuriHalSubGhzPreset2FSKDev476Async" }
 };
 
-// 1.- Validar que existe directorio para guardar las señales
 bool subghz_file_create_root_path(const char *path)
 {
     if (!path)
@@ -114,4 +114,70 @@ bool subghz_file_create(const char *file_name_path, subghz_capture_session_t *se
     free(buffer_data);
 
     return saved;
+}
+
+bool sughz_file_read(const char *file_path, subghz_flipper_sub_file_t *out_file)
+{
+    if (zv_is_empty(file_path) || !out_file)
+        return false;
+
+    long file_size;
+    char *buffer = read_file_as_buffer(file_path, &file_size);
+    if (!buffer)
+        return false;
+
+    subghz_flipper_sub_file_t result = {0};
+    result.raw_data = malloc((size_t)file_size + 1);
+    if (!result.raw_data)
+    {
+        free(buffer);
+        return false;
+    }
+
+    result.raw_data[0] = '\0';
+    size_t raw_length = 0;
+    char *next_line;
+
+    for (char *line = strtok_r(buffer, "\n", &next_line); line;
+         line = strtok_r(NULL, "\n", &next_line))
+    {
+        zv_trim_inplace(line);
+        if (zv_is_empty(line) || line[0] == '#')
+            continue;
+
+        char *value = strchr(line, ':');
+        if (!value)
+            continue;
+
+        *value++ = '\0';
+        zv_trim_inplace(line);
+        zv_trim_inplace(value);
+
+        if (strcmp(line, "Filetype") == 0)
+            snprintf(result.file_type, sizeof(result.file_type), "%s", value);
+        else if (strcmp(line, "Version") == 0)
+            result.version = (int)strtol(value, NULL, 10);
+        else if (strcmp(line, "Frequency") == 0)
+            result.frecuency = (int)strtol(value, NULL, 10);
+        else if (strcmp(line, "Preset") == 0)
+            snprintf(result.preset, sizeof(result.preset), "%s", value);
+        else if (strcmp(line, "Protocol") == 0)
+            snprintf(result.protocol, sizeof(result.protocol), "%s", value);
+        else if (strcmp(line, "RAW_Data") == 0)
+        {
+            if (raw_length)
+                result.raw_data[raw_length++] = ' ';
+
+            size_t length = strlen(value);
+            memcpy(result.raw_data + raw_length, value, length + 1);
+            raw_length += length;
+        }
+    }
+
+    free(buffer);
+
+    free(out_file->raw_data);
+    *out_file = result;
+
+    return true;
 }

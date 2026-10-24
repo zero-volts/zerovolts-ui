@@ -5,6 +5,7 @@ extern "C" {
 #endif
 
 #include <stdint.h>
+#include <stdio.h>
 
 #define UNKNOWN_NAME "Unknown"
 #define BT_ALLOWED_MAX_DEVICES 20
@@ -66,6 +67,16 @@ typedef struct {
     uint16_t count;
     int32_t timings[32];
 } subghz_data_chunk_t;
+
+typedef struct {
+    char name[256];
+    char path[1024];
+} zv_file_path_item;
+
+typedef struct {
+    zv_file_path_item *signals;
+    size_t count;
+} zv_file_item_list;
 
 #ifdef __cplusplus
 }

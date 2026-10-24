@@ -183,7 +183,7 @@ static void capture_handler(ui_status_t status, subghz_event_arg *event)
         return;
     }
 
-    if (status == UI_DONE && event)
+    if (status == UI_DONE && event && event->session_id != 0)
     {
         local_ctx.sessions_ended = event->session_id;
 
@@ -211,12 +211,7 @@ static void capture_handler(ui_status_t status, subghz_event_arg *event)
     subghz_data_chunk_t *data = event->data;
     local_ctx.capture_id = data->capture_id;
 
-    printf("seq: %u\n", data->seq);
-    printf("count: %u\n", data->count);
-    printf("chunks: %u\n", data->chunks);
     add_data(data);
-
-    printf("\n");
 }
 
 static void subghz_discard_capture_handler(event_data_btn *e)
@@ -369,7 +364,7 @@ static void create_bottom_panel(lv_obj_t *parent)
 static void view_delete_cb(lv_event_t *e)
 {
     (void)e;
-    subghz_controller_set_capture_cb(NULL);
+    subghz_controller_set_event_cb(NULL);
     subghz_controller_discard_session(local_ctx.sessions_ended);
     subghz_controller_discard_session(local_ctx.capture_id);
     memset(&local_ctx, 0, sizeof(local_ctx));
@@ -401,7 +396,7 @@ zv_view_t *subghz_capture_page_create(const zv_config *cfg)
     create_action_panel(root);
     create_bottom_panel(root);
 
-    subghz_controller_set_capture_cb(capture_handler);
+    subghz_controller_set_event_cb(capture_handler);
 
     return view;
 }
