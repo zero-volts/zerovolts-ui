@@ -11,6 +11,7 @@ struct ui_list{
     int item_count;
     ui_list_item_event_cb_t cb;
     void *user_data;
+    obj_size_t item_size;
 };
 
 typedef struct {
@@ -21,6 +22,7 @@ typedef struct {
     char *subtitle_buf;
     char *raw_value_buf;
     void *user_data_buf;
+
 } ui_list_item_ctx_t;
 
 static int icon_scale_or_default(int scale, int default_scale)
@@ -119,6 +121,10 @@ ui_list *create_list(lv_obj_t *parent, int width, int height)
     list->user_data = NULL;
     list->item_count = 0;
     list->cb = NULL;
+    list->item_size = (obj_size_t){
+        .width = LV_PCT(100),
+        .height = 60,
+    };
 
     return list;
 }
@@ -130,7 +136,7 @@ lv_obj_t *add_item(ui_list *list, const list_item_t *item)
 
     lv_obj_t *btn = lv_btn_create(list->list);
     lv_obj_clear_flag(btn, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_size(btn, LV_PCT(100), 60);
+    lv_obj_set_size(btn, list->item_size.width, list->item_size.height);
 
     ui_list_item_ctx_t *ctx = (ui_list_item_ctx_t *)malloc(sizeof(ui_list_item_ctx_t));
     if (!ctx)
@@ -314,6 +320,14 @@ void set_list_bg_color_op(ui_list *list, lv_opa_t opacity)
         return;
 
     lv_obj_set_style_bg_opa(list->list, opacity, 0);
+}
+
+void ui_list_set_item_size(ui_list *list, obj_size_t size)
+{
+    if (!list)
+        return;
+
+    list->item_size = size;
 }
 
 int item_length(ui_list *list)

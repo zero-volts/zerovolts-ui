@@ -53,6 +53,7 @@ void set_event_data(ui_list *list, ui_list_item_event_cb_t cb, void *user_data);
 void set_list_border(ui_list *list, bool enabled);
 void set_list_bg_color(ui_list *list, lv_color_t color);
 void set_list_bg_color_op(ui_list *list, lv_opa_t opacity);
+void ui_list_set_item_size(ui_list *list, obj_size_t size);
 int item_length(ui_list *list);
 void clean_list(ui_list *list);
 void destroy_list(ui_list *list); 
