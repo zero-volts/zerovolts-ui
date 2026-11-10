@@ -43,7 +43,7 @@ zv_view_t *subghz_view_create(const zv_config *cfg)
         },
         {
             .text = "Signal Replay",
-            .subtitle = "retransmit saved signals",
+            .subtitle = "Retransmit saved signals",
             .user_data = &nav_replay_signal,
             .user_data_size = sizeof(nav_ctx_t),
         }

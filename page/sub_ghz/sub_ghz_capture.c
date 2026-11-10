@@ -47,10 +47,12 @@ typedef struct  {
 } frequency_t;
 
 static const dropdown_item_t frequencies[] = {
-    //{0, 315000000U, "315 MHz"},
-    {0, 433920000U, "433.92 MHz"},
-    // {2, 868000000U, "868 MHz"},
-    // {3, 915000000U, "915 MHz"},
+    {0, 315000000U, "315 MHz"},
+    {1, 380000000U, "380 MHz"},
+    {2, 381000000U, "381 MHz"},
+    {3, 433920000U, "433.92 MHz"},
+    {4, 868000000U, "868 MHz"},
+    {5, 915000000U, "915 MHz"},
 };
 
 typedef struct {

@@ -153,6 +153,13 @@ zv_view_t *subghz_replay_create(const zv_config *cfg)
         return NULL;
     }
 
+    obj_size_t item_size = {
+        .width = LV_PCT(100),
+        .height = 40
+    };
+
+    ui_list_set_item_size(local_ctx.list, item_size);
+
     set_list_border(local_ctx.list, false);
     set_list_bg_color_op(local_ctx.list, LV_OPA_TRANSP);
     set_event_data(local_ctx.list, on_signal_selected, NULL);
