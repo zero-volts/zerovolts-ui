@@ -46,19 +46,22 @@ typedef enum {
     UI_IDLE = 0,
     UI_LOADING,
     UI_DONE,
-    UI_ERROR
+    UI_ERROR,
+    UI_TIMEOUT
 } ui_status_t;
 
 typedef enum {
-    BT_CONN_IDLE = 0,
-    BT_CONN_CONNECTING,
-    BT_CONN_CONNECTED,
-    BT_CONN_DISCOVERING,
-    BT_CONN_READY,
-    BT_CONN_FAILED,
-    BT_CONN_LOST,
-    BT_CONN_DISCONNECTED
-} bt_conn_status_t;
+    BT_IDLE = 0,
+    BT_CONNECTING,
+    BT_CONNECTED,
+    BT_DISCOVERING,
+    BT_READY,
+    BT_FAILED,
+    BT_LOST,
+    BT_DISCONNECTED,
+    BT_SCANNING,
+    BT_TIMEOUT
+} bt_status_t;
 
 typedef struct {
     uint64_t capture_id;

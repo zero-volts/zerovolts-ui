@@ -11,7 +11,8 @@ extern "C" {
 
 typedef struct bt_context_t bt_context_t;
 typedef void (*scanner_handler)(device_t *device, ui_status_t status);
-typedef void (*bt_conn_handler)(bt_conn_status_t status, const char *info);
+typedef void (*bt_conn_handler)(bt_status_t status, const char *info);
+typedef void (*bt_timeout_handler)();
 
 uart_status_t bt_controller_init(const uart_config_t *config);
 uart_status_t start_scan();
@@ -31,7 +32,7 @@ int bt_get_visible_devices_length(void);
 uart_status_t bt_connect(const device_t *device);
 uart_status_t bt_disconnect(void);
 void set_conn_cb(bt_conn_handler new_callback);
-bt_conn_status_t bt_get_conn_status(void);
+bt_status_t bt_get_conn_status(void);
 
 bt_service_t *bt_get_services(void);
 int bt_get_services_length(void);

@@ -5,6 +5,7 @@
 #include "components/ui_pills.h"
 #include "components/ui_theme.h"
 #include "bt_uuid_registry.h"
+#include "utils/string_utils.h"
 
 #include <ctype.h>
 #include <stdio.h>
@@ -26,17 +27,18 @@ typedef struct {
 
 static view_ctx own_ctx;
 
-static const char *status_text(bt_conn_status_t s)
+static const char *status_text(bt_status_t s)
 {
     switch (s) {
-        case BT_CONN_IDLE:         return "Idle";
-        case BT_CONN_CONNECTING:   return "Connecting...";
-        case BT_CONN_CONNECTED:    return "Connected";
-        case BT_CONN_DISCOVERING:  return "Discovering...";
-        case BT_CONN_READY:        return "Ready";
-        case BT_CONN_FAILED:       return "Failed";
-        case BT_CONN_LOST:         return "Lost";
-        case BT_CONN_DISCONNECTED: return "Disconnected";
+        case BT_IDLE:         return "Idle";
+        case BT_CONNECTING:   return "Connecting...";
+        case BT_CONNECTED:    return "Connected";
+        case BT_DISCOVERING:  return "Discovering...";
+        case BT_READY:        return "Ready";
+        case BT_FAILED:       return "Failed";
+        case BT_LOST:         return "Lost";
+        case BT_DISCONNECTED: return "Disconnected";
+        case BT_TIMEOUT:      return "Timeout...";
         default:                   return "?";
     }
 }
@@ -116,33 +118,38 @@ static void rebuild_services_list(void)
     }
 }
 
-static void update_btn_state(bt_conn_status_t s)
+static void update_btn_state(bt_status_t s)
 {
     if (!own_ctx.connect_btn)
         return;
 
-    bool loading = (s == BT_CONN_CONNECTING || s == BT_CONN_DISCOVERING);
+    bool loading = (s == BT_CONNECTING || s == BT_DISCOVERING);
     ui_button_set_loading(own_ctx.connect_btn, loading);
 
-    if (s == BT_CONN_CONNECTED || s == BT_CONN_READY)
+    if (s == BT_CONNECTED || s == BT_READY)
         ui_button_set_text(own_ctx.connect_btn, "Disconnect");
     else
         ui_button_set_text(own_ctx.connect_btn, "Connect");
 
 }
 
-static void on_conn_event(bt_conn_status_t status, const char *info)
+static void on_conn_event(bt_status_t status, const char *info)
 {
     if (!is_active)
         return;
 
     if (own_ctx.status_label)
-        lv_label_set_text(own_ctx.status_label, status_text(status));
+    {
+        if(zv_is_empty(info) )
+            lv_label_set_text(own_ctx.status_label, status_text(status));
+        else
+             lv_label_set_text(own_ctx.status_label, info);
+    }
 
     update_btn_state(status);
 
     // Rebuild solo cuando termina el discovery, asi no parpadea por cada char.
-    if (status == BT_CONN_READY)
+    if (status == BT_READY)
         rebuild_services_list();
 }
 
@@ -150,8 +157,8 @@ static void on_connect_click(event_data_btn *e)
 {
     (void)e;
 
-    bt_conn_status_t s = bt_get_conn_status();
-    if (s == BT_CONN_CONNECTED || s == BT_CONN_READY) {
+    bt_status_t s = bt_get_conn_status();
+    if (s == BT_CONNECTED || s == BT_READY) {
         bt_disconnect();
         return;
     }
@@ -169,9 +176,9 @@ static void detail_delete_cb(lv_event_t *e)
 {
     is_active = false;
     set_conn_cb(NULL);
-    bt_conn_status_t status = bt_get_conn_status();
-    if (status == BT_CONN_CONNECTED || status == BT_CONN_READY ||
-        status == BT_CONN_CONNECTING || status == BT_CONN_DISCOVERING)
+    bt_status_t status = bt_get_conn_status();
+    if (status == BT_CONNECTED || status == BT_READY ||
+        status == BT_CONNECTING || status == BT_DISCOVERING)
         bt_disconnect();
 
     bt_clear_discovery();
@@ -229,7 +236,7 @@ zv_view_t *bt_device_detail_page_create(const zv_config *cfg)
         LV_FLEX_ALIGN_CENTER);
 
     own_ctx.status_label = lv_label_create(action_row);
-    lv_label_set_text(own_ctx.status_label, status_text(BT_CONN_IDLE));
+    lv_label_set_text(own_ctx.status_label, status_text(BT_IDLE));
     lv_obj_set_style_text_color(own_ctx.status_label, COLOR_TERMINAL, 0);
 
     own_ctx.connect_btn = ui_button_create(action_row, 100, 40, "Connect");
@@ -300,7 +307,7 @@ void bt_device_detail_refresh(void)
         lv_obj_clear_flag(own_ctx.services_placeholder, LV_OBJ_FLAG_HIDDEN);
 
     if (own_ctx.status_label) 
-        lv_label_set_text(own_ctx.status_label, status_text(BT_CONN_IDLE));
+        lv_label_set_text(own_ctx.status_label, status_text(BT_IDLE));
 
-    update_btn_state(BT_CONN_IDLE);
+    update_btn_state(BT_IDLE);
 }

@@ -12,6 +12,15 @@
 #include "service/uart_commands.h"
 
 #define UART_BT_TAG_ID "BT_TAG_CONTROLLER"
+#define BT_SERVICE_TIMEOUT_PROCCESS_MS 30000
+
+
+typedef struct {
+    scanner_handler internal_cb;
+    bt_conn_handler conn_cb;
+
+    bt_status_t bt_status;
+} bt_ctx;
 
 typedef struct {
     device_t devices[BT_ALLOWED_MAX_DEVICES];
@@ -19,26 +28,25 @@ typedef struct {
 } list_items_ctx;
 
 static list_items_ctx local_ctx;
-static scanner_handler internal_cb = NULL;
-static bt_conn_handler conn_cb = NULL;
 
 static bt_service_t services[BT_MAX_SERVICES];
 static int services_count = 0;
-static bt_conn_status_t conn_status = BT_CONN_IDLE;
+
+static bt_ctx context;
 
 void set_scanner_cb(scanner_handler new_callback)
 {
-    internal_cb = new_callback;
+    context.internal_cb = new_callback;
 }
 
 void set_conn_cb(bt_conn_handler new_callback)
 {
-    conn_cb = new_callback;
+    context.conn_cb = new_callback;
 }
 
-bt_conn_status_t bt_get_conn_status(void)
+bt_status_t bt_get_conn_status(void)
 {
-    return conn_status;
+    return context.bt_status;
 }
 
 bt_service_t *bt_get_services(void)
@@ -55,7 +63,7 @@ void bt_clear_discovery(void)
 {
     services_count = 0;
     memset(services, 0, sizeof(services));
-    conn_status = BT_CONN_IDLE;
+    context.bt_status = BT_IDLE;
 }
 
 static bt_service_t *find_service(int svc_index)
@@ -64,6 +72,7 @@ static bt_service_t *find_service(int svc_index)
         if (services[i].svc_index == svc_index)
             return &services[i];
     }
+
     return NULL;
 }
 
@@ -131,11 +140,11 @@ static device_t parse_device(const char *buffer)
     return device;
 }
 
-static void set_status(bt_conn_status_t new_status, const char *info)
+static void set_status(bt_status_t new_status, const char *info)
 {
-    conn_status = new_status;
-    if (conn_cb)
-        conn_cb(new_status, info);
+    context.bt_status = new_status;
+    if (context.conn_cb)
+        context.conn_cb(new_status, info);
 }
 
 static void parse_discover_service(char *buffer)
@@ -146,12 +155,12 @@ static void parse_discover_service(char *buffer)
 
     if (get_field_value(buffer, "svc", val, sizeof(val)))
         svc_index = atoi(val);
+
     get_field_value(buffer, "uuid", uuid, sizeof(uuid));
 
     add_service(svc_index, uuid);
-
-    if (conn_cb)
-        conn_cb(BT_CONN_DISCOVERING, NULL);
+    if (context.conn_cb)
+        context.conn_cb(BT_DISCOVERING, NULL);
 }
 
 static void parse_discover_char(char *buffer)
@@ -165,18 +174,21 @@ static void parse_discover_char(char *buffer)
 
     if (get_field_value(buffer, "svc", val, sizeof(val)))
         svc_index = atoi(val);
+
     if (get_field_value(buffer, "char", val, sizeof(val)))
         char_index = atoi(val);
+
     get_field_value(buffer, "uuid", uuid, sizeof(uuid));
     if (get_field_value(buffer, "props", val, sizeof(val)))
         props = (unsigned int)strtoul(val, NULL, 0);
+
     if (get_field_value(buffer, "handle", val, sizeof(val)))
         handle = (unsigned int)strtoul(val, NULL, 0);
 
     add_characteristic(svc_index, char_index, uuid, props, handle);
 
-    if (conn_cb)
-        conn_cb(BT_CONN_DISCOVERING, NULL);
+    if (context.conn_cb)
+        context.conn_cb(BT_DISCOVERING, NULL);
 }
 
 static void event_handler(const char *tag_id, char *buffer)
@@ -186,81 +198,142 @@ static void event_handler(const char *tag_id, char *buffer)
     }
 
     // -- SCAN --
-    if (internal_cb != NULL)
+    if (context.internal_cb != NULL)
     {
         if (strstr(buffer, BT_COMMAND_RES_SCAN_START) != NULL) {
-            internal_cb(NULL, UI_LOADING);
+            context.internal_cb(NULL, UI_LOADING);
             return;
         }
-        if (strstr(buffer, BT_COMMAND_RES_SCAN_DONE) != NULL) {
-            internal_cb(NULL, UI_DONE);
+
+        if (strstr(buffer, BT_COMMAND_RES_SCAN_DONE) != NULL)
+        {   
+            context.internal_cb(NULL, UI_DONE);
+
+            uart_cancel_response_timeout(UART_BT_TAG_ID);
+            context.bt_status = BT_IDLE;
             return;
         }
-        if (strstr(buffer, BT_COMMAND_RES_SCAN_DEVICE) != NULL) {
+
+        if (strstr(buffer, BT_COMMAND_RES_SCAN_DEVICE) != NULL)
+        {
             device_t device = parse_device(buffer);
-            internal_cb(&device, UI_LOADING);
+            context.internal_cb(&device, UI_LOADING);
             bt_context_add_device(&device);
+
             return;
         }
     }
 
     // -- CONNECT --
-    if (zv_starts_with(buffer, BT_COMMAND_RES_CONNECT_START)) {
-        set_status(BT_CONN_CONNECTING, NULL);
+    if (zv_starts_with(buffer, BT_COMMAND_RES_CONNECT_START))
+    {
+        set_status(BT_CONNECTING, NULL);
         return;
     }
-    if (zv_starts_with(buffer, BT_COMMAND_RES_CONNECT_OK)) {
-        set_status(BT_CONN_CONNECTED, NULL);
+
+    if (zv_starts_with(buffer, BT_COMMAND_RES_CONNECT_OK))
+    {
+        set_status(BT_CONNECTED, NULL);
         return;
     }
-    if (zv_starts_with(buffer, BT_COMMAND_RES_CONNECT_FAIL)) {
+
+    if (zv_starts_with(buffer, BT_COMMAND_RES_CONNECT_FAIL))
+    {
         char reason[32] = {0};
         get_field_value(buffer, "reason", reason, sizeof(reason));
-        set_status(BT_CONN_FAILED, reason);
+        set_status(BT_FAILED, reason);
+
+        uart_cancel_response_timeout(UART_BT_TAG_ID);
         return;
     }
-    if (zv_starts_with(buffer, BT_COMMAND_RES_CONNECT_LOST)) {
+
+    if (zv_starts_with(buffer, BT_COMMAND_RES_CONNECT_LOST))
+    {
         char reason[32] = {0};
         get_field_value(buffer, "reason", reason, sizeof(reason));
-        set_status(BT_CONN_LOST, reason);
+        set_status(BT_LOST, reason);
+
+        uart_cancel_response_timeout(UART_BT_TAG_ID);
         return;
     }
-    if (zv_starts_with(buffer, BT_COMMAND_RES_CONNECT_ERROR)) {
-        set_status(BT_CONN_FAILED, "command error");
+
+    if (zv_starts_with(buffer, BT_COMMAND_RES_CONNECT_ERROR))
+    {
+        set_status(BT_FAILED, "command error");
+        uart_cancel_response_timeout(UART_BT_TAG_ID);
+        
         return;
     }
 
     // -- DISCONNECT --
-    if (zv_starts_with(buffer, BT_COMMAND_RES_DISCONNECT_OK)) {
-        set_status(BT_CONN_DISCONNECTED, NULL);
+    if (zv_starts_with(buffer, BT_COMMAND_RES_DISCONNECT_OK))
+    {
+        set_status(BT_DISCONNECTED, NULL);
+        uart_cancel_response_timeout(UART_BT_TAG_ID);
+
         return;
     }
 
     // -- DISCOVER --
-    if (zv_starts_with(buffer, BT_COMMAND_RES_DISCOVER_START)) {
+    if (zv_starts_with(buffer, BT_COMMAND_RES_DISCOVER_START))
+    {
         services_count = 0;
         memset(services, 0, sizeof(services));
-        set_status(BT_CONN_DISCOVERING, NULL);
+        set_status(BT_DISCOVERING, NULL);
         return;
     }
+
     if (zv_starts_with(buffer, BT_COMMAND_RES_DISCOVER_SERVICE)) {
         parse_discover_service(buffer);
         return;
     }
+
     if (zv_starts_with(buffer, BT_COMMAND_RES_DISCOVER_CHAR)) {
         parse_discover_char(buffer);
         return;
     }
-    if (zv_starts_with(buffer, BT_COMMAND_RES_DISCOVER_DONE)) {
-        set_status(BT_CONN_READY, NULL);
+    if (zv_starts_with(buffer, BT_COMMAND_RES_DISCOVER_DONE))
+    {
+        set_status(BT_READY, NULL);
+        uart_cancel_response_timeout(UART_BT_TAG_ID);
         return;
     }
-    if (zv_starts_with(buffer, BT_COMMAND_RES_DISCOVER_FAIL)) {
+
+    if (zv_starts_with(buffer, BT_COMMAND_RES_DISCOVER_FAIL))
+    {
         char reason[32] = {0};
         get_field_value(buffer, "reason", reason, sizeof(reason));
-        set_status(BT_CONN_FAILED, reason);
+        set_status(BT_FAILED, reason);
+
+        uart_cancel_response_timeout(UART_BT_TAG_ID);
         return;
     }
+}
+
+static void on_bt_action_timeout(const char *tag_id)
+{
+    log_warning("we have a timeout %d", context.bt_status);
+    (void)tag_id;
+    switch(context.bt_status)
+    {
+        case BT_SCANNING:
+            set_status(BT_FAILED, "Can't scan devices the ESP32 never reply!");
+            if (context.internal_cb != NULL)
+                context.internal_cb(NULL, UI_TIMEOUT);
+
+            break;
+        case BT_CONNECTING:
+            set_status(BT_FAILED, "Can't connect to the device");
+            break;
+        case BT_DISCOVERING:
+            set_status(BT_FAILED, "Discovering services and characteristics return timeout");
+            break;
+        default:
+            context.bt_status = BT_IDLE;
+
+    }
+
+    uart_cancel_response_timeout(UART_BT_TAG_ID);
 }
 
 uart_status_t bt_controller_init(const uart_config_t *config)
@@ -275,17 +348,32 @@ uart_status_t bt_controller_init(const uart_config_t *config)
         log_warning("UART init failed: %s\n", last_error());
         return uart_rc;
     }
-
+    
     add_event_callback(event_handler, UART_BT_TAG_ID);
+    uart_rc = uart_set_timeout_callback(UART_BT_TAG_ID, on_bt_action_timeout);
+    if (uart_rc != UART_OK)
+        return uart_rc;
+
+    context.bt_status = BT_IDLE;
 
     return UART_OK;
 }
 
 uart_status_t start_scan()
 {
+    context.bt_status = BT_SCANNING;
     uart_status_t uart_rc = uart_send_line("SCAN");
-    if (uart_rc != UART_OK) {
+    if (uart_rc != UART_OK)
+    {
+        context.bt_status = BT_FAILED;
         log_warning("start_scan error: %s\n", last_error());
+        return uart_rc;
+    }
+
+    uart_rc = uart_start_response_timeout(UART_BT_TAG_ID, BT_SERVICE_TIMEOUT_PROCCESS_MS);
+    if (uart_rc != UART_OK)
+    {
+        context.bt_status = BT_FAILED;
         return uart_rc;
     }
 
@@ -300,15 +388,24 @@ uart_status_t bt_connect(const device_t *device)
     }
 
     bt_clear_discovery();
-    set_status(BT_CONN_CONNECTING, NULL);
+    set_status(BT_CONNECTING, NULL);
 
+    context.bt_status = BT_CONNECTING;
     uart_status_t rc = uart_send_formatted_line("%s|%s|%d",
              BT_COMMAND_REQ_CONNECT, device->mac, device->addr_type);
 
     if (rc != UART_OK)
     {
         log_warning("bt_connect error: %s\n", last_error());
-        set_status(BT_CONN_FAILED, "uart");
+        set_status(BT_FAILED, "uart");
+        return rc;
+    }
+
+    rc = uart_start_response_timeout(UART_BT_TAG_ID, BT_SERVICE_TIMEOUT_PROCCESS_MS);
+    if (rc != UART_OK)
+    {        
+        set_status(BT_FAILED, "uart");
+        return rc;
     }
 
     return rc;

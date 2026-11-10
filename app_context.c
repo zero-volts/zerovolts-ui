@@ -91,6 +91,7 @@ void bt_context_add_device(device_t *device)
     {
         dev_found->rssi = device->rssi;
         dev_found->connectable = device->connectable;
+        dev_found->addr_type = device->addr_type;
 
         if (device->name[0] && strcmp(dev_found->name, UNKNOWN_NAME) == 0)
             snprintf(dev_found->name, sizeof(dev_found->name), "%s", device->name);
@@ -117,6 +118,7 @@ void bt_context_add_device(device_t *device)
 
     dev_found->rssi = device->rssi;
     dev_found->connectable = device->connectable;
+    dev_found->addr_type = device->addr_type;
 
     snprintf(dev_found->name, sizeof(dev_found->name), "%s",
              device->name[0] ? device->name : UNKNOWN_NAME);

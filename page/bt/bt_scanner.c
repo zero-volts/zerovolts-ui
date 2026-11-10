@@ -84,6 +84,11 @@ static void handler_devices(device_t *device, ui_status_t status)
     if (status == UI_LOADING)
         ui_button_set_loading(scan_btn, true);
 
+    if (status == UI_TIMEOUT)
+    {
+        ui_button_set_loading(scan_btn, false);
+    }
+
     if (status == UI_DONE)
     {
         ui_button_set_loading(scan_btn, false);
