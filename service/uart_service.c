@@ -95,10 +95,10 @@ uart_status_t uart_service_init(const char *device, int baudrate)
 
     if (uart_fd >= 0)
     {
-        close(uart_fd);
-        uart_fd = -1;
+        log_info("[UART][service] service already initialized!");
+        return UART_OK;
     }
-
+    
     /*
      * O_RDWR: Open the device to write and read
      * O_NOCTTY: Avoid that the port converts into terminal. wwe dont want an interactiver terminal 

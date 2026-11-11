@@ -22,7 +22,9 @@ typedef enum {
     IR_ERR_IO           = -2,
     IR_ERR_TIMEOUT      = -3,
     IR_ERR_INVALID      = -4,
-    IR_ERR_UNSUPPORTED  = -5
+    IR_ERR_UNSUPPORTED  = -5,
+    IR_ERR_BUSY         = -6,
+    IR_ERR_CENCELLED    = -7,
 } ir_status_t;
 
 typedef struct {
@@ -36,11 +38,12 @@ typedef void (*ir_raw_cb)(const file_desc *desc, void *user);
 typedef struct {
     ir_raw_cb cb;
     void *data;
-}ir_callback_event;
+} ir_callback_event;
 
 ir_status_t ir_service_init(const ir_context *ctx);
 ir_status_t ir_learn_raw (const char *out_raw_path);
 ir_status_t ir_send_raw(const char *raw_path);
+const char *ir_get_status_text(ir_status_t status);
 
 ir_status_t ir_list_raw_files_cb(const char *dir, ir_callback_event *event);
 

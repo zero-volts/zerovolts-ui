@@ -32,12 +32,15 @@ typedef struct {
     size_t count;
 } ir_button_list;
 
+typedef void(*ir_system_done_cb) (ir_status_t result, void *user_data);
+
 ir_status_t ir_controller_init(const ir_remote_ctx *remote_ctx);
 void ir_controller_deinit(void);
 ir_status_t ir_controller_create_remote(const char *remote_name);
 ir_status_t ir_controller_list_remotes(ir_remote_list *out_list);
 ir_status_t ir_controller_list_buttons(const char *remote_name, ir_button_list *out);
-ir_status_t ir_controller_learn_button(const char *remote_name, const char *button_name);
+ir_status_t ir_controller_learn_button(const char *remote_name, const char *button_name, ir_system_done_cb callback);
+void ir_controller_cancel_learn(void);
 ir_status_t ir_controller_send_button(const char *remote_name, const char *button_name);
 void ir_controller_free_remote_list(ir_remote_list *list);
 void ir_controller_free_button_list(ir_button_list *list);

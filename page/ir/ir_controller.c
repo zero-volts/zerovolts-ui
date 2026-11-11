@@ -2,10 +2,12 @@
 #include "page/ir/ir_raw_helper.h"
 #include "utils/string_utils.h"
 #include "utils/error_handler.h"
+#include "utils/logger.h"
 
 #include <stdio.h>
 #include <string.h>
 #include <limits.h>
+#include <pthread.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
@@ -24,6 +26,15 @@ typedef struct {
     size_t capacity;
     int has_error;
 } buttons_handler_ctx;
+
+typedef struct {
+    char *raw_path;
+    ir_system_done_cb task_cb;
+    bool canceled_task;
+} task_ctx;
+
+static task_ctx *active_task = NULL;
+static pthread_mutex_t task_learn_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static ir_remote_ctx remote_context;
 
@@ -193,6 +204,15 @@ static ir_status_t create_buttons_directory(const char *remote_directory,
         return IR_ERR_IO;
 
     return IR_OK;
+}
+
+static bool learn_task_is_cancelled(task_ctx *context)
+{
+    pthread_mutex_lock(&task_learn_mutex);
+    bool cancelled = context->canceled_task;
+    pthread_mutex_unlock(&task_learn_mutex);
+
+    return cancelled;
 }
 
 ir_status_t ir_controller_init(const ir_remote_ctx *remote_ctx)
@@ -380,7 +400,84 @@ ir_status_t ir_controller_list_buttons(const char *remote_name, ir_button_list *
     return IR_OK;
 }
 
-ir_status_t ir_controller_learn_button(const char *remote_name, const char *button_name)
+void* learn_worker(void* arg)
+{
+    task_ctx *context = (task_ctx*)arg;
+    log_debug("[IR controller]::learn_worker started path=%s", context->raw_path);
+
+    ir_status_t rc = IR_ERR_IO;
+    for (int attempt = 1; attempt <= IR_LEARN_MAX_ATTEMPTS; attempt++)
+    {
+        char invalid_path[PATH_MAX];
+        int token_count = 0;
+        int last_sign = 0;
+
+        if (learn_task_is_cancelled(context))
+        {
+            rc = IR_ERR_CENCELLED;
+            break;
+        }
+
+        log_debug("[IR controller]::learn_worker capture attempt=%d/%d", attempt, IR_LEARN_MAX_ATTEMPTS);
+        rc = ir_learn_raw(context->raw_path);
+        if (rc != IR_OK)
+            continue;
+
+        if (ir_validate_raw_capture_file(context->raw_path, &token_count, &last_sign))
+        {
+            rc = IR_OK;
+            break;
+        }
+
+        if (ir_append_synthetic_gap_for_odd_capture(context->raw_path, token_count, last_sign)) 
+        {
+            int fixed_tokens = 0;
+            int fixed_last_sign = 0;
+            if (ir_validate_raw_capture_file( context->raw_path, &fixed_tokens, &fixed_last_sign))
+            {
+                rc = IR_OK;
+                break;
+            }
+        }
+
+        // At this point is an error, the signal doesnt pass the validation!
+        rc = IR_ERR_IO;
+
+        size_t path_size = sizeof (invalid_path);
+        int invalid_path_len = snprintf(invalid_path, path_size, "%s.invalid%d", context->raw_path, attempt);
+        if (invalid_path_len > 0 && strnlen(invalid_path, path_size) < path_size) 
+        {
+            if (rename( context->raw_path, invalid_path) != 0) {
+                (void)errno;
+            }
+        }
+    }
+
+    pthread_mutex_lock(&task_learn_mutex);
+    active_task = NULL;
+    pthread_mutex_unlock(&task_learn_mutex);
+
+    ir_system_done_cb callback = context->task_cb;
+    free(context->raw_path);
+    free(context);
+
+    if (callback != NULL)
+        callback(rc, NULL);
+
+    return NULL;
+}
+
+void ir_controller_cancel_learn(void)
+{
+    pthread_mutex_lock(&task_learn_mutex);
+
+    if (active_task != NULL)
+        active_task->canceled_task = true;
+
+    pthread_mutex_unlock(&task_learn_mutex);
+}
+
+ir_status_t ir_controller_learn_button(const char *remote_name, const char *button_name, ir_system_done_cb callback)
 {
     if (zv_is_empty(remote_name) || zv_is_empty(button_name))
         return IR_ERR_INVALID;
@@ -401,6 +498,7 @@ ir_status_t ir_controller_learn_button(const char *remote_name, const char *butt
         remote_name,
         remote_name_sanitize, sizeof(remote_name_sanitize),
         remote_directory, sizeof(remote_directory));
+
     if (created != IR_OK)
         return created;
 
@@ -421,36 +519,73 @@ ir_status_t ir_controller_learn_button(const char *remote_name, const char *butt
     if (ret < 0)
         return IR_ERR_INVALID;
 
-    ir_status_t rc = IR_ERR_IO;
-    for (int attempt = 1; attempt <= IR_LEARN_MAX_ATTEMPTS; attempt++)
+    task_ctx *task_data = malloc(sizeof(*task_data));
+    if (task_data == NULL)
+        return IR_ERR_IO;
+
+    if (duplicate_string(raw_path, &task_data->raw_path) != 0)
     {
-        char invalid_path[PATH_MAX];
-        int token_count = 0;
-        int last_sign = 0;
-
-        rc = ir_learn_raw(raw_path);
-        if (rc != IR_OK)
-            continue;
-
-        if (ir_validate_raw_capture_file(raw_path, &token_count, &last_sign))
-            return IR_OK;
-
-        if (ir_append_synthetic_gap_for_odd_capture(raw_path, token_count, last_sign)) {
-            int fixed_tokens = 0;
-            int fixed_last_sign = 0;
-            if (ir_validate_raw_capture_file(raw_path, &fixed_tokens, &fixed_last_sign))
-                return IR_OK;
-        }
-
-        if (snprintf(invalid_path, sizeof(invalid_path), "%s.invalid%d", raw_path, attempt) > 0 &&
-            strnlen(invalid_path, sizeof(invalid_path)) < sizeof(invalid_path)) {
-            if (rename(raw_path, invalid_path) != 0) {
-                (void)errno;
-            }
-        }
+        free(task_data);
+        return IR_ERR_IO;
     }
 
-    return rc;
+    task_data->task_cb = callback;
+    
+    pthread_t processor;
+    pthread_attr_t attr;
+    int attr_result = pthread_attr_init(&attr);
+    if (attr_result != 0)
+    {
+        free(task_data->raw_path);
+        free(task_data);
+        log_error("[IR controller] pthread_attr_init failed: %s", strerror(attr_result));
+
+        return IR_ERR_IO;
+    }
+
+    int result = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+    if (result != 0)
+    {
+        pthread_attr_destroy(&attr);
+        free(task_data->raw_path);
+        free(task_data);
+
+        return IR_ERR_IO;
+    }
+
+    pthread_mutex_lock(&task_learn_mutex);
+    if (active_task != NULL)
+    {
+        pthread_mutex_unlock(&task_learn_mutex);
+        free(task_data->raw_path);
+        free(task_data);
+        pthread_attr_destroy(&attr);
+
+        return IR_ERR_BUSY; 
+    }
+
+    task_data->canceled_task = false;
+    active_task  = task_data;
+
+    int thread = pthread_create(&processor, &attr, learn_worker, task_data);
+    if (thread != 0)
+        active_task = NULL;
+
+    pthread_mutex_unlock(&task_learn_mutex);
+    pthread_attr_destroy(&attr);
+
+    if (thread != 0)
+    {
+        free(task_data->raw_path);
+        free(task_data);
+
+        log_error("[IR controller] pthread_create failed: %s", strerror(thread));
+        set_last_error("Failed to start IR capture thread");
+
+        return IR_ERR_IO;
+    }
+
+    return IR_OK;
 }
 
 ir_status_t ir_controller_send_button(const char *remote_name, const char *button_name)

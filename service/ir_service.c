@@ -186,6 +186,20 @@ static ir_status_t irctl_learn_raw (const char *out_raw_path)
     return IR_OK;
 }
 
+const char *ir_get_status_text(ir_status_t status)
+{
+    switch (status) {
+        case IR_OK:                 return "OK";
+        case IR_ERR_CONFIG:         return "Cofiguration error";
+        case IR_ERR_IO:             return "I/O Error";
+        case IR_ERR_TIMEOUT:        return "Timeout";
+        case IR_ERR_INVALID:        return "Invalido";
+        case IR_ERR_UNSUPPORTED:    return "Unsupported";
+        case IR_ERR_CENCELLED:      return "Cancelled";
+        default:                    return "?";
+    }
+}
+
 ir_status_t ir_learn_raw (const char *out_raw_path) 
 {
     if (context.backend == NULL)

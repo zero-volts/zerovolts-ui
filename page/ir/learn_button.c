@@ -1,17 +1,19 @@
 #include "page/ir/learn_button.h"
-#include "components/component_helper.h"
-#include "components/ui_theme.h"
-#include "page/navigation_page.h"
+
 #include "config.h"
 #include "utils/logger.h"
-#include "page/ir/ir_controller.h"
 #include "utils/string_utils.h"
+#include "components/ui_theme.h"
+#include "page/navigation_page.h"
+#include "page/ir/ir_controller.h"
 #include "components/button/ui_button.h"
+#include "components/component_helper.h"
 #include "components/dropdown/ui_dropdown.h"
 #include "components/text_input/ui_text_input.h"
 
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 typedef struct {
     ui_dropdown *dropdown_remotes;
@@ -49,6 +51,14 @@ static void learn_set_status(const char *txt)
         return;
 
     lv_label_set_text(g_learn.status, txt);
+}
+
+static void update_status_thread(void *user_data)
+{
+    char *message = (char *)user_data;
+    learn_set_status(message);
+
+    free(message);
 }
 
 static void load_remote_dropdown(void)
@@ -96,6 +106,24 @@ static void learn_refresh_remotes_cb(event_data_btn *e)
     load_remote_dropdown();
 }
 
+static void learn_system_done(ir_status_t result, void *user_data)
+{
+    char text[80];
+
+    if (result == IR_OK)
+        snprintf(text, sizeof(text), "Signal saved!");
+    else
+        snprintf(text, sizeof(text), "Error saving signal - %s",
+                 ir_get_status_text(result));
+
+    char *message = NULL;
+    if (duplicate_string(text, &message) != 0)
+        return;
+
+    if (lv_async_call(update_status_thread, message) != LV_RESULT_OK)
+        free(message);
+}
+
 static void finish_button_handler(event_data_btn *event)
 {
     dropdown_item_t *selected_item = dropdown_get_item(g_learn.dropdown_remotes, g_learn.remote_selected_position);
@@ -123,16 +151,15 @@ static void finish_button_handler(event_data_btn *event)
     learn_set_status("Recording signal... Press remote now.");
     lv_refr_now(NULL);
 
-    ir_status_t rc = ir_controller_learn_button(selected_item->text, button_name);
-    log_debug("[IR][learn_ui] learn result rc=%d err='%s'\n", (int)rc, ir_controller_last_error());
-    
-    if (rc == IR_OK)
+    ir_status_t rc = ir_controller_learn_button(selected_item->text, button_name, &learn_system_done);
+    if (rc != IR_OK)
     {
-        learn_set_status("Signal captured and stored.");
+        log_debug("[IR][learn_ui] learn result rc=%d err='%s'\n", (int)rc, ir_controller_last_error());
+        learn_set_status(ir_controller_last_error());
         return;
     }
 
-    learn_set_status(ir_controller_last_error());
+    learn_set_status("Reading signal ...");
 }
 
 static void learn_cancel_cb(event_data_btn *event)
@@ -141,6 +168,7 @@ static void learn_cancel_cb(event_data_btn *event)
     if (!g_learn.button_txt)
         return;
 
+    ir_controller_cancel_learn();
     keyboard_hide(g_learn.button_txt);
     ui_text_clear(g_learn.button_txt);
 
@@ -155,6 +183,8 @@ static void remote_on_change_handler(dropdown_item_t *item, void *user_data)
 static void view_delete_cb(lv_event_t *e)
 {
     (void)e;
+
+    ir_controller_cancel_learn();
     memset(&g_learn, 0, sizeof(g_learn));
 }
 
