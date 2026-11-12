@@ -120,6 +120,7 @@ static void event_handler(subghz_service_event_t *event)
             controller_handler(UI_DONE, &event_arg);
             break;
 
+        case SUBGHZ_EVENT_TIMEOUT:
         case SUBGHZ_EVENT_CAPTURE_ERROR:
         case SUBGHZ_EVENT_SEND_ERROR:
             event_arg.message = event->message;

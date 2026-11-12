@@ -17,8 +17,19 @@ typedef enum {
     SUBGHZ_ERR_IO           = -2,
     SUBGHZ_ERR_TIMEOUT      = -3,
     SUBGHZ_ERR_INVALID      = -4,
-    SUBGHZ_ERR_UNSUPPORTED  = -5
+    SUBGHZ_ERR_UNSUPPORTED  = -5,
+    SUBGHZ_ERR_BUSY         = -6
 } subghz_status_t;
+
+typedef enum {
+    SUBGHZ_CAPTURE_IDLE = 0,
+    SUBGHZ_CAPTURE_WAIT_START,
+    SUBGHZ_CAPTURE_STARTED,
+    SUBGHZ_CAPTURE_RECEIVING,
+    SUBGHZ_CAPTURE_DONE,
+    SUBGHZ_CAPTURE_FAILED,
+    SUBGHZ_CAPTURE_TIMEOUT
+} subghz_capture_status_t;
 
 typedef enum {
     SUBGHZ_EVENT_NONE = 0,
@@ -28,20 +39,22 @@ typedef enum {
     SUBGHZ_EVENT_CAPTURE_SAVED,
     SUBGHZ_EVENT_CAPTURE_ERROR,
     SUBGHZ_EVENT_SEND_DONE,
-    SUBGHZ_EVENT_SEND_ERROR
+    SUBGHZ_EVENT_SEND_ERROR,
+    SUBGHZ_EVENT_TIMEOUT
 } subghz_event_type_t;
 
 typedef struct {
     subghz_event_type_t type;
     char message[255];
     void *data;
-    subghz_status_t status; //Result for SEND_DONE/SEND_ERROR
+    subghz_status_t status; // Result for capture and send events.
 } subghz_service_event_t;
 
 typedef void (*subghz_service_handler)(subghz_service_event_t *event);
 
 subghz_status_t subghz_service_init(const zv_config *config);
 subghz_status_t subghz_service_start_capture(uint32_t frequency, uint32_t time_frame_ms);
+subghz_capture_status_t subghz_service_get_capture_status(void);
 void subghz_service_add_event_callback(subghz_service_handler new_cb);
 subghz_status_t subghz_service_save(subghz_capture_session_t *session, const char *file_name_path);
 subghz_status_t subghz_service_read(const char *file_name_path, subghz_flipper_sub_file_t *out);

@@ -27,13 +27,6 @@
 #define UART_SUBGHZ_TAG_ID "SUBGHZ_TAG_CONTROLLER"
 #define DATA_TIMING_BUFFER SUBGHZ_DATA_CHUNK_MAX_VALUES * 10
 
-typedef struct {
-    char files_directory[512];
-    subghz_service_handler service_handler;
-} service_context;
-
-static service_context ctx;
-
 typedef enum {
     REPLAY_IDLE = 0,
     REPLAY_WAIT_BEGIN_OK,
@@ -43,7 +36,6 @@ typedef enum {
 
 // The controller can release the file as soon as BEGIN is sent.
 static struct {
-    replay_state_t state;
     uint32_t id;
     uint16_t seq;
     uint16_t count;
@@ -51,15 +43,64 @@ static struct {
     uint64_t completion_timeout_ms;
     int32_t timings[SUBGHZ_SEND_MAX_TIMINGS];
 } replay;
+
+typedef struct {
+    char files_directory[512];
+    subghz_service_handler service_handler;
+
+    subghz_capture_status_t capture_status;
+    uint64_t capture_id; // Learned from the first data block; zero before data arrives.
+    replay_state_t replay_state;
+} service_context;
+
 typedef struct {
     file_callback callback;
     void *user_data;
 } signal_list_ctx;
 
+static service_context ctx;
+
+static bool capture_is_active(void)
+{
+    return ctx.capture_status == SUBGHZ_CAPTURE_WAIT_START ||
+           ctx.capture_status == SUBGHZ_CAPTURE_STARTED ||
+           ctx.capture_status == SUBGHZ_CAPTURE_RECEIVING;
+}
+
+static void notify_event(subghz_service_event_t *event)
+{
+    if (ctx.service_handler)
+        ctx.service_handler(event);
+}
+
+static void finish_capture(subghz_capture_status_t state, subghz_status_t status,
+                           const char *message, subghz_capture_session_t *session)
+{
+    uart_cancel_response_timeout(UART_SUBGHZ_TAG_ID);
+    ctx.capture_status = state;
+
+    if (state != SUBGHZ_CAPTURE_DONE && ctx.capture_id != 0)
+        subghz_remove_session_by(ctx.capture_id);
+
+    ctx.capture_id = 0;
+
+    subghz_service_event_t event = {
+        .type = state == SUBGHZ_CAPTURE_DONE ? SUBGHZ_EVENT_CAPTURE_READY :
+                state == SUBGHZ_CAPTURE_TIMEOUT ? SUBGHZ_EVENT_TIMEOUT : SUBGHZ_EVENT_CAPTURE_ERROR,
+        .status = status,
+        .data = session,
+    };
+
+    snprintf(event.message, sizeof(event.message), "%s", message);
+    set_last_error(status == SUBGHZ_OK ? NULL : event.message);
+
+    notify_event(&event);
+}
+
 static void finish_replay(subghz_status_t status, const char *message)
 {
     uart_cancel_response_timeout(UART_SUBGHZ_TAG_ID);
-    replay.state = REPLAY_IDLE;
+    ctx.replay_state = REPLAY_IDLE;
 
     subghz_service_event_t event = {
         .type = status == SUBGHZ_OK ? SUBGHZ_EVENT_SEND_DONE : SUBGHZ_EVENT_SEND_ERROR,
@@ -72,11 +113,17 @@ static void finish_replay(subghz_status_t status, const char *message)
         ctx.service_handler(&event);
 }
 
-static void on_replay_timeout(const char *tag_id)
+static void on_event_timeout(const char *tag_id)
 {
     (void)tag_id;
-    if (replay.state != REPLAY_IDLE)
-        finish_replay(SUBGHZ_ERR_TIMEOUT, "Timeout waiting for Sub-GHz replay confirmation.");
+    if (ctx.replay_state != REPLAY_IDLE)
+    {
+        finish_replay(SUBGHZ_ERR_TIMEOUT, "Timeout waiting for Sub-GHz \nreplay confirmation.");
+        return;
+    }
+
+    if (capture_is_active())
+        finish_capture(SUBGHZ_CAPTURE_TIMEOUT, SUBGHZ_ERR_TIMEOUT, "Timeout waiting for Sub-GHz \ncapture confirmation.", NULL);
 }
 
 static subghz_status_t send_replay_chunk(void)
@@ -115,25 +162,25 @@ static subghz_status_t send_replay_chunk(void)
     if (result != UART_OK)
         return (subghz_status_t)result;
 
-    replay.state = REPLAY_WAIT_ACK;
+    ctx.replay_state = REPLAY_WAIT_ACK;
+
     return (subghz_status_t)uart_start_response_timeout(UART_SUBGHZ_TAG_ID, SUBGHZ_UPLOAD_RESPONSE_TIMEOUT_MS);
 }
 
 static subghz_status_t send_replay_end(void)
 {
-    uart_status_t result = uart_send_formatted_line("%s|id=%" PRIu32,
-        SUBGHZ_COMMAND_REQ_SEND_END, replay.id);
+    uart_status_t result = uart_send_formatted_line("%s|id=%" PRIu32, SUBGHZ_COMMAND_REQ_SEND_END, replay.id);
     if (result != UART_OK)
         return (subghz_status_t)result;
 
-    replay.state = REPLAY_WAIT_DONE;
-    return (subghz_status_t)uart_start_response_timeout(
-        UART_SUBGHZ_TAG_ID, replay.completion_timeout_ms);
+    ctx.replay_state = REPLAY_WAIT_DONE;
+
+    return (subghz_status_t)uart_start_response_timeout(UART_SUBGHZ_TAG_ID, replay.completion_timeout_ms);
 }
 
 static bool handle_replay_response(const char *buffer)
 {
-    if (replay.state == REPLAY_IDLE)
+    if (ctx.replay_state == REPLAY_IDLE)
         return false;
 
     char id[21];
@@ -155,7 +202,7 @@ static bool handle_replay_response(const char *buffer)
     }
 
     const char *expected;
-    switch (replay.state)
+    switch (ctx.replay_state)
     {
         case REPLAY_WAIT_BEGIN_OK: 
             expected = SUBGHZ_COMMAND_RES_SEND_BEGIN_OK; 
@@ -174,7 +221,7 @@ static bool handle_replay_response(const char *buffer)
     if (strncmp(buffer, expected, length) != 0 || buffer[length] != '|')
         return false;
 
-    if (replay.state == REPLAY_WAIT_ACK)
+    if (ctx.replay_state == REPLAY_WAIT_ACK)
     {
         char seq[21];
         if (!get_field_value(buffer, "seq", seq, sizeof(seq)))
@@ -186,13 +233,13 @@ static bool handle_replay_response(const char *buffer)
     }
 
     uart_cancel_response_timeout(UART_SUBGHZ_TAG_ID);
-    if (replay.state == REPLAY_WAIT_DONE)
+    if (ctx.replay_state == REPLAY_WAIT_DONE)
     {
         finish_replay(SUBGHZ_OK, "Signal sent.");
         return true;
     }
 
-    if (replay.state == REPLAY_WAIT_ACK)
+    if (ctx.replay_state == REPLAY_WAIT_ACK)
         replay.seq++;
 
     subghz_status_t result;
@@ -293,105 +340,101 @@ static void event_handler(const char *tag_id, char *buffer)
     if (handle_replay_response(buffer))
         return;
 
-    if (ctx.service_handler == NULL)
-    {
-        log_warning("subghz_service::event_handler no associated handler");
+    if (!capture_is_active())
         return;
-    }
 
     subghz_service_event_t event = {
         .type = SUBGHZ_EVENT_NONE,
-        .message = {0},
-        .data = NULL
+        .status = SUBGHZ_OK,
     };
 
     if (strstr(buffer, SUBGHZ_COMMAND_RES_CAPTURE_START) != NULL)
     {
+        if (ctx.capture_status != SUBGHZ_CAPTURE_WAIT_START)
+            return;
+
+        ctx.capture_status = SUBGHZ_CAPTURE_STARTED;
         event.type = SUBGHZ_EVENT_CAPTURE_STARTED;
-        ctx.service_handler(&event);
+        notify_event(&event);
+
         return;
     }
 
     if (strstr(buffer, SUBGHZ_COMMAND_RES_CAPTURE_DONE) != NULL)
     {
         char tmp_value[21];
-        if(!get_field_value(buffer, "capture_id", tmp_value, sizeof(tmp_value)) )
+        if (!get_field_value(buffer, "capture_id", tmp_value, sizeof(tmp_value)))
+        {
+            finish_capture(SUBGHZ_CAPTURE_FAILED, SUBGHZ_ERR_INVALID, "Capture result is missing capture_id.", NULL);
             return;
+        }
 
         uint64_t session_id = strtoull(tmp_value, NULL, 10);
         subghz_capture_session_t *session = subghz_get_session_by(session_id);
         char *end = NULL;
         if (!session || !get_field_value(buffer, "freq", tmp_value, sizeof(tmp_value)))
         {
-            event.type = SUBGHZ_EVENT_CAPTURE_ERROR;
-            snprintf(event.message, sizeof(event.message), "Captura incompleta o sin frecuencia");
-            ctx.service_handler(&event);
+            finish_capture(SUBGHZ_CAPTURE_FAILED, SUBGHZ_ERR_INVALID, "Captura incompleta o sin frecuencia", NULL);
             return;
         }
 
         unsigned long long frequency = strtoull(tmp_value, &end, 10);
         if (!tmp_value[0] || *end || frequency == 0 || frequency > UINT32_MAX)
         {
-            event.type = SUBGHZ_EVENT_CAPTURE_ERROR;
-            snprintf(event.message, sizeof(event.message), "Frecuencia de captura invalida");
-            ctx.service_handler(&event);
+            finish_capture(SUBGHZ_CAPTURE_FAILED, SUBGHZ_ERR_INVALID, "Frecuencia de captura invalida", NULL);
             return;
         }
         session->frequency = (uint32_t)frequency;
 
         if (!subghz_set_session_completed(session_id))
         {
-            event.type = SUBGHZ_EVENT_CAPTURE_ERROR;
-            ctx.service_handler(&event);
-
-            log_warning("subghz_service::event_handler Can't complete the session : %" PRIu64 "", session_id);
+            finish_capture(SUBGHZ_CAPTURE_FAILED, SUBGHZ_ERR_INVALID, "Captura incompleta: faltan bloques de datos.", NULL);
             return;
         }
 
-        event.data = subghz_get_session_by(session_id);
-        event.type = SUBGHZ_EVENT_CAPTURE_READY;
-        ctx.service_handler(&event);
-
+        finish_capture(SUBGHZ_CAPTURE_DONE, SUBGHZ_OK, "Signal captured.", session);
         return;
     }
 
     if (strstr(buffer, SUBGHZ_COMMAND_RES_CAPTURE_DATA) != NULL)
     {
         subghz_data_chunk_t chunk = {0};
-        if(!parse_capture_data(buffer, &chunk))
+        if (!parse_capture_data(buffer, &chunk))
         {
-            event.type = SUBGHZ_EVENT_CAPTURE_ERROR;
-            snprintf(event.message, sizeof(event.message), "%s", "Error capturando datos");
-            ctx.service_handler(&event);
+            finish_capture(SUBGHZ_CAPTURE_FAILED, SUBGHZ_ERR_INVALID, "Error capturando datos", NULL);
             return;
         }
 
-        subghz_add_session_chunk(chunk);
+        if (ctx.capture_id != 0 && ctx.capture_id != chunk.capture_id)
+        {
+            finish_capture(SUBGHZ_CAPTURE_FAILED, SUBGHZ_ERR_INVALID, "Capture ID changed during data transfer.", NULL);
+            return;
+        }
 
+        ctx.capture_id = chunk.capture_id;
+        subghz_add_session_chunk(chunk);
+        ctx.capture_status = SUBGHZ_CAPTURE_RECEIVING;
         event.data = &chunk;
         event.type = SUBGHZ_EVENT_CAPTURE_DATA;
+        notify_event(&event);
 
-        ctx.service_handler(&event);
         return;
     }
 
-    if (strstr(buffer, SUBGHZ_COMMAND_RES_CAPTURE_ERROR) != NULL || strstr(buffer, SUBGHZ_COMMAND_RES_CAPTURE_FAIL) != NULL) 
+    if (strstr(buffer, SUBGHZ_COMMAND_RES_CAPTURE_ERROR) != NULL || strstr(buffer, SUBGHZ_COMMAND_RES_CAPTURE_FAIL) != NULL)
     {
         char err_message[255] = "Unknown capture error";
         get_field_value(buffer, "reason", err_message, sizeof(err_message));
-
-        event.type = SUBGHZ_EVENT_CAPTURE_ERROR;
-        snprintf(event.message, sizeof(event.message), "%s", err_message);
-        ctx.service_handler(&event);
-        return;
+        bool timed_out = strcmp(err_message, "timeout") == 0;
+        finish_capture(timed_out ? SUBGHZ_CAPTURE_TIMEOUT : SUBGHZ_CAPTURE_FAILED,
+                       timed_out ? SUBGHZ_ERR_TIMEOUT : SUBGHZ_ERR_IO, err_message, NULL);
     }
 }
 
 subghz_status_t subghz_service_init(const zv_config *config)
 {
-    if (config == NULL) {
+    if (config == NULL)
         return SUBGHZ_ERR_CONFIG;
-    }
 
     const uart_config_t *uart_config = &config->uart;
     uart_status_t uart_rc = uart_service_init(uart_config->device, uart_config->baudrate);
@@ -402,7 +445,7 @@ subghz_status_t subghz_service_init(const zv_config *config)
     }
 
     add_event_callback(event_handler, UART_SUBGHZ_TAG_ID);
-    uart_rc = uart_set_timeout_callback(UART_SUBGHZ_TAG_ID, on_replay_timeout);
+    uart_rc = uart_set_timeout_callback(UART_SUBGHZ_TAG_ID, on_event_timeout);
     if (uart_rc != UART_OK)
         return (subghz_status_t)uart_rc;
 
@@ -410,21 +453,55 @@ subghz_status_t subghz_service_init(const zv_config *config)
         return SUBGHZ_ERR_IO;
 
     snprintf(ctx.files_directory, sizeof(ctx.files_directory), "%s", config->subghz.signals_path);
+    ctx.capture_status = SUBGHZ_CAPTURE_IDLE;
+    ctx.capture_id = 0;
+    ctx.replay_state = REPLAY_IDLE;
 
     return SUBGHZ_OK;
 }
 
+subghz_capture_status_t subghz_service_get_capture_status(void)
+{
+    return ctx.capture_status;
+}
+
 subghz_status_t subghz_service_start_capture(uint32_t frequency, uint32_t time_frame_ms)
 {
+    if (ctx.replay_state != REPLAY_IDLE || capture_is_active())
+    {
+        set_last_error("A Sub-GHz capture or replay is already in progress.");
+        return SUBGHZ_ERR_BUSY;
+    }
+
+    if (frequency == 0 || time_frame_ms == 0)
+    {
+        set_last_error("Capture frequency and timeout must be positive.");
+        ctx.capture_status = SUBGHZ_CAPTURE_FAILED;
+
+        return SUBGHZ_ERR_INVALID;
+    }
+
+    ctx.capture_id = 0;
+    ctx.capture_status = SUBGHZ_CAPTURE_WAIT_START;
     uart_status_t uart_rc = uart_send_formatted_line("%s|freq_hz=%" PRIu32 "|timeout_ms=%" PRIu32,
         SUBGHZ_COMMAND_REQ_CAPTURE, frequency, time_frame_ms);
 
     if (uart_rc != UART_OK)
     {
+        ctx.capture_status = SUBGHZ_CAPTURE_FAILED;
         log_warning("subghz_start_capture error: %s\n", last_error());
         return (subghz_status_t)uart_rc;
     }
 
+    // Allow time for command processing and transfer of the captured blocks.
+    uart_rc = uart_start_response_timeout(UART_SUBGHZ_TAG_ID, (uint64_t)time_frame_ms + SUBGHZ_TIMEOUT_FIXED_MARGIN_MS);
+    if (uart_rc != UART_OK)
+    {
+        ctx.capture_status = SUBGHZ_CAPTURE_FAILED;
+        return (subghz_status_t)uart_rc;
+    }
+
+    set_last_error(NULL);
     return SUBGHZ_OK;
 }
 
@@ -493,10 +570,10 @@ subghz_status_t subghz_service_send_signal(const subghz_flipper_sub_file_t *sign
         return SUBGHZ_ERR_UNSUPPORTED;
     }
 
-    if (replay.state != REPLAY_IDLE)
+    if (ctx.replay_state != REPLAY_IDLE || capture_is_active())
     {
-        set_last_error("A Sub-GHz replay is already in progress.");
-        return SUBGHZ_ERR_IO;
+        set_last_error("A Sub-GHz capture or replay is already in progress.");
+        return SUBGHZ_ERR_BUSY;
     }
 
     replay.count = 0;
@@ -573,7 +650,7 @@ subghz_status_t subghz_service_send_signal(const subghz_flipper_sub_file_t *sign
     if (result != UART_OK)
         return (subghz_status_t)result;
 
-    replay.state = REPLAY_WAIT_BEGIN_OK;
+    ctx.replay_state = REPLAY_WAIT_BEGIN_OK;
     set_last_error(NULL);
 
     return SUBGHZ_OK;
