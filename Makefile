@@ -51,7 +51,7 @@ SRC := \
 	utils/string_utils.c \
 	utils/cJSON.c \
 	utils/parser.c \
-	../tactile_switch/gpio_buttons.c
+	drivers/gpio_buttons.c
 
 
 INCLUDES := \
@@ -102,13 +102,3 @@ test-navigation: setup bin/navigation-test
 
 bin/navigation-test: tests/navigation_test.cpp $(NAV_TEST_SRC)
 	$(CC) tests/navigation_test.cpp $(NAV_TEST_SRC) -o $@ $(CFLAGS) $(INCLUDES) $(LIBS) -lm -lpthread
-
-SUBGHZ_TEST_SRC := app_context.c page/sub_ghz/sub_ghz_controller.c \
-	service/subghz/subghz_service.c service/subghz/subghz_file.c \
-	utils/file.c utils/string_utils.c utils/parser.c utils/error_handler.c utils/logger.c utils/cJSON.c
-.PHONY: test-subghz
-test-subghz: setup bin/subghz-test
-	./bin/subghz-test
-
-bin/subghz-test: tests/subghz_capture_test.cpp $(SUBGHZ_TEST_SRC)
-	$(CC) tests/subghz_capture_test.cpp $(SUBGHZ_TEST_SRC) -o $@ -I. -fsanitize=address,undefined -g
