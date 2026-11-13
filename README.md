@@ -1,756 +1,358 @@
 # ZeroVolts UI
 
-Proyecto **personal de aprendizaje** sobre Raspberry Pi 4 + Parrot OS, construido para
-estudiar y experimentar con:
+ZeroVolts UI es un proyecto personal que estoy desarrollando en C con LVGL, usando una Raspberry Pi 4 con Parrot OS.
 
-- **C** (memoria, punteros, arquitectura por capas, modularidad).
-- **LVGL 9** sobre Linux (`fbdev` para framebuffer y `evdev` para touch SPI).
-- **IoT y comunicación con microcontroladores** (UART RPi ↔ ESP32).
-- **Bluetooth Low Energy** (escaneo, GATT, descubrimiento de servicios y características).
-- **Señales infrarrojas** (captura y reproducción de mandos a distancia).
-- **USB HID / BadUSB** (gadgets USB en Linux con `configfs`).
-- **GPIO de Raspberry Pi** (botones tactiles, drivers de IR vía device tree).
+La idea es construir una herramienta portátil con pantalla, botones y distintos módulos para experimentar con señales de radio y la comunicación con otros dispositivos. Por ahora estoy trabajando con infrarrojo, Bluetooth Low Energy, USB HID y Sub-GHz. Con este proyecto voy aprendiendo sobre electrónica, programación y cómo integrar todo en una misma interfaz.
 
-No es un producto, es un banco de pruebas. Cada módulo se incorpora cuando hay
-algo nuevo que aprender o probar: a veces se reescribe entero y a veces se
-deja a medio camino. Si algo falla, normalmente lo aprendido se queda.
+El proyecto todavía está en desarrollo, así que la estructura, el protocolo y las funciones pueden cambiar. Hay partes que ya se pueden usar y otras que son experimentales o todavía necesitan trabajo.
 
----
+## Contenido
 
-## Tabla de contenidos
+- [Hardware y funcionamiento general](#hardware-y-funcionamiento-general)
+- [Preparación: compilar LVGL primero](#preparación-compilar-lvgl-primero)
+- [Compilar y ejecutar ZeroVolts UI](#compilar-y-ejecutar-zerovolts-ui)
+- [Funciones actuales](#funciones-actuales)
+- [Conexiones y pines](#conexiones-y-pines)
+- [Comunicación con el ESP32](#comunicación-con-el-esp32)
+- [Arquitectura y directorios](#arquitectura-y-directorios)
+- [Configuración y datos](#configuración-y-datos)
+- [Ejemplos y pruebas](#ejemplos-y-pruebas)
+- [Estado y próximos aprendizajes](#estado-y-próximos-aprendizajes)
 
-- [1. Hardware actual](#1-hardware-actual)
-- [2. Inicio rápido](#2-inicio-rápido)
-- [3. Compilar e integrar LVGL](#3-compilar-e-integrar-lvgl)
-- [4. Touch y framebuffer](#4-touch-y-framebuffer)
-- [5. Ejemplos mínimos](#5-ejemplos-mínimos)
-- [6. Funcionalidades implementadas](#6-funcionalidades-implementadas)
-  - [6.1 USB HID / BadUSB](#61-usb-hid--badusb)
-  - [6.2 Infrarrojo (IR)](#62-infrarrojo-ir)
-  - [6.3 Bluetooth Low Energy (BLE)](#63-bluetooth-low-energy-ble)
-- [7. Mapa de GPIO](#7-mapa-de-gpio)
-- [8. Arquitectura del proyecto](#8-arquitectura-del-proyecto)
-- [9. Configuración (app-config.json)](#9-configuración-app-configjson)
-- [10. Estructura de directorios](#10-estructura-de-directorios)
+## Hardware y funcionamiento general
 
----
+La Raspberry Pi se encarga de la interfaz y de los archivos. El ESP32 maneja BLE y el módulo CC1101 para Sub-GHz. Los dos se comunican por UART.
 
-## 1. Hardware actual
+```text
+Pantalla táctil + botones
+           │
+     Raspberry Pi
+      ZeroVolts UI
+       ├── Infrarrojo RX/TX
+       ├── USB HID
+       └── UART ── ESP32
+                     ├── Bluetooth Low Energy
+                     └── SPI ── CC1101 (Sub-GHz)
+```
 
-| Pieza | Detalle |
+| Elemento | Uso actual |
 |---|---|
-| SBC | Raspberry Pi 4 con Parrot OS |
-| Pantalla | SPI táctil 320×240 (controlador `ADS7846`, framebuffer `/dev/fb0`) |
-| Botones físicos | 2 tactile switches (NAV + SELECT) leídos por `libgpiod` |
-| IR | Módulo TX + RX usando `gpio-ir` / `gpio-ir-tx` del kernel (`/dev/lirc0`, `/dev/lirc1`) |
-| BLE | ESP32 DevKit conectado por **UART** (firmware en repo aparte: [`zerovolts_firmware`](../zerovolts_firmware/)) |
-| HID | Modo *USB gadget* del propio Raspberry Pi (puerto USB-C como dispositivo) |
+| Raspberry Pi 4 con Parrot OS | Ejecuta la aplicación y guarda configuración, mandos y señales. |
+| Pantalla SPI touch de 320 × 240 | Interfaz LVGL mediante framebuffer y entrada táctil mediante `evdev`; el montaje actual usa ADS7846 para el touch. |
+| Dos pulsadores físicos | NAV para desplazarse y SELECT para seleccionar. |
+| Receptor y transmisor IR | Aprender botones de mandos y volver a enviar sus señales. |
+| ESP32 DevKit | Ejecuta el firmware de BLE y Sub-GHz y responde por UART. |
+| CC1101 conectado al ESP32 | Captura y retransmisión experimental de señales de radio. |
+| Conexión USB de datos de la Raspberry Pi | Función USB HID mediante el modo gadget de Linux. |
 
----
+El firmware del ESP32 se mantiene en otro proyecto: [`zerovolts_firmware`](../zerovolts_firmware/).
 
-## 2. Inicio rápido
+## Preparación: compilar LVGL primero
 
-Desde el directorio del proyecto:
+**Antes de compilar la aplicación, hay que compilar LVGL.** El `Makefile` usa la biblioteca externa `liblvgl.a`; al ejecutar `make` en este proyecto, LVGL no se descarga ni se compila automáticamente.
+
+En el [tutorial de LVGL para Raspberry Pi](https://zerovolts-site.pages.dev/meta/03-lvgl-raspberry/#2-herramientas-necesarias-y-descarga-de-lvgl) explico cómo preparar la pantalla, las herramientas y la biblioteca. Recomiendo seguirlo primero. Aquí dejo un resumen de lo que necesita este proyecto.
+
+### Dependencias
+
+Estas son las dependencias que uso en mi instalación:
+
+```bash
+sudo apt install build-essential cmake git python3 pkg-config libevdev-dev libgpiod-dev v4l-utils evtest
+```
+
+`libevdev` permite trabajar con la entrada táctil; `libgpiod`, con los pulsadores; e `ir-ctl`, incluido en `v4l-utils`, se usa para infrarrojo. El driver actual de botones utiliza la API de **libgpiod 1.x**; una instalación con la API 2.x requiere adaptar ese driver.
+
+### Descargar y compilar el port de Linux
+
+La ubicación predeterminada es `~/git/lv_port_linux`:
+
+```bash
+mkdir -p ~/git
+cd ~/git
+git clone --recurse-submodules https://github.com/lvgl/lv_port_linux.git
+cd lv_port_linux
+cmake -B build -DCONFIG=fbdev
+cmake --build build -j"$(nproc)"
+```
+
+Si ya clonaste el repositorio, descarga los submódulos con `git submodule update --init --recursive` antes de compilar.
+
+La configuración de LVGL debe incluir framebuffer (`LV_USE_LINUX_FBDEV`), entrada táctil (`LV_USE_EVDEV`), acceso a archivos (`LV_USE_FS_STDIO`) y las fuentes que usa la interfaz. El código actual referencia explícitamente Montserrat de tamaños **10 y 12**, además de la fuente predeterminada de LVGL. Para los recursos PNG, habilita `LV_USE_LODEPNG`; la configuración usada en este montaje reserva `256 * 1024U` bytes mediante `LV_MEM_SIZE` cuando se utiliza el asignador interno.
+
+En el port local, `build/lv_conf.h` se genera desde la configuración de LVGL. Mantén los ajustes en el archivo de configuración de origen que corresponda a tu versión del port y recompila para que la biblioteca y sus cabeceras coincidan.
+
+Antes de continuar, debe existir:
+
+```text
+~/git/lv_port_linux/build/lvgl/lib/liblvgl.a
+```
+
+Además de esa biblioteca, el [Makefile](Makefile) utiliza las cabeceras de `lvgl/`, los drivers de framebuffer y `evdev`, y la configuración generada en `build/`. El proyecto usa LVGL 9; los cambios entre versiones del port pueden requerir ajustes.
+
+## Compilar y ejecutar ZeroVolts UI
+
+Con LVGL compilado y el hardware configurado, desde la raíz de este repositorio:
 
 ```bash
 make
 ./bin/zero-volts-ui
 ```
 
-Limpiar binarios:
+También puedes usar `make run`. Para otra ubicación de LVGL:
 
 ```bash
-make clean
+make LVPORT=/ruta/a/lv_port_linux
 ```
 
-Compilar todos los ejemplos (`examples/main_*.c`):
+Para limpiar el binario principal y los ejemplos, usa `make clean`.
 
-```bash
-make examples
-```
+La aplicación necesita acceso al framebuffer, al dispositivo táctil y a los dispositivos que use cada módulo, como GPIO, UART o IR. Todo esto debe estar configurado en la Raspberry Pi.
 
-Compilar un ejemplo específico:
+### Pantalla y touch
 
-```bash
-make example NAME=hello_world      # genera bin/example-hello_world
-make example NAME=touch_switch     # genera bin/example-touch_switch
-make example NAME=touch_calibration
-```
+El framebuffer se configura en `app-config.json`; actualmente es `/dev/fb0`. El touch se busca automáticamente en `/proc/bus/input/devices`, primero por sus propiedades y después por el nombre del dispositivo. Si no se encuentra, la aplicación no completa el arranque.
 
-> El `Makefile` espera **LVGL** clonado en `~/git/lv_port_linux` y compilado
-> con `liblvgl.a` en `build/lvgl/lib/`. Ver siguiente sección.
-
----
-
-## 3. Compilar e integrar LVGL
-
-LVGL no se distribuye con este repositorio: se compila aparte como librería
-estática y se enlaza desde el `Makefile`.
-
-### 3.1 Clonar el port oficial de Linux
-
-```bash
-cd ~/git
-git clone https://github.com/lvgl/lv_port_linux.git
-cd lv_port_linux/
-git submodule update --init --recursive
-```
-
-Esto descarga:
-
-- LVGL (motor gráfico).
-- Drivers Linux: `fbdev` (framebuffer) y `evdev` (touch).
-- Demos y ejemplos oficiales.
-
-### 3.2 Instalar dependencias del sistema
-
-```bash
-sudo apt install cmake libevdev-dev libgpiod-dev v4l-utils ir-ctl
-```
-
-- `libevdev-dev` → driver de touch.
-- `libgpiod-dev` → botones físicos por GPIO (NAV/SELECT).
-- `ir-ctl` → backend usado por el módulo IR (paquete `v4l-utils`).
-
-### 3.3 Compilar la librería LVGL
-
-```bash
-cd ~/git/lv_port_linux
-cmake -B build -DCONFIG=fbdev
-cmake --build build -j$(nproc)
-```
-
-Salida relevante para este proyecto:
-
-```
-~/git/lv_port_linux/build/lvgl/lib/liblvgl.a
-~/git/lv_port_linux/lvgl/src/drivers/display/fb/    # lv_linux_fbdev.h
-~/git/lv_port_linux/lvgl/src/drivers/evdev/         # lv_evdev.h
-```
-
-Estos paths son los que importa el `Makefile` mediante `-I` y `LIBS`.
-
-```
-lv_port_linux/lvgl/src/drivers/display/fb/
-lv_port_linux/lvgl/src/drivers/evdev/
-```
- habilitar LV_USE_LODEPNG a 1 en el lv_config.h
- y cambiar LV_MEM_SIZE a 256 en vez de 64
----
-
-<a id="sec-4"></a>
-## ▶️ 4. Ejecutar demo oficial (opcional)
-
-```bash
-./build/bin/lvglsim
-```
-
-### 3.5 Deshabilitar demos y ejemplos al integrar
-
-Editar `~/git/lv_port_linux/CMakeLists.txt`:
-
-```cmake
-set(LVGL_ENABLE_DEMO ON)     -> OFF
-set(LVGL_ENABLE_EXAMPLES ON) -> OFF
-```
-
-Y recompilar:
-
-```bash
-cmake --build build -j$(nproc)
-```
-
-### 3.6 Compilar la app
-
-<a id="sec-6"></a>
-## 🚀 6. Compilar la aplicación con LVGL
-
-Forma recomendada (usa el `Makefile` del proyecto):
-
-```bash
-make
-```
-
-El `Makefile` enlaza:
-
-```bash
-bin/zero-volts-ui
-```
-
-Para compilar manualmente, tomar como referencia el comando generado por `make`
-y los includes/librerías definidos en `Makefile`.
-
----
-
-## 4. Touch y framebuffer
-
-LVGL no detecta el touch automáticamente: hay que indicarle el `event` correcto.
-
-### 4.1 Encontrar el dispositivo de entrada
+La rotación y la calibración están ajustadas a mi pantalla en [main.c](main.c): se intercambian los ejes y se usan los valores `296, 294, 3931, 3843`. Si cambias de pantalla, revisa esos valores. Para identificar y comprobar el touch:
 
 ```bash
 cat /proc/bus/input/devices
+evtest /dev/input/eventN
 ```
 
-Buscar la entrada cuyo `Name=` corresponde al touch. Ejemplo:
+Sustituye `eventN` por el dispositivo de tu pantalla.
 
+## Funciones actuales
+
+### Navegación táctil y con pulsadores
+
+Desde la pantalla principal se puede entrar a Bad USB, Infrared, Bluetooth y Sub-GHz. La interfaz se puede usar con el touch o con los botones NAV y SELECT. NAV mueve el foco y permite desplazarse por los desplegables y el teclado en pantalla; SELECT confirma la opción.
+
+La navegación entre pantallas está en [page/navigation_page.c](page/navigation_page.c), y la lectura de los pulsadores está en [drivers/gpio_buttons.c](drivers/gpio_buttons.c). El filtrado básico de clicks y la traducción de pulsaciones a teclas LVGL siguen en `main.c`.
+
+### USB HID / Bad USB
+
+Desde la interfaz se pueden ver y seleccionar scripts, además de activar o desactivar la sesión HID. La idea es que la Raspberry Pi funcione como un dispositivo USB de entrada y ejecute acciones mediante scripts.
+
+Actualmente, [service/hid_service.c](service/hid_service.c) delega la activación en los scripts de [scripts/](scripts/) y en `zv-hid-session.service`. Requiere preparar previamente el gadget USB de Linux; los scripts incluidos conectan y desconectan un gadget ya creado, no lo construyen desde cero.
+
+**La ejecución completa depende de componentes externos al estado actual del repositorio:** la unidad de sesión referencia `scripts/hid_watcher.py`, que no está incluido. También hay rutas locales en el servicio que deben adaptarse a otra instalación y llamadas a `sudo` que necesitan permisos sin interacción.
+
+### Infrarrojo
+
+Permite crear mandos, aprender las señales de sus botones, guardarlas y volver a enviarlas. Por ejemplo, se puede crear un mando de televisión y guardar el botón de encendido para usarlo después desde la pantalla.
+
+El backend implementado utiliza `ir-ctl` y los dispositivos IR de Linux. Las señales se guardan como archivos `.raw` dentro de `data/ir/remotes/<mando>/buttons/`. La aplicación comprueba las capturas y ofrece reintentos cuando no son válidas.
+
+Código principal: [page/ir/](page/ir/) y [service/ir_service.c](service/ir_service.c). Más adelante me gustaría implementar el acceso con `lircdev`, que creo que sería una mejor opción.
+
+### Bluetooth Low Energy (BLE)
+
+Permite buscar dispositivos BLE cercanos, filtrar la lista, ver su nombre, dirección e intensidad de señal y conectarse a los que lo permitan. También se pueden descubrir sus servicios y características GATT para explorar las funciones que ofrece cada dispositivo.
+
+El ESP32 maneja la radio y la Raspberry Pi envía las solicitudes y muestra los resultados. Por ahora se puede escanear, conectar y descubrir servicios, pero todavía no hay una interfaz general para leer o escribir características.
+
+Código principal: [page/bt/](page/bt/) y [service/uart_service.c](service/uart_service.c).
+
+### Sub-GHz
+
+Aquí se puede elegir una frecuencia, capturar una señal, ver sus pulsos en un gráfico y guardar o descartar el resultado. Las señales guardadas aparecen en la pantalla de reproducción, donde también se puede elegir cuántas veces enviarlas.
+
+La interfaz ofrece **315, 380, 381, 433.92, 868 y 915 MHz**. Su uso efectivo depende del firmware y del módulo y la antena instalados. La Raspberry Pi guarda las señales como archivos `.sub` en `data/subghz/signals/`; el ESP32 controla el CC1101 y realiza la captura o transmisión.
+
+La reproducción actual admite señales RAW, es decir, una secuencia de duraciones de pulsos, con un límite de 256 valores. La comunicación envía los datos en partes y espera confirmaciones del ESP32. Esto sigue siendo experimental: guardar una señal no garantiza que pueda reproducirse correctamente en cualquier dispositivo.
+
+Código principal: [page/sub_ghz/](page/sub_ghz/), [service/subghz/](service/subghz/) y el firmware del ESP32.
+
+## Conexiones y pines
+
+En las tablas dejo tanto el número GPIO como el pin físico del conector de 40 pines para facilitar el cableado.
+
+### Raspberry Pi
+
+| Función | GPIO de Raspberry Pi | Pin físico | Conexión |
+|---|---|---|---|
+| Receptor IR | GPIO 5 | 29 | Salida de datos del receptor infrarrojo. |
+| Transmisor IR | GPIO 6 | 31 | Entrada del circuito transmisor infrarrojo. |
+| UART TX | GPIO 12 | 32 | RX del ESP32, GPIO 16. |
+| UART RX | GPIO 13 | 33 | TX del ESP32, GPIO 17. |
+| Tierra UART | GND | 34 | GND del ESP32. |
+| Botón SELECT | GPIO 26 | 37 | Pulsador para confirmar. |
+| Botón NAV | GPIO 21 | 40 | Pulsador para desplazarse. |
+| Tierra para botones | GND | 39 | Referencia común para los pulsadores. |
+
+Los pulsadores se detectan al pasar de nivel alto a bajo: al pulsar deben llevar la entrada a GND. El circuito debe mantener un nivel alto estable al soltarlos; el driver actual no configura una resistencia pull-up por software. Las señales GPIO y UART trabajan a 3.3 V.
+
+En este montaje, el conector de la pantalla SPI y su touch ocupa la zona de los pines físicos 1–26. Se ha dejado esa zona reservada para la pantalla; no significa que todos esos pines transporten datos. Si cambias de pantalla, revisa su distribución antes de reutilizarlos.
+
+Para habilitar IR y la UART utilizada, la configuración de arranque del montaje incluye:
+
+```ini
+dtoverlay=gpio-ir,gpio_pin=5
+dtoverlay=gpio-ir-tx,gpio_pin=6
+dtoverlay=uart5
 ```
-I: Bus=001c Vendor=0000 Product=1ea6 Version=0000
-N: Name="ADS7846 Touchscreen"
-P: Phys=spi0.1/input0
-H: Handlers=mouse0 event4
+
+En Parrot OS se ha usado `/boot/firmware/config.txt`. Tras reiniciar, comprueba los nombres de los dispositivos y ajústalos en `app-config.json`: el montaje actual usa `/dev/lirc0` para transmitir, `/dev/lirc1` para recibir y `/dev/ttyAMA5` para UART. La numeración de los dispositivos puede variar.
+
+USB HID no utiliza un GPIO del conector: usa el puerto USB de datos en modo gadget. Su preparación incluye `dwc2` y la configuración del gadget mediante `configfs`; añadir el overlay por sí solo no completa esa instalación.
+
+### CC1101 conectado al ESP32
+
+El CC1101 se conecta al **ESP32**, no directamente a los GPIO de la Raspberry Pi. Los GPIO de esta tabla corresponden al ESP32:
+
+| Señal del CC1101 | Conexión en ESP32 | Para qué sirve |
+|---|---|---|
+| VCC | 3.3 V | Alimentación. |
+| GND | GND | Tierra común. |
+| SCK | GPIO 14 | Reloj de comunicación SPI. |
+| MOSI | GPIO 13 | Datos hacia el módulo. |
+| MISO / GDO1 | GPIO 25 | Datos desde el módulo. |
+| CSN | GPIO 5 | Selección del módulo en el bus SPI. |
+| GDO0 | GPIO 27 | Señal utilizada para los pulsos de radio. |
+| GDO2 | GPIO 26 | Conexión prevista en la definición del módulo del firmware. |
+
+Estas asignaciones están definidas en `include/zv_spi_bus.h`, `include/zv_subghz.h` e `include/zv_cc1101.h` del proyecto de firmware. Si cambian allí, revisa también el cableado.
+
+## Comunicación con el ESP32
+
+Para comunicar la interfaz con el ESP32 hice un protocolo de texto sencillo que funciona por UART a 115200 baudios. Me sirve para aprender y ver qué mensajes se intercambian entre los dos. Todavía puede cambiar a medida que avance el proyecto.
+
+Cada mensaje ocupa una línea. Algunos son órdenes cortas; otros llevan datos separados por `|`. Por ejemplo:
+
+```text
+SCAN
+CONNECT|AA:BB:CC:DD:EE:FF|0
+DISCOVER
+SUBGHZ_CAPTURE|freq_hz=433920000|timeout_ms=30000
 ```
 
-Aquí el path sería `/dev/input/event4`. La aplicación principal lo
-**autodetecta** vía `detect_touch_event_path()` (busca el `INPUT_PROP_DIRECT`).
+La interfaz pide buscar dispositivos, conectar, descubrir servicios o capturar una señal. El ESP32 devuelve mensajes de inicio, resultados, finalización o error, como `SCAN:START`, `SCAN:DONE` o `CONNECT:OK`.
 
-Para inspección manual:
+El servicio UART recibe las líneas y las entrega al módulo correspondiente. También permite limitar la espera de una respuesta para informar de errores o tiempos agotados. No hace falta conocer todos los campos para usar la aplicación; para modificarlo, las referencias son [service/uart_commands.h](service/uart_commands.h), [service/uart_service.c](service/uart_service.c) y los controladores BLE y Sub-GHz.
 
-```bash
-evtest /dev/input/event4
+## Arquitectura y directorios
+
+Intento organizar el código por responsabilidades. En los módulos principales, la **vista** dibuja la pantalla, el **controlador** coordina las acciones y el **servicio** se comunica con el sistema o el hardware.
+
+Por ejemplo, al reproducir una señal Sub-GHz: la vista recoge la selección, el controlador solicita la reproducción y el servicio lee el archivo y envía sus datos al ESP32. La respuesta recorre el camino de vuelta para actualizar la pantalla.
+
+```text
+                  Raspberry Pi - ZeroVolts UI
+                  ==========================
+                  Vistas (pantallas y componentes)
+                               ^
+                               |
+                               v
+                         Controladores
+                               ^
+                               |
+                               v
+                           Servicios
+                               ^
+                               |
+             +-----------------+-----------------+
+             |                 |                 |
+             v                 v                 v
+         Archivos        Hardware local        UART
+      (configuracion,     (IR y USB HID)         ^
+       mandos, senales)                          |
+                                                 v
+                                               ESP32
+                                                 ^
+                                                 |
+                                      +----------+----------+
+                                      |                     |
+                                      v                     v
+                                     BLE             Sub-GHz (CC1101)
 ```
 
-### 4.2 Calibración
+Las flechas dobles representan las solicitudes y los resultados que actualizan la interfaz. IR y USB HID se gestionan en la Raspberry Pi; BLE y Sub-GHz se gestionan en el ESP32, conectado por UART.
 
-La pantalla actual está rotada 90°, así que usamos `lv_evdev_set_swap_axes(touch, true)`
-y los puntos de calibración se obtuvieron tocando las esquinas con `evtest`:
+Todavía estoy mejorando esta organización. Algunas tareas, como el arranque y la adaptación de los botones a LVGL, siguen en `main.c`.
 
-```c
-lv_evdev_set_calibration(touch, 296, 294, 3931, 3843);
+```text
+zerovolts-ui/
+├── main.c                  # Arranque, pantalla, botones y bucle principal
+├── app_context.[ch]        # Dispositivos BLE y sesiones de captura compartidas
+├── config.[ch]             # Carga, guardado y resolución de rutas
+├── app-config.json         # Configuración local
+├── types.h                 # Tipos y límites comunes
+├── Makefile                # Compilación de la aplicación y ejemplos
+├── drivers/                # Acceso a hardware: gpio_buttons.[ch]
+├── components/             # Controles visuales LVGL reutilizables y tema
+├── page/                   # Pantallas, navegación y controladores
+│   ├── hid/
+│   ├── ir/
+│   ├── bt/
+│   └── sub_ghz/
+├── service/                # Comunicación y operaciones del sistema
+│   ├── hid_service.[ch]
+│   ├── ir_service.[ch]
+│   ├── uart_service.[ch]
+│   ├── uart_commands.h
+│   ├── subghz/              # Captura, archivos y envío de señales
+│   └── ducky_script/        # Intérprete en desarrollo, aún sin integrar
+├── utils/                  # Archivos, cadenas, JSON, logs y errores
+├── assets/                 # Recursos gráficos
+├── data/                   # Scripts, mandos IR, señales Sub-GHz y log
+├── scripts/                # Soporte HID y unidades de systemd
+├── examples/               # Programas de ejemplo y comprobaciones aisladas
+├── tests/                  # Pruebas de navegación, UART y Sub-GHz
+├── docs/                   # Notas y planificación
+├── case/                   # Archivos relacionados con la carcasa
+└── bin/                    # Ejecutables generados
 ```
 
-Esto vive en [main.c:54-62](main.c#L54-L62) y se replica en
-[examples/main_touch_switch.c:141-156](examples/main_touch_switch.c#L141-L156).
+## Configuración y datos
 
----
+[app-config.json](app-config.json) define las rutas de datos y los dispositivos del montaje:
 
-## 5. Ejemplos mínimos
-
-Pequeños programas autocontenidos que usan la misma `liblvgl.a`. Sirven para
-probar partes aisladas sin levantar toda la app.
-
-| Ejemplo | Qué muestra |
+| Sección | Qué configura |
 |---|---|
-| [examples/main_hello_world.c](examples/main_hello_world.c) | Inicialización mínima de LVGL + label centrado en el framebuffer. |
-| [examples/main_touch_calibration.c](examples/main_touch_calibration.c) | Cómo calibrar el touch SPI usando `lv_evdev_set_calibration`. |
-| [examples/main_touch_switch.c](examples/main_touch_switch.c) | Botones LVGL + grupo de foco controlado por dos GPIO físicos (NAV/SELECT) usando `libgpiod`. |
+| `version` | Versión mostrada en la barra superior. |
+| `display` | Framebuffer, actualmente `/dev/fb0`. |
+| `uart` | Puerto del ESP32 y velocidad, actualmente `/dev/ttyAMA5` a 115200. |
+| `hid` | Carpeta de scripts, selección y estado de activación. |
+| `ir` | Carpeta de mandos, backend, dispositivos RX/TX y tiempo de aprendizaje. |
+| `subghz` | Carpeta de señales guardadas. |
 
-Compilar y ejecutar:
+La aplicación busca la configuración un nivel por encima de la carpeta del ejecutable. Las carpetas de mandos IR y scripts HID se resuelven respecto a la raíz del proyecto. La ruta Sub-GHz todavía se usa tal como está configurada: si es relativa, depende del directorio desde el que ejecutes la aplicación. Por eso los comandos de esta guía se ejecutan desde la raíz del repositorio. Mantén la distribución `bin/` junto a `app-config.json` y las carpetas de recursos al mover la instalación.
+
+Los datos del montaje se organizan así:
+
+```text
+data/
+├── badusb/                  # Scripts para la función HID
+├── ir/remotes/
+│   └── <mando>/
+│       ├── meta.json
+│       └── buttons/*.raw
+├── subghz/signals/*.sub     # Capturas de radio guardadas
+└── app-log.log              # Registro de la aplicación
+```
+
+## Ejemplos y pruebas
+
+Incluí algunos ejemplos para probar partes concretas sin tener que abrir toda la interfaz:
+
+| Archivo | Qué permite explorar |
+|---|---|
+| [main_hello_world.c](examples/main_hello_world.c) | Arranque básico de LVGL y texto en pantalla. |
+| [main_touch_calibration.c](examples/main_touch_calibration.c) | Lectura y calibración del touch. |
+| [main_touch_switch.c](examples/main_touch_switch.c) | Navegación con pulsadores GPIO. |
+
+Para compilar y ejecutar el ejemplo básico:
 
 ```bash
 make example NAME=hello_world
 ./bin/example-hello_world
 ```
 
----
+La regla genérica de ejemplos del `Makefile` solo compila el archivo principal, por lo que todavía requiere ajustes para ellos. El ejemplo de pulsadores conserva su propia inicialización GPIO y su configuración de pantalla.
 
-## 6. Funcionalidades implementadas
+## Estado y próximos aprendizajes
 
-Cada módulo sigue el mismo patrón: **vista LVGL → controller (lógica) → service (sistema/hardware)**.
-Ver [§8 Arquitectura](#8-arquitectura-del-proyecto).
+Quiero seguir reuniendo herramientas para explorar dispositivos y señales desde un mismo equipo y aprender cómo funciona cada parte mientras lo construyo. Todavía tengo trabajo pendiente con la captura y reproducción de radio, la integración HID y la organización del código.
 
-### 6.1 USB HID / BadUSB
-
-Aprovecha que el puerto USB-C del Raspberry Pi 4 soporta **modo gadget**: el
-RPi se presenta al host como un teclado/ratón USB y reproduce un script.
-
-#### Pines / hardware
-
-- **Sin GPIO dedicado**: todo ocurre en USB.
-- El Raspberry Pi se conecta al equipo víctima con un cable USB-C.
-- En `/boot/firmware/config.txt` y `/boot/cmdline.txt` debe estar habilitado `dwc2`:
-  ```
-  dtoverlay=dwc2
-  modules-load=dwc2
-  ```
-
-#### Componentes
-
-| Capa | Archivo | Rol |
-|---|---|---|
-| Vista | [page/hid/hid_view.c](page/hid/hid_view.c) | Lista de scripts, switch on/off, label de seleccionado. |
-| Controller | [page/hid/hid_controller.c](page/hid/hid_controller.c) | Persiste el script seleccionado en `app-config.json`, valida estados. |
-| Service | [service/hid_service.c](service/hid_service.c) | Llama a los shell scripts y al servicio systemd. |
-
-#### Scripts y servicios externos
-
-Todos en [scripts/](scripts/):
-
-| Archivo | Función |
-|---|---|
-| [scripts/zv-hid-enable.sh](scripts/zv-hid-enable.sh) | Activa el gadget escribiendo en `/sys/kernel/config/usb_gadget/zerovolts-hid/UDC` el nombre del UDC disponible. |
-| [scripts/zv-hid-disable.sh](scripts/zv-hid-disable.sh) | Desactiva el gadget escribiendo `""` en el mismo `UDC`. |
-| [scripts/zv-hid-session.service](scripts/zv-hid-session.service) | Unidad systemd que ejecuta `hid_watcher.py` en background; detecta cuándo el host conecta y dispara el script seleccionado. |
-
-> El gadget USB (`configfs`) se configura **una sola vez** en arranque
-> (vendor/product, descriptor HID, etc.). Los scripts solo conectan/desconectan
-> el bind con el UDC.
-
-#### Flujo del toggle ON/OFF
-
-```
-hid_view  →  hid_controller_toggle(true)
-                ├─ hid_service_enable()         → sudo zv-hid-enable.sh
-                ├─ hid_service_start_session()  → sudo systemctl start zv-hid-session.service
-                └─ guarda script seleccionado en app-config.json
-```
-
-#### Ubicación de los payloads
-
-Configurado en `app-config.json`:
-
-```json
-"hid": {
-  "script_list_path": "data/badusb/",
-  "script_selected_path": "",
-  "is_enabled": false
-}
-```
-
-> Requiere `sudo` sin password para los scripts (ver `/etc/sudoers.d/`),
-> ya que se invocan desde el binario sin sesión interactiva.
-
----
-
-### 6.2 Infrarrojo (IR)
-
-Captura señales de mandos IR (TV, ventilador, aire acondicionado, etc.) y las
-re-emite. Sirve para entender modulación IR, codificación pulso/espacio y el
-subsistema **CIR (Consumer IR)** del kernel Linux.
-
-#### Pines / hardware
-
-| Función | GPIO | Pin físico | Device tree overlay |
-|---|---|---|---|
-| IR RX (receptor) | GPIO 5 | 29 | `dtoverlay=gpio-ir,gpio_pin=5` |
-| IR TX (transmisor) | GPIO 6 | 31 | `dtoverlay=gpio-ir-tx,gpio_pin=6` |
-
-Esto debe ir en `/boot/firmware/config.txt`. Tras un reboot aparecen `/dev/lirc0` (TX)
-y `/dev/lirc1` (RX).
-
-#### Componentes
-
-| Capa | Archivo | Rol |
-|---|---|---|
-| Vista (hub) | [page/ir/ir.c](page/ir/ir.c) | Página principal IR. |
-| Vistas | [page/ir/remotes.c](page/ir/remotes.c), [page/ir/new_remote.c](page/ir/new_remote.c), [page/ir/learn_button.c](page/ir/learn_button.c), [page/ir/send_signal.c](page/ir/send_signal.c) | Listar mandos, crear mando, aprender botón, enviar señal. |
-| Controller | [page/ir/ir_controller.c](page/ir/ir_controller.c) | Crea estructura de directorios, sanitiza nombres, gestiona reintentos de captura. |
-| Helper | [page/ir/ir_raw_helper.c](page/ir/ir_raw_helper.c) | Validación del archivo `.raw`, normalización de capturas con número impar de tokens. |
-| Service | [service/ir_service.c](service/ir_service.c) | Wrapper sobre `ir-ctl` (`v4l-utils`). |
-
-#### Backend
-
-Hoy solo está implementado el backend **`irctl`** (configurable en `app-config.json`).
-El backend `lircdev` está stubbed (`IR_ERR_UNSUPPORTED`).
-
-Comandos reales lanzados:
-
-```bash
-# Aprender (RX)
-timeout <N>s ir-ctl -r -d '/dev/lirc1' > '<button>.raw.tmp'
-
-# Enviar (TX)
-timeout 3s ir-ctl -d '/dev/lirc0' -s '<button>.raw'
-```
-
-#### Estructura en disco
-
-```
-data/ir/remotes/
-└── <remote_name>/
-    ├── meta.json
-    └── buttons/
-        ├── on.raw
-        ├── off.raw
-        └── ...
-```
-
-Path raíz configurable en `app-config.json` → `ir.remotes_path`.
-
-#### Formato del archivo `.raw`
-
-Lo escribe `ir-ctl` directamente; nosotros solo validamos:
-
-- Tokens con signo, alternando pulso/espacio: `+1270 -397 +1279 -396 ...`
-- Cantidad mínima: `IR_RAW_MIN_TOKENS` (160).
-- Cantidad **par** (cada pulso debe llevar su gap).
-
-#### Detalle interesante: capturas con tokens impares
-
-A veces `ir-ctl` corta justo después de un pulso `+...` sin emitir el `-...`
-final. Para no descartar la captura, [ir_raw_helper.c](page/ir/ir_raw_helper.c)
-añade un **gap sintético** (`-20000`) y revalida. Si pasa, se acepta.
-
-Si la captura sigue inválida, los intentos fallidos quedan en disco para
-diagnóstico:
-
-```
-<button>.raw.invalid1
-<button>.raw.invalid2
-<button>.raw.invalid3
-```
-
-Útiles para comparar contra un `.raw` que sí funciona:
-
-```bash
-REMOTES_PATH="data/ir/remotes"
-wc -w "$REMOTES_PATH/<remote>/buttons/off.raw" \
-      "$REMOTES_PATH/<remote>/buttons/<button>.raw.invalid1"
-```
-
----
-
-### 6.3 Bluetooth Low Energy (BLE)
-
-Escaneo de dispositivos BLE cercanos, conexión y enumeración de **servicios y
-características GATT**. La parte de radio NO la hace el RPi: la hace un
-**ESP32** que actúa como módulo BLE dedicado y se comunica por **UART**.
-
-Ventajas principales:
-- Menor acoplamiento entre UI y hardware.
-- Mejor testabilidad de la logica sin depender de dispositivos reales.
-- Más facilidad para cambiar backends sin tocar las vistas.
-- Mantenimiento más simple cuando crece el proyecto.
-
-- Aprender a comunicar dos sistemas distintos (RPi ↔ MCU).
-- Aprender el stack **Bluedroid** de ESP-IDF.
-- Aislar la radio en hardware dedicado, sin pelearse con BlueZ.
-- Liberar al RPi para la UI y el resto de funcionalidades.
-
-#### Pines / hardware (UART)
-
-| RPi | ESP32 | Función |
-|---|---|---|
-| GPIO 12 (Pin 32) — TX | GPIO 16 — RX | RPi → ESP32 |
-| GPIO 13 (Pin 33) — RX | GPIO 17 — TX | ESP32 → RPi |
-| GND (Pin 34) | GND | Referencia común |
-
-En `/boot/firmware/config.txt`:
-
-```
-dtoverlay=uart5
-```
-
-Tras reiniciar aparece `/dev/ttyAMA5` (configurado en `app-config.json` →
-`uart.device`). Velocidad: **115200 baudios**.
-
-#### Componentes en el RPi (este repo)
-
-| Capa | Archivo | Rol |
-|---|---|---|
-| Vistas | [page/bt/bt_view.c](page/bt/bt_view.c), [page/bt/bt_scanner.c](page/bt/bt_scanner.c), [page/bt/bt_device_detail.c](page/bt/bt_device_detail.c) | Hub, lista de scan con filtro (All/Near/Connectable), detalle del dispositivo con servicios y propiedades. |
-| Controller | [page/bt/bt_controller.c](page/bt/bt_controller.c) | Parser del protocolo, máquina de estados de conexión, almacén de servicios y características. |
-| UUID registry | [page/bt/bt_uuid_registry.c](page/bt/bt_uuid_registry.c) | Mapeo de UUID estándar 16-bit a nombres legibles (Battery, HID, GAP, …). |
-| Service | [service/uart_service.c](service/uart_service.c) | Apertura no-bloqueante del puerto, parser línea-a-línea, despacho a callbacks por **tag**. |
-| Constantes | [service/uart_commands.h](service/uart_commands.h) | Strings del protocolo (REQ/RES). |
-| Contexto | [app_context.c](app_context.c) | Almacén de dispositivos descubiertos persistente entre pantallas. |
-
-#### Componentes en el ESP32 (repo aparte)
-
-Firmware: [`zerovolts_firmware`](../zerovolts_firmware/), construido con **PlatformIO + ESP-IDF**.
-Stack: **Bluedroid**. Capas:
-
-- `zv_bt_gap.c` → GAP (escaneo, parsing de advertising data, fabricantes).
-- `zv_bt_gattc.c` → GATT Client (MTU, services, characteristics).
-- `zv_uart.c` → mismo protocolo de texto que se documenta abajo.
-
-#### Protocolo UART (inventado para este proyecto)
-
-**Transporte:** texto plano, una línea por mensaje (`\n` como delimitador).
-El UI envía comandos sin newline; el `uart_service` añade el `\n` final.
-El ESP32 acumula bytes hasta encontrar `\n`.
-
-**Formato general:**
-
-```
-TIPO[:SUBTIPO][|key=value|key=value|...]
-```
-
-- Separador de campos clave-valor: `|`
-- Separador `key`/`value`: `=`
-- Algunos comandos request usan `|` posicionalmente: `CONNECT|<MAC>|<addr_type>`
-
-##### Comandos (RPi → ESP32)
-
-| Comando | Significado |
-|---|---|
-| `SCAN` | Iniciar escaneo BLE. |
-| `CONNECT|<mac>|<addr_type>` | Conectar a un dispositivo (`addr_type` 0=public, 1=random). |
-| `DISCONNECT` | Cerrar la conexión activa. |
-| `DISCOVER` | Enumerar servicios y características del dispositivo conectado. |
-
-##### Respuestas / eventos (ESP32 → RPi)
-
-**Scan:**
-
-```
-SCAN:START
-SCAN:DEVICE|name=Mi Banda|mac=AA:BB:CC:DD:EE:FF|rssi=-67|manufacturer=Xiaomi|service=...|appearance=Watch|connectable=1|addr_type=1
-SCAN:DEVICE|...
-SCAN:DONE
-```
-
-**Connect:**
-
-```
-CONNECT:START
-CONNECT:OK
-CONNECT:FAIL|reason=timeout
-CONNECT:LOST|reason=...
-CONNECT:ERROR
-DISCONNECT:OK
-```
-
-**Discover:**
-
-```
-DISCOVER:START
-DISCOVER:SERVICE|svc=0|uuid=00001800-0000-1000-8000-00805f9b34fb
-DISCOVER:CHAR|svc=0|char=0|uuid=00002a00-0000-1000-8000-00805f9b34fb|props=0x02|handle=3
-DISCOVER:CHAR|svc=0|char=1|uuid=...|props=0x0a|handle=5
-DISCOVER:SERVICE|svc=1|uuid=...
-...
-DISCOVER:DONE
-DISCOVER:FAIL|reason=...
-```
-
-`props` es el bitmask GATT estándar (`ESP_GATT_CHAR_PROP_BIT_*`):
-`READ=0x02`, `WRITE_NR=0x04`, `WRITE=0x08`, `NOTIFY=0x10`, `INDICATE=0x20`.
-La UI lo dibuja como pills en [bt_device_detail.c:47-54](page/bt/bt_device_detail.c#L47-L54).
-
-#### Bus de eventos sobre UART
-
-El service expone un sistema de **suscripción por tag** ([service/uart_service.c](service/uart_service.c)):
-
-```c
-add_event_callback(my_handler, "BT_TAG_CONTROLLER");
-```
-
-`uart_process_loop()` se llama desde el loop principal en [main.c:344](main.c#L344);
-cada línea recibida se reparte a todos los handlers registrados, que filtran por
-prefijo (`SCAN:`, `CONNECT:`, `DISCOVER:`).
-
-#### Límites actuales
-
-Definidos en [types.h](types.h):
-
-- `BT_ALLOWED_MAX_DEVICES = 20`
-- `BT_MAX_SERVICES = 20`
-- `BT_MAX_CHARS_PER_SERVICE = 16`
-
----
-
-## 7. Mapa de GPIO
-
-Header de 40 pines del Raspberry Pi 4. Los pines 1-26 los reserva la pantalla
-SPI + touch, así que todos los periféricos nuevos viven del 27 hacia adelante.
-
-```
-     3.3V  [ 1] [ 2]  5V
-    GPIO2  [ 3] [ 4]  5V
-    GPIO3  [ 5] [ 6]  GND
-    GPIO4  [ 7] [ 8]  GPIO14    ─┐
-      GND  [ 9] [10]  GPIO15     │
-   GPIO17  [11] [12]  GPIO18     │
-   GPIO27  [13] [14]  GND        │  Reservados por la
-   GPIO22  [15] [16]  GPIO23     │  pantalla SPI + touch
-     3.3V  [17] [18]  GPIO24     │
-   GPIO10  [19] [20]  GND        │
-    GPIO9  [21] [22]  GPIO25     │
-   GPIO11  [23] [24]  GPIO8      │
-      GND  [25] [26]  GPIO7     ─┘
-    GPIO0  [27] [28]  GPIO1
-🟠 GPIO5   [29] [30]  GND          ← IR RX  (gpio-ir,    /dev/lirc1)
-🟠 GPIO6   [31] [32]  GPIO12 🔵    ← IR TX  (gpio-ir-tx, /dev/lirc0)  /  UART5 TX → ESP32 RX
-🔵 GPIO13  [33] [34]  GND          ← UART5 RX ← ESP32 TX
-   GPIO19  [35] [36]  GPIO16
-🟢 GPIO26  [37] [38]  GPIO20       ← Botón SELECT (enter)
-      GND  [39] [40]  GPIO21 🟢    ← Botón NAV (mover foco)
-```
-
-**Leyenda:**
-- 🟠 IR  · 🔵 UART (ESP32) · 🟢 Botones físicos
-
-`/boot/firmware/config.txt` mínimo para activar todo:
-
-```
-dtoverlay=gpio-ir,gpio_pin=5
-dtoverlay=gpio-ir-tx,gpio_pin=6
-dtoverlay=uart5
-dtoverlay=dwc2          # para el HID gadget
-```
-
----
-
-## 8. Arquitectura del proyecto
-
-Tres capas estrictas, una por funcionalidad:
-
-- **view** → pantallas LVGL, eventos de UI, formato de strings.
-- **controller** → reglas de negocio, validaciones, máquina de estados, sanitización de paths.
-- **service** → I/O con sistema operativo / hardware (`ir-ctl`, `systemctl`, UART, filesystem).
-
-Ventajas que ya se notan:
-
-- Cambiar el backend de IR (`irctl` → `lircdev`) no toca la UI.
-- Sustituir el ESP32 por otro transporte (TCP, USB) solo afectaría a `uart_service`.
-- Los controllers se pueden probar sin pantalla.
-
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                              main.c                              │
-│        init LVGL + config + IR + UART + nav GPIO + bucle         │
-└──────────┬───────────────┬───────────────┬───────────────────────┘
-           │               │               │
-   ┌───────▼─────┐ ┌───────▼─────┐ ┌───────▼─────┐
-   │     HID     │ │      IR     │ │     BLE     │
-   └─────┬───────┘ └─────┬───────┘ └─────┬───────┘
-         │               │               │
-   ┌─────▼─────────┐ ┌───▼─────────┐ ┌───▼──────────────┐
-   │ page/hid/     │ │ page/ir/    │ │ page/bt/         │
-   │  view, ctrl   │ │ view, ctrl  │ │  view, ctrl      │
-   └─────┬─────────┘ └───┬─────────┘ └───┬──────────────┘
-         │               │               │
-   ┌─────▼─────────┐ ┌───▼─────────┐ ┌───▼──────────────┐
-   │ hid_service   │ │ ir_service  │ │ uart_service     │
-   │ scripts +     │ │ ir-ctl +    │ │ termios + bus de │
-   │ systemctl     │ │ filesystem  │ │ eventos por tag  │
-   └───────────────┘ └─────────────┘ └────┬─────────────┘
-                                          │ UART 115200 8N1
-                                  ┌───────▼────────────┐
-                                  │   ESP32 firmware   │
-                                  │  (Bluedroid stack) │
-                                  └────────────────────┘
-```
-
-#### Flujo de datos típico
-
-```
-Evento UI (touch o GPIO)
-  └─> Controller (valida + decide)
-        └─> Service (I/O al hardware o al SO)
-              └─> Resultado / evento asíncrono
-                    └─> Controller (actualiza estado)
-                          └─> View (refresca LVGL)
-```
-
-#### Contexto de aplicación
-
-[app_context.c](app_context.c) mantiene estado **compartido entre pantallas**
-(p. ej. lista de dispositivos BLE escaneados, dispositivo seleccionado para
-ver detalles). Evita re-pedir datos cuando navegas entre páginas.
-
-#### Navegación con botones físicos
-
-[components/nav.c](components/nav.c) + el `keypad_read` en [main.c:125-173](main.c#L125-L173)
-inyectan eventos `LV_KEY_*` en el grupo focal de LVGL leyendo los GPIO 21
-(NAV) y 26 (SELECT) con `libgpiod`. La interpretación cambia según el widget
-focado (ej.: en un dropdown abierto, NAV envía `LV_KEY_DOWN`).
-
----
-
-## 9. Configuración (app-config.json)
-
-Archivo cargado al arrancar (ver [main.c:65-87](main.c#L65-L87)). Las rutas
-relativas se resuelven contra el directorio del binario.
-
-```json
-{
-  "version": "0.3",
-  "hid": {
-    "script_selected_path": "",
-    "script_list_path": "data/badusb/",
-    "is_enabled": false
-  },
-  "ir": {
-    "remotes_path": "data/ir/remotes/",
-    "backend": "irctl",
-    "tx_device": "/dev/lirc0",
-    "rx_device": "/dev/lirc1",
-    "learn_timeout_ms": 5000,
-    "use_on_screen_keyboard": true
-  },
-  "display": {
-    "fb_device": "/dev/fb0"
-  },
-  "uart": {
-    "device": "/dev/ttyAMA5",
-    "baudrate": 115200
-  }
-}
-```
-
----
-
-## 10. Estructura de directorios
-
-```
-zerovolts-ui/
-├── main.c                       # Init LVGL/IR/UART, navegación, bucle principal
-├── config.[ch]                  # Carga/guardado de app-config.json
-├── app_context.[ch]             # Estado global compartido entre pantallas
-├── types.h                      # Tipos comunes (device_t, bt_service_t, …)
-├── Makefile                     # App + ejemplos
-├── app-config.json
-│
-├── components/                  # Widgets LVGL reutilizables
-│   ├── top_bar.* / nav.*
-│   ├── list/ui_list.*
-│   ├── ui_pills.* / ui_loading_btn.* / ui_info_panel.*
-│   ├── ui_theme.h               # Colores y tipografía
-│   └── component_helper.*
-│
-├── page/                        # Pantallas + controllers (capas view/controller)
-│   ├── base_view.*              # Tipo base de pantalla
-│   ├── home_view.*              # Hub principal
-│   ├── hid/                     # BadUSB
-│   ├── ir/                      # Mandos IR
-│   └── bt/                      # BLE scanner + detalle
-│
-├── service/                     # Capa hardware / SO
-│   ├── hid_service.*            # configfs + scripts + systemctl
-│   ├── ir_service.*             # ir-ctl
-│   ├── uart_service.*           # termios + bus de eventos
-│   └── uart_commands.h          # Constantes del protocolo BLE
-│
-├── utils/                       # Utilidades transversales
-│   ├── cJSON.*                  # JSON
-│   ├── file.*                   # FS helpers
-│   ├── string_utils.*           # Sanitización, prefijos, etc.
-│   ├── logger.* / error_handler.*
-│
-├── scripts/                     # Scripts de soporte (HID gadget)
-│   ├── zv-hid-enable.sh
-│   ├── zv-hid-disable.sh
-│   └── zv-hid-session.service
-│
-├── examples/                    # Programas mínimos sobre la misma liblvgl.a
-│   ├── main_hello_world.c
-│   ├── main_touch_calibration.c
-│   └── main_touch_switch.c
-│
-├── data/                        # Assets, iconos, mandos IR, scripts BadUSB
-│   ├── assets/  icons/
-│   └── (en runtime) ir/remotes/<name>/buttons/*.raw
-│
-├── docs/                        # Documentación interna y planificación
-│   ├── GPIO_PINOUT.md
-│   ├── ESP32_MODULO_PASO_A_PASO.md
-│   ├── BLUETOOTH_COMUNICACION_PASO_A_PASO.md
-│   └── ...
-│
-└── bin/                         # Binarios generados
-```
-
----
-
-## Notas finales
-
-- El proyecto **depende** de un repo hermano para el firmware del ESP32:
-  [`zerovolts_firmware`](../zerovolts_firmware/). Sin ese ESP32 flasheado, la
-  pantalla BLE no recibe respuestas (pero la app sigue funcionando).
-- Hay un `gpio_buttons.c` referenciado desde el `Makefile` que vive **fuera**
-  del repo (`../tactile_switch/`). Es el wrapper sobre `libgpiod` reutilizado
-  por `main.c` y por el ejemplo `touch_switch`.
-- El `/etc/sudoers.d/` debe permitir ejecutar los scripts de HID y `systemctl`
-  sin contraseña, ya que se invocan desde código no-interactivo.
+La configuración que aparece aquí corresponde a mi montaje. Si usas otra pantalla, una versión diferente de LVGL o cambias el firmware, puede que tengas que adaptar algunas cosas.

@@ -9,7 +9,7 @@
 #include "lv_linux_fbdev.h"
 #include "lv_evdev.h"
 
-#include "gpio_buttons.h"
+#include "drivers/gpio_buttons.h"
 
 #include "components/top_bar.h"
 #include "components/ui_theme.h"

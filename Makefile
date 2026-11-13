@@ -56,7 +56,6 @@ SRC := \
 
 INCLUDES := \
 	-I. \
-	-I../tactile_switch \
 	-I$(LVPORT)/lvgl \
 	-I$(LVPORT)/lvgl/src/drivers/display/fb \
 	-I$(LVPORT)/lvgl/src/drivers/evdev \
@@ -93,12 +92,3 @@ clean:
 
 run: $(APP_TARGET)
 	./$(APP_TARGET)
-
-# Uses real LVGL with UART mocked by the test; no display or GPIO required.
-NAV_TEST_SRC := $(filter-out main.c service/uart_service.c ../tactile_switch/gpio_buttons.c,$(SRC))
-.PHONY: test-navigation
-test-navigation: setup bin/navigation-test
-	./bin/navigation-test
-
-bin/navigation-test: tests/navigation_test.cpp $(NAV_TEST_SRC)
-	$(CC) tests/navigation_test.cpp $(NAV_TEST_SRC) -o $@ $(CFLAGS) $(INCLUDES) $(LIBS) -lm -lpthread
