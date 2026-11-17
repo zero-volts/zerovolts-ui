@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
-# MUST be run as root
-
+set -euo pipefail
 GADGET_DIR=/sys/kernel/config/usb_gadget/zerovolts-hid
 UDC_NAME=$(ls /sys/class/udc)
-echo "$UDC_NAME" > "$GADGET_DIR/UDC"
-
-echo "Script enabled"
+printf '%s\n' "$UDC_NAME" > "$GADGET_DIR/UDC"

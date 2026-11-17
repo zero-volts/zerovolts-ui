@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-# MUST be run as root
-
+set -euo pipefail
 GADGET_DIR=/sys/kernel/config/usb_gadget/zerovolts-hid
-echo "" > "$GADGET_DIR/UDC"
-
-echo "Script disabled"
+printf '\n' > "$GADGET_DIR/UDC"
