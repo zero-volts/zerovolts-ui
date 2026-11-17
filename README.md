@@ -1,134 +1,302 @@
 # ZeroVolts UI
 
-ZeroVolts UI es un proyecto personal que estoy desarrollando en C con LVGL, usando una Raspberry Pi 4 con Parrot OS.
+ZeroVolts es un proyecto personal con el que quiero construir una herramienta portátil para experimentar con infrarrojo, Bluetooth Low Energy, USB HID y señales Sub-GHz desde una misma pantalla. Desarrollo la interfaz en C con LVGL, sobre una Raspberry Pi 4 con Parrot OS, y uso un ESP32 como coprocesador para BLE y radio.
 
-La idea es hacer una herramienta portátil con pantalla, botones y varios módulos para experimentar con señales de radio y otros dispositivos. Por ahora estoy trabajando con infrarrojo, Bluetooth Low Energy, USB HID y Sub-GHz. De paso, voy aprendiendo electrónica, programación y cómo juntar todo en una misma interfaz.
-
-El proyecto sigue en desarrollo, así que la estructura, el protocolo y las funciones pueden cambiar. Algunas cosas ya se pueden usar y otras todavía están en pruebas o necesitan más trabajo.
+El proyecto me sirve para aprender C, electrónica, interfaces gráficas, comunicación entre dispositivos y organización del software por responsabilidades. Quiero entender el recorrido completo de una acción: desde pulsar un botón hasta controlar el hardware, recibir un resultado y guardarlo. El montaje sigue en desarrollo; las funciones de radio y su compatibilidad física todavía son experimentales.
 
 ## Contenido
 
-- [Hardware y funcionamiento general](#hardware-y-funcionamiento-general)
-- [Preparación: compilar LVGL primero](#preparación-compilar-lvgl-primero)
-- [Compilar y ejecutar ZeroVolts UI](#compilar-y-ejecutar-zerovolts-ui)
-- [Funciones actuales](#funciones-actuales)
-- [Conexiones y pines](#conexiones-y-pines)
-- [Comunicación con el ESP32](#comunicación-con-el-esp32)
-- [Arquitectura y directorios](#arquitectura-y-directorios)
-- [Configuración y datos](#configuración-y-datos)
-- [Ejemplos y pruebas](#ejemplos-y-pruebas)
-- [Estado y próximos aprendizajes](#estado-y-próximos-aprendizajes)
+- [Hardware y conexiones](#hardware-y-conexiones)
+  - [Pines GPIO de la Raspberry Pi](#pines-gpio-de-la-raspberry-pi)
+  - [CC1101 conectado al ESP32](#cc1101-conectado-al-esp32)
+- [Entorno de desarrollo](#entorno-de-desarrollo)
+- [Instalación y configuración](#instalación-y-configuración)
+  - [Flujo de servicios HID](#flujo-de-servicios-hid)
+- [Compilar y ejecutar la aplicación](#compilar-y-ejecutar-la-aplicación)
+- [Arquitectura del sistema](#arquitectura-del-sistema)
+  - [Comunicación UART con el ESP32](#comunicación-uart-con-el-esp32)
+- [Funciones implementadas](#funciones-implementadas)
 
-## Hardware y funcionamiento general
+## Hardware y conexiones
 
-La Raspberry Pi se encarga de la interfaz y de los archivos. El ESP32 maneja BLE y el módulo CC1101 para Sub-GHz. Los dos se comunican por UART.
+| Elemento | Uso en el montaje |
+|---|---|
+| Raspberry Pi 4 con Parrot OS | Interfaz, archivos, infrarrojo y USB HID. |
+| Pantalla SPI táctil de 320 × 240 | Salida por framebuffer y entrada táctil mediante evdev; el touch se identifica como ADS7846. |
+| Dos pulsadores | NAV para mover el foco y SELECT para confirmar. |
+| Receptor y circuito transmisor IR | Aprender y enviar señales de mandos. |
+| ESP32 DevKit | Escaneo/conexión BLE y control del CC1101; enlace UART con la Raspberry. |
+| CC1101 y antena | Captura y reproducción experimental de pulsos Sub-GHz. |
+| Puerto USB-C de datos de la Raspberry | Conexión al host como teclado HID. Requiere cable de datos y alimentación suficiente para el montaje. |
+
+El firmware se mantiene en [zerovolts_firmware](../zerovolts_firmware/README.md). Debe compilarse y cargarse en el ESP32 para utilizar BLE y Sub-GHz.
+
+### Pines GPIO de la Raspberry Pi
+
+Los números GPIO son BCM; la columna «Pin físico» corresponde al conector de 40 pines.
+
+| Función | GPIO | Pin físico | Conexión |
+|---|---|---|---|
+| Receptor IR | 5 | 29 | Salida del receptor. |
+| Transmisor IR | 6 | 31 | Entrada del circuito transmisor. |
+| UART TX | 12 | 32 | RX del ESP32, GPIO 16. |
+| UART RX | 13 | 33 | TX del ESP32, GPIO 17. |
+| Tierra UART | GND | 34 | Tierra del ESP32. |
+| SELECT | 26 | 37 | Pulsador hacia GND. |
+| NAV | 21 | 40 | Pulsador hacia GND. |
+| Tierra de botones | GND | 39 | Referencia común. |
+
+Los botones son activos en bajo: al pulsar llevan la entrada a GND. Sus pull-up se configuran durante el arranque. GPIO y UART usan niveles de 3,3 V. En este montaje el conector de pantalla ocupa la zona de pines físicos 1–26, aunque no todos se utilizan eléctricamente; revisa su pinout antes de reutilizarlos.
+
+### CC1101 conectado al ESP32
+
+| Señal CC1101 | Conexión ESP32 | Uso |
+|---|---|---|
+| VCC / GND | 3,3 V / GND | Alimentación y tierra. |
+| SCK | GPIO 14 | Reloj SPI. |
+| MOSI | GPIO 13 | Datos hacia el módulo. |
+| MISO / GDO1 | GPIO 25 | Datos desde el módulo. |
+| CSN | GPIO 5 | Selección SPI. |
+| GDO0 | GPIO 27 | Pulsos de radio. |
+| GDO2 | GPIO 26 | Conexión prevista en el firmware. |
+
+Estas asignaciones están definidas en los headers del firmware. Si las cambias, adapta también el cableado.
+
+El enlace entre las dos placas cruza TX y RX y comparte tierra:
 
 ```text
-Pantalla táctil + botones
-           │
-     Raspberry Pi
-      ZeroVolts UI
-       ├── Infrarrojo RX/TX
-       ├── USB HID
-       └── UART ── ESP32
-                     ├── Bluetooth Low Energy
-                     └── SPI ── CC1101 (Sub-GHz)
+Raspberry Pi                         ESP32
+GPIO 12 / TX (pin físico 32) -------> GPIO 16 / RX
+GPIO 13 / RX (pin físico 33) <------- GPIO 17 / TX
+GND          (pin físico 34) -------- GND
 ```
 
-| Elemento | Uso actual |
+Los GPIO de cada tabla pertenecen a su placa: por ejemplo, el GPIO 13 de la Raspberry es UART RX y el GPIO 13 del ESP32 es MOSI del CC1101. NAV y SELECT se conectan entre su GPIO y GND; `gpio=21=pu` y `gpio=26=pu` mantienen el nivel alto cuando están sueltos.
+
+
+## Entorno de desarrollo
+
+Versiones registradas en la instalación actual; sirven como referencia para reproducir el entorno:
+
+| Componente | Versión |
 |---|---|
-| Raspberry Pi 4 con Parrot OS | Ejecuta la aplicación y guarda configuración, mandos y señales. |
-| Pantalla SPI touch de 320 × 240 | Interfaz LVGL mediante framebuffer y entrada táctil mediante `evdev`; el montaje actual usa ADS7846 para el touch. |
-| Dos pulsadores físicos | NAV para desplazarse y SELECT para seleccionar. |
-| Receptor y transmisor IR | Aprender botones de mandos y volver a enviar sus señales. |
-| ESP32 DevKit | Ejecuta el firmware de BLE y Sub-GHz y responde por UART. |
-| CC1101 conectado al ESP32 | Captura y retransmisión experimental de señales de radio. |
-| Conexión USB de datos de la Raspberry Pi | Función USB HID mediante el modo gadget de Linux. |
+| Sistema | Parrot Security 6.4 (lorikeet), ARM64 |
+| Kernel | `6.12.93+rpt-rpi-v8` |
+| GCC | `12.2.0` (Debian `12.2.0-14+deb12u1`) |
+| Make / CMake | `4.3` / `3.25.1` |
+| Python | `3.11.2` |
+| libgpiod / libevdev | `1.6.3` / `1.13.0` |
+| ir-ctl | `1.22.1` |
+| LVGL | `9.4.0` en las cabeceras locales |
 
-El firmware del ESP32 se mantiene en otro proyecto: [`zerovolts_firmware`](../zerovolts_firmware/).
+El ESP32 usa PlatformIO Core `6.2.0`, plataforma `espressif32 6.12.0`, ESP-IDF `5.5.0` y GCC Xtensa `14.2.0`. Su preparación se explica en el [README del firmware](../zerovolts_firmware/README.md#entorno-de-desarrollo-actual).
 
-## Preparación: compilar LVGL primero
+## Instalación y configuración
 
-**Antes de compilar la aplicación, hay que compilar LVGL.** El `Makefile` usa la biblioteca externa `liblvgl.a`; al ejecutar `make` en este proyecto, LVGL no se descarga ni se compila automáticamente.
+El orden de preparación es: dependencias y LVGL → configuración de arranque → configuración de la aplicación → servicios → compilación y ejecución. Los pasos siguientes corresponden al montaje descrito; adapta dispositivos y pantalla si tu hardware es diferente.
 
-Para descargar y compilar LVGL y preparar la pantalla, sigue el [tutorial de LVGL para Raspberry Pi](https://zerovolts-site.pages.dev/meta/03-lvgl-raspberry/#2-herramientas-necesarias-y-descarga-de-lvgl). Más abajo dejo las versiones y los ajustes que uso en ZeroVolts UI.
+### 1. Dependencias y compilación de LVGL
 
-### Dependencias
-
-Estas son las dependencias que uso en mi instalación:
+Instala las herramientas en la Raspberry:
 
 ```bash
-sudo apt install build-essential cmake git python3 pkg-config libevdev-dev libgpiod-dev v4l-utils evtest
+sudo apt update
+sudo apt install build-essential cmake git python3 pkg-config libevdev-dev libgpiod-dev v4l-utils evtest sudo kmod udev util-linux xxd bsdextrautils
 ```
 
-`libevdev` permite trabajar con la entrada táctil; `libgpiod`, con los pulsadores; e `ir-ctl`, incluido en `v4l-utils`, se usa para infrarrojo. El driver actual de botones utiliza la API de **libgpiod 1.x**; una instalación con la API 2.x requiere adaptar ese driver.
+`libgpiod` controla los botones, `libevdev` da soporte a la entrada y `v4l-utils` incluye `ir-ctl`. El driver de botones usa la API de **libgpiod 1.x**; usar la 2.x requiere adaptarlo.
 
-### Versiones del entorno actual
+**Compila LVGL antes de la UI.** El Makefile enlaza una biblioteca externa y no descarga ni construye LVGL. Sigue el [tutorial de instalación y compilación de LVGL para Raspberry Pi](https://zerovolts-site.pages.dev/meta/03-lvgl-raspberry/#2-herramientas-necesarias-y-descarga-de-lvgl) para descargar el port y preparar su entorno.
 
-Estas son las versiones que tengo instaladas. Las dejo como referencia. El proyecto usa LVGL 9.
-
-| Componente | Versión o revisión observada |
-|---|---|
-| Sistema operativo | Parrot Security 6.4 (lorikeet), ARM64 (`aarch64`) |
-| Kernel Linux | `6.12.93+rpt-rpi-v8` |
-| GCC del host | `12.2.0`, paquete Debian `12.2.0-14+deb12u1` |
-| GNU Make | `4.3` |
-| CMake del sistema | `3.25.1` |
-| Python | `3.11.2` |
-| libgpiod | `1.6.3` |
-| libevdev | `1.13.0` |
-| ir-ctl | `1.22.1` |
-| LVGL | `9.4.0` |
-
-El ESP32 usa PlatformIO Core **6.2.0**, plataforma **espressif32 6.12.0**, **ESP-IDF 5.5.0** y GCC Xtensa **14.2.0**. Las versiones y la configuración del coprocesador se detallan en el [README del firmware](../zerovolts_firmware/README.md#entorno-de-desarrollo-actual).
-
-### Configuración de LVGL usada por la aplicación
-
-El Makefile usa actualmente la configuración generada en `~/git/lv_port_linux/build/lv_conf.h`. Estos son los ajustes que necesita la aplicación:
-
-| Opción | Valor actual |
-|---|---|
-| `LV_COLOR_DEPTH` | `16` |
-| `LV_USE_LINUX_FBDEV` | `1` |
-| `LV_LINUX_FBDEV_RENDER_MODE` | `LV_DISPLAY_RENDER_MODE_DIRECT` |
-| `LV_LINUX_FBDEV_BUFFER_COUNT` | `2` |
-| `LV_USE_EVDEV` | `1` |
-| `LV_USE_FS_STDIO` | `1` |
-| `LV_FS_STDIO_LETTER` | `'A'` |
-| `LV_FS_STDIO_PATH` | `""` |
-| `LV_USE_LODEPNG` | `1` |
-| `LV_FONT_MONTSERRAT_10`, `LV_FONT_MONTSERRAT_12`, `LV_FONT_MONTSERRAT_14` | `1` |
-| `LV_FONT_DEFAULT` | `&lv_font_montserrat_14` |
-| `LV_USE_OS` | `LV_OS_NONE` |
-| `LV_USE_STDLIB_MALLOC` | `LV_STDLIB_CLIB` |
-
-En `lv_conf.defaults`, las opciones se escriben como `NOMBRE valor`, sin `#define`. Mantén ahí los ajustes y recompila para que la biblioteca y sus cabeceras coincidan. `LV_MEM_SIZE` está definido como `256 * 1024U`, pero solo se aplica con `LV_STDLIB_BUILTIN`; la configuración generada actual usa el asignador de C (`LV_STDLIB_CLIB`).
-
-
-Antes de continuar, debe existir:
+Edita `lv_conf.defaults` y conserva estos valores, escritos como `NOMBRE valor`, sin `#define`:
 
 ```text
-~/git/lv_port_linux/build/lvgl/lib/liblvgl.a
+LV_COLOR_DEPTH 16
+LV_USE_LINUX_FBDEV 1
+LV_LINUX_FBDEV_RENDER_MODE LV_DISPLAY_RENDER_MODE_DIRECT
+LV_LINUX_FBDEV_BUFFER_COUNT 2
+LV_USE_EVDEV 1
+LV_USE_LIBINPUT 0
+LV_USE_FS_STDIO 1
+LV_FS_STDIO_LETTER 'A'
+LV_FS_STDIO_PATH ""
+LV_USE_LODEPNG 1
+LV_FONT_MONTSERRAT_10 1
+LV_FONT_MONTSERRAT_12 1
+LV_FONT_MONTSERRAT_14 1
+LV_FONT_DEFAULT &lv_font_montserrat_14
+LV_USE_OS LV_OS_NONE
+LV_USE_STDLIB_MALLOC LV_STDLIB_CLIB
 ```
 
-Además de esa biblioteca, el [Makefile](Makefile) utiliza las cabeceras de `lvgl/`, los drivers de framebuffer y `evdev`, y la configuración generada en `build/`. El proyecto usa LVGL 9; los cambios entre versiones del port pueden requerir ajustes.
+| Grupo de opciones | Para qué se usa |
+|---|---|
+| Color y FBDEV | Color de 16 bits, dibujo directo al framebuffer y dos buffers. |
+| EVDEV | Entrada táctil mediante los dispositivos Linux de entrada. |
+| FS STDIO | Acceso a archivos desde LVGL con la unidad `A:`. |
+| LODEPNG | Lectura de los iconos PNG. |
+| Montserrat | Fuentes de 10, 12 y 14 puntos utilizadas por la interfaz. |
+| OS y memoria | Sin integración de SO en LVGL y memoria asignada con la biblioteca C. |
 
-## Compilar y ejecutar ZeroVolts UI
+El port local también tiene demos, fuentes adicionales y herramientas de diagnóstico activadas; el bloque anterior recoge la configuración que debe conservar esta aplicación. La configuración generada actualmente incluye opciones que faltan en el archivo de defaults local, como la fuente de 10 puntos y LODEPNG: añádelas al archivo de origen antes de regenerarlo.
 
-La ejecución manual es el procedimiento predeterminado de esta guía. Con LVGL compilado, el hardware configurado y los servicios HID instalados según la sección USB HID, desde la raíz de este repositorio:
+Desde `lv_port_linux`, compila:
+
+```bash
+cmake -S . -B build -DCONFIG=default -DBUILD_SHARED_LIBS=OFF
+cmake --build build --target lvgl -j2
+```
+
+`CONFIG=default` conserva tus ajustes; seleccionar otro perfil puede reemplazar `lv_conf.defaults`. Se generan `build/lv_conf.h` y `build/lvgl/lib/liblvgl.a`. La UI utiliza ambos junto con las cabeceras del port, por lo que debes recompilar LVGL después de cambiar sus opciones.
+
+### 2. Configuración de arranque de la Raspberry
+
+Edita `/boot/firmware/config.txt`. Este bloque reúne los parámetros activos del montaje actual; integra los valores en el archivo existente, sin duplicar overlays ni reemplazar ajustes propios de tu sistema:
+
+```ini
+dtparam=i2c_arm=on
+dtparam=spi=on
+dtparam=audio=on
+camera_auto_detect=1
+display_auto_detect=1
+auto_initramfs=1
+dtoverlay=vc4-kms-v3d
+max_framebuffers=2
+disable_fw_kms_setup=1
+arm_64bit=1
+disable_overscan=1
+arm_boost=1
+
+[cm4]
+otg_mode=1
+
+[all]
+dtoverlay=dwc2,dr_mode=peripheral
+dtoverlay=piscreen,drm,speed=18000000,rotate=90
+dtoverlay=gpio-ir-tx,gpio_pin=6
+dtoverlay=gpio-ir,gpio_pin=5
+gpio=21=pu
+gpio=26=pu
+dtoverlay=uart5
+```
+
+| Parámetro | Significado en esta configuración |
+|---|---|
+| `dtparam=i2c_arm=on` | Habilita el bus I²C del procesador; no lo usa directamente la UI actual. |
+| `dtparam=spi=on` | Habilita SPI, utilizado por la pantalla y el touch. El SPI del CC1101 pertenece al ESP32. |
+| `dtparam=audio=on` | Habilita el audio integrado; es un ajuste del sistema, sin función propia en la UI. |
+| `camera_auto_detect=1` | Carga overlays de cámaras reconocidas; no es requisito de ZeroVolts. |
+| `display_auto_detect=1` | Detecta pantallas DSI compatibles; la pantalla SPI se configura por separado. |
+| `auto_initramfs=1` | Carga automáticamente un initramfs compatible si está disponible. |
+| `dtoverlay=vc4-kms-v3d` | Activa el controlador gráfico VC4 con KMS. |
+| `max_framebuffers=2` | Permite hasta dos framebuffers gestionados por el firmware; no equivale a los dos buffers de LVGL. |
+| `disable_fw_kms_setup=1` | Evita que el firmware añada una selección de modo de vídeo al kernel. |
+| `arm_64bit=1` | Selecciona la ejecución del kernel en 64 bits. |
+| `disable_overscan=1` | Desactiva la compensación de bordes del modo de vídeo del firmware. |
+| `arm_boost=1` | Permite la frecuencia elevada de CPU admitida por la placa y el firmware. |
+| `[cm4]` y `otg_mode=1` | Ajuste exclusivo de Compute Module 4 para el controlador USB host. No se aplica a esta Raspberry Pi 4. |
+| `[all]` | Hace que las líneas siguientes se apliquen a todas las placas. |
+| `dtoverlay=dwc2,dr_mode=peripheral` | Activa el controlador USB DWC2 en modo dispositivo, necesario para el gadget HID. |
+| `dtoverlay=piscreen,drm,speed=18000000,rotate=90` | Carga el overlay de pantalla; `drm` selecciona DRM/KMS, `speed` fija SPI en 18 MHz y `rotate` gira la imagen 90 grados. |
+| `dtoverlay=gpio-ir-tx,gpio_pin=6` | Transmisión IR por GPIO 6. |
+| `dtoverlay=gpio-ir,gpio_pin=5` | Recepción IR por GPIO 5. |
+| `gpio=21=pu` y `gpio=26=pu` | Activa pull-up para NAV y SELECT, manteniendo nivel alto al soltar los botones. |
+| `dtoverlay=uart5` | Habilita UART5; sin CTS/RTS, el enlace usa GPIO 12 y 13. |
+
+Los parámetros generales de vídeo, audio y detección se conservan del sistema; no todos son requisitos de la aplicación. La referencia local de overlays está en `/boot/firmware/overlays/README`.
+
+En `/boot/firmware/cmdline.txt`, conserva la **única línea existente** y añade este argumento separado del anterior por un espacio:
+
+```text
+modules-load=dwc2,libcomposite
+```
+
+La coma separa los nombres de módulos dentro de ese argumento. No lo unas por una coma a otro parámetro, como `cfg80211.ieee80211_regdom`. Si ya existe `modules-load=...`, incorpora los módulos a esa lista. No copies identificadores de partición de otra instalación. Reinicia después de guardar los cambios.
+
+### 3. Configuración de la aplicación
+
+Antes de ejecutar, revisa [app-config.json](app-config.json). La aplicación guarda cambios de selección HID y configuración en ese archivo; edítalo con la UI y la sesión HID detenidas.
+
+| Campo | Valor del montaje y propósito |
+|---|---|
+| `version` | `"0.5"`: texto de versión de la barra superior. |
+| `display.fb_device` | `"/dev/fb0"`: framebuffer de la pantalla. Comprueba cuál corresponde al TFT. |
+| `uart.device` | `"/dev/ttyAMA5"`: enlace con el ESP32. |
+| `uart.baudrate` | `115200`: debe coincidir con el firmware. |
+| `hid.script_list_path` | `"data/badusb/"`: carpeta de scripts Python seleccionables. |
+| `hid.script_selected_path` | `""` inicialmente; la UI guarda la selección. |
+| `hid.is_enabled` | `false` inicialmente. Si conservas `true`, la UI intenta reactivar HID al arrancar; no representa el resultado final del script. |
+| `hid.config_scripts` | `"scripts"`: carpeta del proyecto con bind/unbind; no es el directorio de instalación del sistema. |
+| `ir.remotes_path` | `"data/ir/remotes/"`: mandos y botones aprendidos. |
+| `ir.backend` | `"irctl"`: backend actual basado en `ir-ctl`. |
+| `ir.tx_device` / `ir.rx_device` | `"/dev/lirc0"` / `"/dev/lirc1"`: transmisión y recepción; comprueba la numeración real. |
+| `ir.learn_timeout_ms` | `5000`: plazo de aprendizaje en milisegundos. |
+| `ir.use_on_screen_keyboard` | `true`: teclado en pantalla para introducir nombres. |
+| `subghz.signals_path` | `"data/subghz/signals"`: capturas `.sub` guardadas. |
+
+El archivo se busca un nivel por encima de la carpeta del ejecutable. Conserva `bin/`, `app-config.json`, `assets/`, `scripts/` y `data/` en la estructura del repositorio. Las rutas relativas de IR y HID se resuelven desde la raíz del proyecto; la de Sub-GHz depende del directorio de ejecución. Por eso esta guía inicia la UI desde la raíz.
+
+El touch se detecta automáticamente en `/proc/bus/input/devices`. El intercambio de ejes y la calibración (`296, 294, 3931, 3843`) están en [main.c](main.c); no son campos del JSON y deben ajustarse si cambia la pantalla.
+
+### 4. Instalación de servicios
+
+Con la configuración HID inicial en `false` y cualquier instancia de la UI cerrada, ejecuta desde la raíz del repositorio:
+
+```bash
+sudo bash scripts/install-hid.sh
+sudo systemctl disable --now zerovolts-ui.service
+```
+
+El instalador copia el setup del gadget y el watcher a `/usr/local/lib/zerovolts/hid`, instala las tres unidades en `/etc/systemd/system` y completa las rutas del proyecto. Habilita e inicia tanto el gadget como la UI. **El segundo comando detiene y deshabilita la UI automática para mantener la ejecución manual como procedimiento predeterminado de esta guía.** Repítelo después de reinstalar si quieres conservar ese modo.
+
+| Servicio | Responsabilidad | Cuándo se ejecuta |
+|---|---|---|
+| [zv-hid-gadget.service](scripts/zv-hid-gadget.service) | Carga y prepara configfs, descriptores USB y teclado HID de reportes de 8 bytes. Deja el gadget sin conectar al host. | Al instalar y en los siguientes arranques. Es `oneshot`; `active (exited)` significa que terminó la preparación. |
+| [zv-hid-session.service](scripts/zv-hid-session.service) | Ejecuta el watcher, que lee la selección, espera la enumeración USB y lanza el script Python una vez. Detenerlo termina los procesos de la sesión. | La UI lo inicia y detiene al activar/desactivar HID. No se habilita al arrancar. |
+| [zerovolts-ui.service](scripts/zerovolts-ui.service) | Ejecuta la aplicación desde su directorio, espera al gadget y reinicia la UI si falla. Omite el inicio si falta el binario. | Al solicitarlo con `start`, o al encender si lo habilitas con `enable`. |
+
+Las tres unidades se ejecutan como root porque no declaran `User=`. Este procedimiento no necesita configurar grupos de dispositivos para el usuario. El watcher y los scripts seleccionados también se ejecutan como root. Ejecutar la UI sin privilegios requiere permisos adicionales; sus llamadas HID usan `sudo` y podrían pedir contraseña.
+
+Los scripts bind/unbind siguen en la carpeta indicada por `hid.config_scripts`; conectan/desconectan el gadget. Si mueves el repositorio o actualizas los scripts instalados, repite la instalación con la UI y la sesión cerradas. No copies directamente las plantillas `.service`, porque contienen `@PROJECT_ROOT@` que debe sustituir el instalador.
+
+### Flujo de servicios HID
+
+La preparación del gadget, su conexión al host y la ejecución del script son pasos distintos. `zv-hid-gadget.service` deja creado el teclado USB; la UI decide cuándo conectarlo e iniciar `zv-hid-session.service`. La UI puede abrirse manualmente o mediante su servicio opcional.
+
+```mermaid
+flowchart TD
+    BOOT["Instalación o arranque de la Raspberry"] --> GADGET["zv-hid-gadget.service"]
+    GADGET --> SETUP["zv-hid-gadget-setup.sh: configfs y descriptores"]
+    SETUP --> READY["Gadget preparado, sin conectar al host"]
+    READY --> UI["Abrir UI manualmente o con zerovolts-ui.service"]
+    UI --> SELECT["Seleccionar script y activar HID"]
+    SELECT --> SAVE["Guardar selección e is_enabled=true en app-config.json"]
+    SAVE --> BIND["zv-hid-gadget-bind.sh: conectar gadget al UDC"]
+    BIND --> SESSION["Iniciar zv-hid-session.service"]
+    SESSION --> WATCH["zv-hid-session.py: esperar host configured"]
+    WATCH --> RUN["Ejecutar script Python una vez"]
+    RUN --> END["Termina la sesión; el gadget sigue conectado"]
+    UI --> OFF["Desactivar HID"]
+    OFF --> STOP["Detener zv-hid-session.service y sus procesos"]
+    STOP --> UNBIND["zv-hid-gadget-unbind.sh: desconectar gadget"]
+    UNBIND --> CLEAR["Guardar is_enabled=false y limpiar selección"]
+```
+
+Bind escribe el controlador USB en el atributo `UDC` del gadget; unbind lo vacía. El watcher lee la configuración al iniciar, espera a que el host termine la enumeración y ejecuta el script seleccionado. Al terminar no vuelve a lanzarlo por reconectar el cable: hace falta una sesión nueva. Si la UI arranca con `is_enabled=true`, intenta reactivar HID con la selección guardada.
+
+## Compilar y ejecutar la aplicación
+
+Desde la raíz del repositorio, compila con tu usuario normal:
 
 ```bash
 make
-sudo systemctl disable --now zerovolts-ui.service
-sudo systemctl start zv-hid-gadget.service
-sudo ./bin/zero-volts-ui
 ```
 
-Para limpiar el binario principal y los ejemplos, usa `make clean`.
+El Makefile busca LVGL en `~/git/lv_port_linux`. Si está en otra ubicación, usa `make LVPORT=/ruta/a/lv_port_linux`. Para limpiar los ejecutables, utiliza `make clean`.
 
-### Comprobar dispositivos antes de ejecutar
+### Comprobar el montaje
 
-Después de configurar los overlays y reiniciar, comprueba los dispositivos del montaje:
+Después de reiniciar y preparar los servicios:
 
 ```bash
 ls -l /dev/fb0 /dev/gpiochip0 /dev/ttyAMA5 /dev/lirc0 /dev/lirc1
@@ -139,420 +307,120 @@ sudo systemctl status zv-hid-gadget.service
 ls -l /dev/hidg0
 ```
 
-Sustituye las rutas por las configuradas en `app-config.json`. Los botones usan `/dev/gpiochip0`; el touch se detecta entre los dispositivos de entrada. Framebuffer, touch y GPIO corresponden a la interfaz; UART, LIRC y HID corresponden a sus módulos. Si falta un dispositivo, revisa su configuración de arranque y conexión antes de usar la función correspondiente. El servicio del gadget debe estar preparado para que exista `/dev/hidg0`.
+Adapta los nombres al JSON y al hardware. Para identificar el touch, puedes usar `sudo evtest /dev/input/eventN`. Los botones usan `gpiochip0`. UART, LIRC y HID corresponden a sus módulos; si falta alguno, revisa el overlay y la conexión. El gadget debe estar preparado antes de activar HID desde la UI, porque bind ocurre antes de iniciar la sesión.
 
-La instalación y la configuración de arranque se realizan una vez, y se repiten cuando cambian el montaje o los scripts. El uso normal consiste en preparar el gadget e iniciar la aplicación. Actualmente la UI, el watcher y los scripts HID se ejecutan como root; no se requiere añadir el usuario a grupos de dispositivos para este procedimiento.
+### Ejecución manual, opción predeterminada
 
-### Ejecutar mediante systemd y habilitar el arranque automático
+```bash
+sudo systemctl start zv-hid-gadget.service
+sudo ./bin/zero-volts-ui
+```
 
-El instalador HID también instala `zerovolts-ui.service`. Para iniciarlo solo en la sesión actual, cierra primero cualquier instancia manual y ejecuta:
+La instalación anterior deja deshabilitado el servicio de la UI. Mantén una sola instancia de la aplicación. La aplicación se ejecuta como root para acceder a los dispositivos con la configuración actual. `make run` o `./bin/zero-volts-ui` no elevan privilegios; su funcionamiento depende de los permisos del usuario. Usa `Ctrl+C` en la terminal para terminar la instancia manual.
+
+### Ejecución mediante el servicio
+
+Cierra primero la instancia manual. Para iniciar la UI sin habilitar el arranque automático:
 
 ```bash
 sudo systemctl start zerovolts-ui.service
-sudo systemctl status zerovolts-ui.service
 ```
 
-`start` inicia el servicio sin habilitarlo para los siguientes arranques. Para que la UI arranque automáticamente al encender la Raspberry:
+Para habilitarla al encender la Raspberry e iniciarla ahora:
 
 ```bash
 sudo systemctl enable --now zerovolts-ui.service
 ```
 
-El servicio se ejecuta como root porque no declara `User=`. Inicia sin que el usuario tenga que iniciar sesión, espera al servicio del gadget y reinicia la UI si falla. Necesita que `bin/zero-volts-ui` exista y sea ejecutable; si falta, systemd omite el inicio. Después de compilarlo, ejecuta `sudo systemctl start zerovolts-ui.service`.
+Arranca en `multi-user.target`, sin escritorio gráfico ni inicio de sesión del usuario. Si instalaste antes de compilar, ejecuta `start` cuando el binario esté listo; compilar por sí solo no inicia el servicio. Para volver al modo manual, usa `sudo systemctl disable --now zerovolts-ui.service`.
 
-Para volver a la ejecución manual:
-
-```bash
-sudo systemctl disable --now zerovolts-ui.service
-sudo ./bin/zero-volts-ui
-```
-
-Ejecuta el binario desde la raíz del repositorio y mantén una sola instancia de la UI. Para consultar los errores del servicio:
+Para consultar estado y errores:
 
 ```bash
-sudo journalctl -u zerovolts-ui.service -b -n 100 --no-pager
+sudo systemctl status zerovolts-ui.service zv-hid-gadget.service zv-hid-session.service
+sudo journalctl -u zerovolts-ui.service -u zv-hid-gadget.service -u zv-hid-session.service -b -n 100 --no-pager
 ```
 
-### Pantalla y touch
+## Arquitectura del sistema
 
-El framebuffer se configura en `app-config.json`; actualmente es `/dev/fb0`. El touch se busca automáticamente en `/proc/bus/input/devices`, primero por sus propiedades y después por el nombre del dispositivo. Si no se encuentra, la aplicación no completa el arranque.
-
-La rotación y la calibración están ajustadas a mi pantalla en [main.c](main.c): se intercambian los ejes y se usan los valores `296, 294, 3931, 3843`. Si cambias de pantalla, revisa esos valores. Para identificar y comprobar el touch:
-
-```bash
-cat /proc/bus/input/devices
-evtest /dev/input/eventN
-```
-
-Cambia `eventN` por el dispositivo de tu pantalla.
-
-## Funciones actuales
-
-### Navegación táctil y con pulsadores
-
-Desde la pantalla principal se puede entrar a Bad USB, Infrared, Bluetooth y Sub-GHz. La interfaz se puede usar con el touch o con los botones NAV y SELECT. NAV mueve el foco y permite desplazarse por los desplegables y el teclado en pantalla; SELECT confirma la opción.
-
-La navegación entre pantallas está en [page/navigation_page.c](page/navigation_page.c), y la lectura de los pulsadores está en [drivers/gpio_buttons.c](drivers/gpio_buttons.c). El filtrado básico de clicks y la traducción de pulsaciones a teclas LVGL siguen en `main.c`.
-
-### USB HID / Bad USB
-
-Desde la interfaz se pueden ver y seleccionar scripts, además de activar o desactivar la sesión HID. La idea es que la Raspberry Pi funcione como un dispositivo USB de entrada y ejecute acciones mediante scripts.
-
-El proyecto incluye los scripts para crear el gadget, el watcher y los servicios necesarios. El flujo actual ejecuta **scripts Python `.py`** que escriben reportes de teclado en `/dev/hidg0`.
-
-La UI guarda la selección y el estado antes de activar el gadget y arrancar `zv-hid-session.service`. El programa `zv-hid-session.py` (el watcher) espera a que el host termine la enumeración USB y ejecuta el script una sola vez. Reconectar el cable no lo vuelve a ejecutar: para una nueva ejecución, desactiva, vuelve a seleccionar el script y activa desde la UI. El watcher escribe su log en `zv-hid-session.log`, en la raíz del proyecto; la salida del script se puede consultar en el journal del servicio. La UI todavía no muestra el progreso ni el resultado final del proceso.
-
-#### Preparar USB HID en la Raspberry Pi
-
-Estos pasos son para mi montaje con Raspberry Pi 4 y Parrot OS. Se necesita el puerto **USB-C con datos**, un cable de datos y alimentación suficiente para la Raspberry y sus periféricos. Los puertos USB-A de la Pi 4 no son el puerto gadget. También puedes consultar la preparación del controlador en la [guía oficial de OTG de Raspberry Pi](https://pip-assets.raspberrypi.com/categories/685-app-notes-guides-whitepapers/documents/RP-009276-WP-1-Using%20OTG%20mode%20on%20Raspberry%20Pi%20SBCs.pdf).
-
-1. Instala las herramientas necesarias:
-
-   ```bash
-   sudo apt install python3 sudo kmod udev util-linux xxd bsdextrautils
-   ```
-
-2. En `/boot/firmware/config.txt`, dentro de una sección aplicable a tu placa (por ejemplo `[all]`), agrega:
-
-   ```ini
-   dtoverlay=dwc2,dr_mode=peripheral
-   ```
-
-   La opción se escribe **`dtoverlay`**. En `/boot/firmware/cmdline.txt`, conserva la única línea existente y añade, separado por un espacio:
-
-   ```text
-   modules-load=dwc2,libcomposite
-   ```
-
-   Si ya existe `modules-load=...`, añade ambos módulos a su lista separados por comas. Reinicia la Raspberry. Después, `ls /sys/class/udc` debe mostrar un controlador. No cargues otro gadget como `g_hid` o `g_ether` sobre el mismo controlador para este montaje.
-
-3. Cierra cualquier instancia manual de la UI y ejecuta el instalador desde la raíz del proyecto. Puedes instalar los servicios antes de compilar la aplicación o preparar sus dependencias de compilación:
-
-   ```bash
-   sudo bash scripts/install-hid.sh
-   sudo systemctl disable --now zerovolts-ui.service
-   ```
-
-   Este script Bash copia los archivos del sistema en `/usr/local/lib/zerovolts/hid` y los tres servicios en `/etc/systemd/system`, completando la ruta del proyecto en las unidades de sesión y UI. Recarga systemd y ejecuta `systemctl enable --now zv-hid-gadget.service` y `systemctl reenable --now zerovolts-ui.service`: prepara el gadget, habilita ambos servicios para los siguientes arranques e inicia la UI si su binario está disponible. El segundo comando de este paso detiene y deshabilita la UI automática para conservar la ejecución manual predeterminada de esta guía; el servicio del gadget sigue habilitado. Repite ese comando cada vez que vuelvas a ejecutar el instalador si quieres mantener el modo manual. Si todavía no existe el binario o no es ejecutable, systemd omite el arranque de la UI sin marcarla como fallida; la instalación continúa. Los servicios se ejecutan como root, manteniendo el funcionamiento original. No configura usuarios, grupos, reglas udev ni permisos sudo.
-
-   En `app-config.json`, `hid.config_scripts` mantiene la carpeta de scripts de la aplicación, relativa a la raíz del proyecto. No es una ruta de instalación del sistema. Para la estructura incluida, conserva estos campos:
-
-   ```json
-   "config_scripts": "scripts",
-   "is_enabled": false
-   ```
-
-   La aplicación ejecuta con `sudo` los scripts `zv-hid-gadget-bind.sh` y `zv-hid-gadget-unbind.sh` de la carpeta indicada en `hid.config_scripts`. Estos conectan y desconectan directamente el gadget, como en las pruebas originales. Las copias del sistema se administran con el instalador, independientemente de ese atributo.
-
-   El servicio del gadget prepara el descriptor y deja el gadget **sin conectar al host** hasta activarlo desde la UI. La sesión HID no se habilita al arrancar el sistema. Si mueves el proyecto o actualizas estos scripts, vuelve a ejecutar el instalador con la UI y la sesión cerradas. El instalador admite espacios en la ruta; para mantenerlo sencillo, rechaza comillas, barras invertidas, `$` y `%` en ella.
-
-4. Prepara el ejemplo incluido y actualiza el listado de scripts en la UI:
-
-   ```bash
-   mkdir -p data/badusb
-   cp examples/hid_test_script.py data/badusb/
-   ```
-
-   Conecta el USB-C al equipo de prueba y deja un editor de texto enfocado. En Bad USB, selecciona `hid_test_script.py` y activa la sesión. El ejemplo escribe `zero volts`, sin Enter ni atajos, usando códigos de teclado para letras minúsculas. El texto efectivo depende del layout del host; este ejemplo no implementa traducción de layouts.
-
-#### Qué hace cada archivo y quién lo ejecuta
-
-| Archivo en `scripts/` | Responsabilidad | Quién lo ejecuta |
-|---|---|---|
-| [install-hid.sh](scripts/install-hid.sh) | Comprueba las herramientas del setup, copia el setup y el watcher al sistema, instala los tres servicios y completa las rutas de sesión y UI. Los habilita y solicita su inicio; no requiere que la UI esté compilada. | El usuario, con `sudo`, durante la instalación o actualización. No conecta el gadget al host ni ejecuta el script seleccionado. |
-| [zv-hid-gadget.service](scripts/zv-hid-gadget.service) | Servicio `oneshot` que prepara el gadget mediante el setup. `RemainAfterExit=yes` conserva el servicio como activo después de terminar el script. | systemd al iniciarlo; también en cada arranque si se habilitó con `enable`. |
-| [zv-hid-gadget-setup.sh](scripts/zv-hid-gadget-setup.sh) | Prepara configfs, carga `libcomposite`, crea el gadget, escribe los descriptores USB y configura el teclado con reportes de 8 bytes. Deja el gadget sin enlazar al controlador USB. | `zv-hid-gadget.service`, usando la copia instalada en el sistema. |
-| [zv-hid-gadget-bind.sh](scripts/zv-hid-gadget-bind.sh) | Obtiene el nombre del controlador de `/sys/class/udc` y lo escribe en el atributo `UDC` del gadget. Esto permite que el host lo enumere como teclado. | La aplicación mediante `sudo`, desde la carpeta indicada en `hid.config_scripts`. |
-| [zv-hid-gadget-unbind.sh](scripts/zv-hid-gadget-unbind.sh) | Vacía el atributo `UDC`, desconectando el gadget del host. Conserva los descriptores creados por el setup. | La aplicación mediante `sudo`, desde la carpeta indicada en `hid.config_scripts`. |
-| [zv-hid-session.service](scripts/zv-hid-session.service) | Arranca el watcher y le proporciona la raíz del proyecto mediante `ZV_PROJECT_ROOT`. Depende del servicio del gadget. Al detenerse, systemd termina los procesos de la sesión. | La aplicación solicita `sudo systemctl start/stop zv-hid-session.service`. El instalador añade la ruta real del proyecto. |
-| [zv-hid-session.py](scripts/zv-hid-session.py) | Lee `app-config.json`, comprueba la activación y el script seleccionado, consulta el estado USB cada 0,5 segundos y ejecuta `python3 <script>` al recibir `configured`. Después termina. | `zv-hid-session.service`, usando la copia instalada. Actualmente se ejecuta como root, igual que el script seleccionado. |
-| [zerovolts-ui.service](scripts/zerovolts-ui.service) | Arranca la interfaz cuando su binario es ejecutable, espera a que se prepare el gadget y reinicia la aplicación si falla. `ConditionFileIsExecutable` omite el inicio si falta el binario. El instalador completa las rutas con la ubicación real del proyecto. | El instalador lo habilita e inicia mediante systemd; después arranca con la Raspberry. |
-
-Los archivos de `scripts/` son los originales del proyecto. El instalador copia al sistema únicamente el setup y el watcher, además de las unidades HID. Los scripts bind/unbind siguen ejecutándose desde el proyecto. Los scripts Python seleccionables se guardan en `hid.script_list_path`, normalmente `data/badusb/`.
-
-#### Orden de ejecución y flujo HID
+La Raspberry ejecuta Linux, la interfaz y las operaciones de archivos, IR y USB HID. El ESP32 se ocupa de BLE y del CC1101. Esto permite conservar las herramientas Linux y delegar la radio y temporización de pulsos al microcontrolador.
 
 ```mermaid
 flowchart TD
-    Install["Primera instalación: sudo bash scripts/install-hid.sh"] --> Files["Copia setup, watcher y servicios al sistema"]
-    Files --> Enable["El instalador habilita e inicia el gadget y la UI"]
-    Boot["Arranques posteriores de la Raspberry"] --> GadgetService["zv-hid-gadget.service"]
-    Enable --> GadgetService
-    GadgetService --> Setup["zv-hid-gadget-setup.sh"]
-    Setup --> Ready["Gadget preparado, sin conectar al host"]
-    Ready --> UI["Abrir UI y seleccionar un script Python"]
-    UI --> Save["Activar HID: guardar selección e is_enabled=true"]
-    Save --> Bind["hid_service ejecuta sudo zv-hid-gadget-bind.sh"]
-    Bind --> Session["sudo systemctl start zv-hid-session.service"]
-    Session --> Watcher["zv-hid-session.py lee app-config.json"]
-    Watcher --> Wait["Espera estado USB configured"]
-    Wait --> Run["Ejecuta el script seleccionado una vez"]
-    Run --> Reports["El script envía reportes a /dev/hidg0"]
-    Reports --> End["Terminan el script y el watcher; el gadget sigue conectado"]
-    UI -. "Desactivar HID" .-> Stop["sudo systemctl stop zv-hid-session.service"]
-    Stop --> Unbind["sudo zv-hid-gadget-unbind.sh"]
-    Unbind --> Clear["Guardar is_enabled=false y limpiar selección"]
+    UI[Vistas y componentes LVGL] <--> CTRL[Controladores]
+    CTRL <--> SVC[Servicios de la Raspberry]
+    SVC <--> FILES[Configuración y datos]
+    SVC <--> LOCAL[IR y USB HID]
+    SVC <--> UART[Servicio UART compartido]
+    UART <-->|115200 baudios| ESP[ESP32]
+    ESP <--> BLE[Bluetooth Low Energy]
+    ESP <--> RF[CC1101 Sub-GHz]
 ```
 
-En el primer uso, ejecuta la preparación USB y los dos comandos de instalación descritos arriba. El instalador habilita el gadget y la UI, y el comando posterior deshabilita la UI para mantener su inicio manual. Que `zv-hid-gadget.service` aparezca como `active (exited)` es normal: su trabajo de preparación ya terminó. Con `hid.is_enabled=false`, la UI no inicia la sesión HID al abrirse. Si conservas una activación anterior en `true`, la UI intenta reactivarla al arrancar.
+Las vistas presentan información; los controladores coordinan acciones y estados; los servicios acceden al sistema y al hardware. Por ejemplo, para reproducir una señal Sub-GHz, el controlador recibe la selección, el servicio carga el archivo y envía sus pulsos al ESP32, y las respuestas actualizan la pantalla. El desacoplamiento sigue en desarrollo: BLE procesa parte de sus mensajes UART desde el controlador.
 
-Si instalaste antes de compilar, prepara después LVGL y las dependencias según las secciones de compilación. Cuando el binario esté listo, inicia la UI:
+`main.c` inicializa configuración, pantalla y botones, y mantiene el bucle LVGL/UART. `app_context` conserva dispositivos BLE y sesiones de captura compartidas. El protocolo UART utiliza líneas de texto con órdenes y campos separados por `|`; el firmware devuelve inicio, datos, finalización o error. El descubrimiento GATT actual ocurre automáticamente después de conectar.
 
-```bash
-make
-sudo systemctl start zv-hid-gadget.service
-sudo ./bin/zero-volts-ui
-```
-
-Para usar el servicio o habilitar el inicio automático de la UI, sigue la sección «Ejecutar mediante systemd y habilitar el arranque automático». Compilar por sí solo no inicia la aplicación.
-
-**El gadget debe estar preparado antes de activar HID.** En el flujo actual, `hid_service.c` ejecuta bind antes de solicitar el arranque de la sesión. Si abres la UI manualmente, asegúrate de que el gadget esté preparado antes; la dependencia de `zv-hid-session.service` no lo hace por sí sola.
-
-`zerovolts-ui.service` se habilita en `multi-user.target` y espera a `zv-hid-gadget.service` y `getty.target`: systemd prepara el gadget y alcanza el punto de arranque de los servicios de login de consola antes de arrancar la aplicación. No requiere LightDM ni un escritorio gráfico. No espera a que el usuario inicie sesión. El instalador usa `reenable` para retirar enlaces de habilitación anteriores, incluido el de `graphical.target`. La aplicación usa la ruta generada por el instalador. Evita abrir otra instancia manual de la aplicación mientras este servicio esté ejecutándola. Puedes consultar su estado con `systemctl status zerovolts-ui.service`.
-
-La lista de scripts se lee desde `hid_controller.c` y `hid_service.c`, que enumeran los archivos `.py` de `hid.script_list_path`. Al activar, el controller guarda la ruta seleccionada y `is_enabled=true` antes de llamar al servicio HID. El watcher lee esos datos al arrancar; no actualiza la selección continuamente ni tiene un timeout de espera del host.
-
-Cuando el script finaliza, el watcher termina y no vuelve a ejecutarlo al reconectar el cable. El gadget permanece conectado y `is_enabled` conserva `true`: ese campo representa la activación solicitada, no el estado del proceso. Al desactivar desde la UI, primero se detiene la sesión, después se hace unbind y, si esas operaciones tienen éxito, se guarda `is_enabled=false` y se limpia la selección. Para repetir una ejecución, vuelve a seleccionar el script después de desactivar.
-
-#### Configuración y diagnóstico HID
-
-| Campo en `app-config.json` | Uso |
+| Directorio o archivo | Responsabilidad |
 |---|---|
-| `hid.script_list_path` | Carpeta de scripts Python seleccionables, por defecto `data/badusb/`. |
-| `hid.script_selected_path` | Script elegido; lo guarda la UI antes de iniciar la sesión. |
-| `hid.config_scripts` | Carpeta de scripts de configuración de la aplicación, por defecto `scripts`, resuelta respecto a la raíz del proyecto. No indica dónde instalar componentes del sistema. |
-| `hid.is_enabled` | Activación solicitada por la UI; no representa por sí sola el resultado de ejecución. |
+| `page/` | Pantallas y controladores de `hid`, `ir`, `bt` y `sub_ghz`; navegación. |
+| `components/` | Controles LVGL y tema reutilizables. |
+| `service/` | HID, IR, UART y captura/archivos/replay Sub-GHz. |
+| `drivers/` | Botones físicos con libgpiod. |
+| `config.[ch]` / `app-config.json` | Carga, persistencia y resolución de configuración. |
+| `utils/` | Archivos, JSON, cadenas, logs y errores. |
+| `scripts/` | Soporte del gadget HID, watcher, instalador y unidades systemd. |
+| `assets/` / `data/` | Recursos visuales y datos del usuario. |
+| `examples/` / `docs/` / `case/` | Ejemplos, documentación y archivos de carcasa. |
+| `bin/` | Ejecutables generados. |
 
-```bash
-systemctl status zv-hid-gadget.service zv-hid-session.service
-journalctl -u zv-hid-gadget.service -u zv-hid-session.service -b
-ls -l /dev/hidg0
-cat /sys/kernel/config/usb_gadget/zerovolts-hid/UDC
+Los scripts HID se guardan en `data/badusb/`, los mandos IR en `data/ir/remotes/<mando>/` con metadatos y botones `.raw`, y las señales Sub-GHz en `data/subghz/signals/`. El log general queda en `data/app-log.log`; el watcher mantiene `zv-hid-session.log` en la raíz del proyecto.
+
+### Comunicación UART con el ESP32
+
+La Raspberry abre el puerto definido en `uart.device`, actualmente `/dev/ttyAMA5`, a **115200 baudios, 8 bits, sin paridad y un bit de parada (8N1)**. El ESP32 recibe las órdenes y devuelve eventos por el mismo enlace. BLE y Sub-GHz comparten este canal; IR y HID se controlan en la Raspberry.
+
+El protocolo propio usa texto, con un mensaje por línea. `|` separa campos y muchos datos se expresan como `clave=valor`. El servicio UART de la UI entrega cada respuesta al módulo correspondiente y gestiona plazos de espera. Por ejemplo, un escaneo BLE puede intercambiar estas líneas; las flechas indican la dirección y no forman parte del mensaje:
+
+```text
+Raspberry → ESP32: SCAN
+ESP32 → Raspberry: SCAN:START
+ESP32 → Raspberry: SCAN:DEVICE|name=Sensor|mac=AA:BB:CC:DD:EE:FF|rssi=-58|manufacturer=|service=|appearance=|connectable=1|addr_type=0
+ESP32 → Raspberry: SCAN:DONE
 ```
 
-Si falta el controlador UDC, revisa DWC2 y reinicia. Si falla la creación del gadget, revisa el journal y que otro gadget no esté usando el controlador. En el procedimiento de esta guía la UI se inicia con `sudo` o mediante el servicio como root, y sus comandos HID heredan esos privilegios; no se presupone una configuración adicional de sudo para un usuario normal. Si la aplicación no encuentra sus scripts, comprueba `hid.config_scripts` y los permisos de ejecución en la carpeta del proyecto. Si el watcher sigue esperando, revisa cable, puerto y enumeración del host. Consulta `zv-hid-session.log` en la raíz del proyecto y el journal para revisar la salida del script.
+`SCAN:START` indica el inicio, cada `SCAN:DEVICE` describe un dispositivo y `SCAN:DONE` cierra el escaneo. `rssi` expresa la señal en dBm, `connectable` indica si admite conexión y `addr_type` identifica el tipo de dirección BLE. Puede haber varios resultados o ninguno. Otra orden del protocolo es `SUBGHZ_CAPTURE|freq_hz=433920000|timeout_ms=30000`, que solicita una captura a 433,92 MHz durante un máximo de 30 segundos.
 
-**Pendiente:** el watcher ejecuta el script seleccionado como root. Se podría limitar esa ejecución a un usuario con acceso a `/dev/hidg0` y acotar los permisos sudo. Esto todavía no está implementado.
+Las referencias para modificar el protocolo son [service/uart_commands.h](service/uart_commands.h), [service/uart_service.c](service/uart_service.c) y el dispatcher `src/zv_uart_protocol.c` del firmware. Las órdenes y respuestas deben mantenerse compatibles en ambos proyectos.
 
-El descriptor usa reportes de teclado de 8 bytes y los identificadores de laboratorio del proyecto de pruebas. Los scripts de control usan configfs siguiendo la [documentación del kernel](https://docs.kernel.org/usb/gadget_configfs.html); el intercambio de reportes por `/dev/hidg0` corresponde al [driver HID gadget](https://docs.kernel.org/usb/gadget_hid.html). Desactivar la sesión detiene su grupo de procesos y desconecta el gadget. Los reportes de pulsación y liberación de teclas quedan a cargo del script seleccionado. Todavía falta probar la enumeración, la escritura y la desconexión con hardware real.
+## Funciones implementadas
+
+### Navegación
+
+La pantalla principal ofrece Bad USB, Infrared, Bluetooth y Sub-GHz. Se puede usar el touch o los botones NAV y SELECT para mover el foco, confirmar opciones y operar desplegables y teclado en pantalla. Los botones y la adaptación de sus pulsaciones a LVGL se gestionan desde `main.c`.
+
+### USB HID / Bad USB
+
+Permite listar scripts Python `.py`, seleccionar uno y activar/desactivar el teclado USB. La UI guarda la selección antes de conectar el gadget y arrancar la sesión. El watcher espera el estado USB `configured`, ejecuta el script una vez y termina. Reconectar el cable no vuelve a ejecutarlo mientras no se inicie una sesión nueva; al abrir otra vez la UI con `is_enabled=true`, sí intenta reactivar HID.
+
+Para repetir, desactiva, selecciona el script y activa de nuevo. Al desactivar se detiene la sesión y se desconecta el gadget. Cada script escribe reportes en `/dev/hidg0` y se encarga de liberar las teclas. La UI todavía no presenta el progreso ni el resultado final del proceso, y no hay traducción general de layouts de teclado.
+
+La conexión al host utiliza el puerto USB-C de datos de la Pi 4; sus puertos USB-A no son el puerto gadget de este montaje.
 
 ### Infrarrojo
 
-Permite crear mandos, aprender las señales de sus botones, guardarlas y volver a enviarlas. Por ejemplo, se puede crear un mando de televisión y guardar el botón de encendido para usarlo después desde la pantalla.
+Permite crear mandos, añadir botones, aprender señales con un plazo de captura, guardarlas y transmitirlas con `ir-ctl`. Los mandos quedan disponibles entre ejecuciones. El aprendizaje incluye validación básica de pulsos y reintentos cuando la captura no resulta utilizable.
 
-Por ahora uso `ir-ctl` y los dispositivos IR de Linux. Las señales se guardan como archivos `.raw` dentro de `data/ir/remotes/<mando>/buttons/`. La aplicación comprueba las capturas y ofrece reintentos cuando no son válidas.
+El backend actual es `irctl`. La fiabilidad con distintas familias de mandos, la cancelación y el envío sin bloquear la interfaz siguen siendo áreas de mejora.
 
-Código principal: [page/ir/](page/ir/) y [service/ir_service.c](service/ir_service.c). Más adelante me gustaría implementar el acceso con `lircdev`, que creo que sería una mejor opción.
+### Bluetooth Low Energy
 
-### Bluetooth Low Energy (BLE)
+Permite buscar dispositivos cercanos, filtrar resultados, consultar nombre, dirección y señal, y conectarse a los periféricos que lo permitan. El ESP32 descubre servicios y características GATT y la UI muestra esa estructura y sus propiedades.
 
-Permite buscar dispositivos BLE cercanos, filtrar la lista, ver su nombre, dirección e intensidad de señal y conectarse a los que lo permitan. También se pueden descubrir sus servicios y características GATT para explorar las funciones que ofrece cada dispositivo.
-
-El ESP32 maneja la radio y la Raspberry Pi envía las solicitudes y muestra los resultados. Por ahora se puede escanear, conectar y descubrir servicios, pero todavía no hay una interfaz general para leer o escribir características.
-
-Código principal: [page/bt/](page/bt/) y [service/uart_service.c](service/uart_service.c).
+Es un explorador BLE: todavía no ofrece una interfaz general para leer/escribir características o suscribirse a notificaciones. El firmware se ocupa de las operaciones BLE y la Raspberry presenta sus resultados.
 
 ### Sub-GHz
 
-Aquí se puede elegir una frecuencia, capturar una señal, ver sus pulsos en un gráfico y guardar o descartar el resultado. Las señales guardadas aparecen en la pantalla de reproducción, donde también se puede elegir cuántas veces enviarlas.
+Permite seleccionar frecuencia, capturar pulsos, verlos en un gráfico, guardar o descartar la captura y listar señales para reproducirlas con repeticiones. Los archivos se guardan en formato `.sub` RAW y el envío se realiza por bloques con confirmaciones del ESP32.
 
-La interfaz ofrece **315, 380, 381, 433.92, 868 y 915 MHz**. Las frecuencias que puedas usar dependen del firmware, el módulo y la antena que tengas instalados. La Raspberry Pi guarda las señales como archivos `.sub` en `data/subghz/signals/`; el ESP32 controla el CC1101 y realiza la captura o transmisión.
-
-La reproducción actual admite señales RAW, es decir, una secuencia de duraciones de pulsos, con un límite de 256 valores. Los datos se envían por partes y se espera una confirmación del ESP32. Esto sigue siendo experimental: guardar una señal no garantiza que pueda reproducirse correctamente en cualquier dispositivo.
-
-Código principal: [page/sub_ghz/](page/sub_ghz/), [service/subghz/](service/subghz/) y el firmware del ESP32.
-
-## Conexiones y pines
-
-En las tablas dejo el número GPIO y el pin físico del conector de 40 pines para que sea más fácil hacer las conexiones.
-
-### Raspberry Pi
-
-| Función | GPIO de Raspberry Pi | Pin físico | Conexión |
-|---|---|---|---|
-| Receptor IR | GPIO 5 | 29 | Salida de datos del receptor infrarrojo. |
-| Transmisor IR | GPIO 6 | 31 | Entrada del circuito transmisor infrarrojo. |
-| UART TX | GPIO 12 | 32 | RX del ESP32, GPIO 16. |
-| UART RX | GPIO 13 | 33 | TX del ESP32, GPIO 17. |
-| Tierra UART | GND | 34 | GND del ESP32. |
-| Botón SELECT | GPIO 26 | 37 | Pulsador para confirmar. |
-| Botón NAV | GPIO 21 | 40 | Pulsador para desplazarse. |
-| Tierra para botones | GND | 39 | Referencia común para los pulsadores. |
-
-Los pulsadores se detectan al pasar de nivel alto a bajo: al pulsar deben llevar la entrada a GND. El circuito debe mantener un nivel alto estable al soltarlos; el driver actual no configura una resistencia pull-up por software. Las señales GPIO y UART trabajan a 3.3 V.
-
-En este montaje, el conector de la pantalla SPI y su touch ocupa la zona de los pines físicos 1–26. En mi montaje dejé esa zona para la pantalla, aunque no todos esos pines llevan datos. Si cambias de pantalla, revisa su distribución antes de reutilizarlos.
-
-Para habilitar IR y la UART utilizada, la configuración de arranque del montaje incluye:
-
-```ini
-dtoverlay=gpio-ir,gpio_pin=5
-dtoverlay=gpio-ir-tx,gpio_pin=6
-dtoverlay=uart5
-```
-
-En mi instalación de Parrot OS uso `/boot/firmware/config.txt`. Tras reiniciar, comprueba los nombres de los dispositivos y ajústalos en `app-config.json`: el montaje actual usa `/dev/lirc0` para transmitir, `/dev/lirc1` para recibir y `/dev/ttyAMA5` para UART. La numeración de los dispositivos puede variar.
-
-USB HID no utiliza un GPIO del conector: usa el puerto USB de datos en modo gadget. Su preparación incluye `dwc2` y la configuración del gadget mediante `configfs`; añadir el overlay por sí solo no completa esa instalación.
-
-### CC1101 conectado al ESP32
-
-El CC1101 se conecta al **ESP32**, no directamente a los GPIO de la Raspberry Pi. Los GPIO de esta tabla corresponden al ESP32:
-
-| Señal del CC1101 | Conexión en ESP32 | Para qué sirve |
-|---|---|---|
-| VCC | 3.3 V | Alimentación. |
-| GND | GND | Tierra común. |
-| SCK | GPIO 14 | Reloj de comunicación SPI. |
-| MOSI | GPIO 13 | Datos hacia el módulo. |
-| MISO / GDO1 | GPIO 25 | Datos desde el módulo. |
-| CSN | GPIO 5 | Selección del módulo en el bus SPI. |
-| GDO0 | GPIO 27 | Señal utilizada para los pulsos de radio. |
-| GDO2 | GPIO 26 | Conexión prevista en la definición del módulo del firmware. |
-
-Estas asignaciones están definidas en `include/zv_spi_bus.h`, `include/zv_subghz.h` e `include/zv_cc1101.h` del proyecto de firmware. Si cambian allí, revisa también el cableado.
-
-## Comunicación con el ESP32
-
-Para comunicar la interfaz con el ESP32 hice un protocolo de texto sencillo que funciona por UART a 115200 baudios. Me sirve para aprender y ver qué mensajes se intercambian entre los dos. Todavía puede cambiar a medida que avance el proyecto.
-
-Cada mensaje ocupa una línea. Algunos son órdenes cortas; otros llevan datos separados por `|`. Por ejemplo:
-
-```text
-SCAN
-CONNECT|AA:BB:CC:DD:EE:FF|0
-DISCOVER
-SUBGHZ_CAPTURE|freq_hz=433920000|timeout_ms=30000
-```
-
-La interfaz pide buscar dispositivos, conectar, descubrir servicios o capturar una señal. El ESP32 devuelve mensajes de inicio, resultados, finalización o error, como `SCAN:START`, `SCAN:DONE` o `CONNECT:OK`.
-
-El servicio UART recibe las líneas y las envía al módulo que corresponde. También limita el tiempo de espera para poder informar si hay un error o no llega una respuesta. No hace falta conocer todos los campos para usar la aplicación; para modificarlo, las referencias son [service/uart_commands.h](service/uart_commands.h), [service/uart_service.c](service/uart_service.c) y los controladores BLE y Sub-GHz.
-
-## Arquitectura y directorios
-
-Intento organizar el código por responsabilidades. En los módulos principales, la **vista** dibuja la pantalla, el **controlador** coordina las acciones y el **servicio** se comunica con el sistema o el hardware.
-
-Por ejemplo, al reproducir una señal Sub-GHz: la vista recoge la selección, el controlador solicita la reproducción y el servicio lee el archivo y envía sus datos al ESP32. La respuesta recorre el camino de vuelta para actualizar la pantalla.
-
-```text
-                  Raspberry Pi - ZeroVolts UI
-                  ==========================
-                  Vistas (pantallas y componentes)
-                               ^
-                               |
-                               v
-                         Controladores
-                               ^
-                               |
-                               v
-                           Servicios
-                               ^
-                               |
-             +-----------------+-----------------+
-             |                 |                 |
-             v                 v                 v
-         Archivos        Hardware local        UART
-      (configuracion,     (IR y USB HID)         ^
-       mandos, senales)                          |
-                                                 v
-                                               ESP32
-                                                 ^
-                                                 |
-                                      +----------+----------+
-                                      |                     |
-                                      v                     v
-                                     BLE             Sub-GHz (CC1101)
-```
-
-Las flechas dobles representan las solicitudes y las respuestas que actualizan la interfaz. IR y USB HID se gestionan en la Raspberry Pi; BLE y Sub-GHz se gestionan en el ESP32, conectado por UART.
-
-Todavía estoy mejorando esta organización. Algunas tareas, como el arranque y la adaptación de los botones a LVGL, siguen en `main.c`.
-
-```text
-zerovolts-ui/
-├── main.c                  # Arranque, pantalla, botones y bucle principal
-├── app_context.[ch]        # Dispositivos BLE y sesiones de captura compartidas
-├── config.[ch]             # Carga, guardado y resolución de rutas
-├── app-config.json         # Configuración local
-├── types.h                 # Tipos y límites comunes
-├── Makefile                # Compilación de la aplicación y ejemplos
-├── drivers/                # Acceso a hardware: gpio_buttons.[ch]
-├── components/             # Controles visuales LVGL reutilizables y tema
-├── page/                   # Pantallas, navegación y controladores
-│   ├── hid/
-│   ├── ir/
-│   ├── bt/
-│   └── sub_ghz/
-├── service/                # Comunicación y operaciones del sistema
-│   ├── hid_service.[ch]
-│   ├── ir_service.[ch]
-│   ├── uart_service.[ch]
-│   ├── uart_commands.h
-│   ├── subghz/              # Captura, archivos y envío de señales
-│   └── ducky_script/        # Intérprete en desarrollo, aún sin integrar
-├── utils/                  # Archivos, cadenas, JSON, logs y errores
-├── assets/                 # Recursos gráficos
-├── data/                   # Scripts, mandos IR, señales Sub-GHz y log
-├── scripts/                # Soporte HID y unidades de systemd
-├── examples/               # Programas de ejemplo y comprobaciones aisladas
-├── tests/                  # Pruebas de navegación, UART y Sub-GHz
-├── docs/                   # Notas y planificación
-├── case/                   # Archivos relacionados con la carcasa
-└── bin/                    # Ejecutables generados
-```
-
-## Configuración y datos
-
-[app-config.json](app-config.json) define las rutas de datos y los dispositivos del montaje:
-
-| Sección | Qué configura |
-|---|---|
-| `version` | Versión mostrada en la barra superior. |
-| `display` | Framebuffer, actualmente `/dev/fb0`. |
-| `uart` | Puerto del ESP32 y velocidad, actualmente `/dev/ttyAMA5` a 115200. |
-| `hid` | Carpeta de scripts Python, scripts de control del gadget, selección y estado de activación. |
-| `ir` | Carpeta de mandos, backend, dispositivos RX/TX y tiempo de aprendizaje. |
-| `subghz` | Carpeta de señales guardadas. |
-
-La aplicación busca la configuración un nivel por encima de la carpeta del ejecutable. Las carpetas de mandos IR y scripts HID se resuelven respecto a la raíz del proyecto. La ruta Sub-GHz todavía se usa tal como está configurada: si es relativa, depende del directorio desde el que ejecutes la aplicación. Por eso los comandos de esta guía se ejecutan desde la raíz del repositorio. Mantén la distribución `bin/` junto a `app-config.json` y las carpetas de recursos al mover la instalación.
-
-Los datos se guardan así:
-
-```text
-data/
-├── badusb/                  # Scripts para la función HID
-├── ir/remotes/
-│   └── <mando>/
-│       ├── meta.json
-│       └── buttons/*.raw
-├── subghz/signals/*.sub     # Capturas de radio guardadas
-└── app-log.log              # Registro de la aplicación
-```
-
-## Ejemplos y pruebas
-
-Para comprobar HID sin conectar un host USB ni modificar servicios del sistema:
-
-```bash
-make test-hid
-```
-
-Comprueba la selección, espera de enumeración y ejecución simulada del watcher, la ubicación de su configuración y el orden de persistencia/arranque del controller con servicios simulados. El test del controller requiere las cabeceras de LVGL preparadas según las secciones anteriores; no abre la interfaz ni usa dispositivos físicos.
-
-También dejé algunos ejemplos para probar partes concretas sin abrir toda la interfaz:
-
-| Archivo | Qué permite explorar |
-|---|---|
-| [main_hello_world.c](examples/main_hello_world.c) | Arranque básico de LVGL y texto en pantalla. |
-| [main_touch_calibration.c](examples/main_touch_calibration.c) | Lectura y calibración del touch. |
-| [main_touch_switch.c](examples/main_touch_switch.c) | Navegación con pulsadores GPIO. |
-
-Para compilar y ejecutar el ejemplo básico:
-
-```bash
-make example NAME=hello_world
-./bin/example-hello_world
-```
-
-La regla genérica de ejemplos del `Makefile` solo compila el archivo principal, por lo que todavía requiere ajustes para ellos. El ejemplo de pulsadores conserva su propia inicialización GPIO y su configuración de pantalla.
+La UI ofrece 315, 380, 381, 433,92, 868 y 915 MHz; que una opción aparezca no significa que esté validada con el módulo y antena instalados. La base de radio es OOK a 433,92 MHz. El replay admite hasta 256 duraciones de pulsos; los perfiles, la integridad de las capturas y la compatibilidad física siguen en desarrollo. Guardar una captura no garantiza que el receptor acepte su reproducción.
