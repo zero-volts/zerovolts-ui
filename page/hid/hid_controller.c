@@ -42,7 +42,8 @@ hid_status_t hid_controller_init(hid_controller *controller, const zv_config *cf
 
     controller->hid_enabled = cfg ? cfg->hid.is_enabled : false;
     set_last_error(NULL);
-    return HID_OK;
+
+    return hid_service_init(cfg);
 }
 
 hid_status_t hid_controller_set_selected_script(hid_controller *controller, const char *script_path)
@@ -69,16 +70,32 @@ hid_status_t hid_controller_toggle(hid_controller *controller, bool enable)
         return HID_ERR_INVALID;
     }
 
-    if (!enable) {
-        (void)hid_service_stop_session();
-        (void)hid_service_disable();
+    if (!enable) 
+    {
+        hid_status_t stop_result = hid_service_stop_session();
 
-        config_set_hid_selected_script("");
-        config_set_hid_enabled(false);
+        char stop_error[256];
+        snprintf(stop_error, sizeof(stop_error), "%s", last_error());
+
+        hid_status_t disable_result = hid_service_disable();
+        if (stop_result != HID_OK || disable_result != HID_OK)
+        {
+            if (stop_result != HID_OK)
+                set_last_error(stop_error);
+
+            return stop_result != HID_OK ? stop_result : disable_result;
+        }
+
+        if (config_set_hid_state("", false) != 0)
+        {
+            set_last_error("HID stopped, but its configuration could not be saved");
+            return HID_ERR_IO;
+        }
 
         controller->hid_enabled = false;
         controller->selected_script[0] = '\0';
         set_last_error(NULL);
+
         return HID_OK;
     }
 
@@ -88,26 +105,54 @@ hid_status_t hid_controller_toggle(hid_controller *controller, bool enable)
         return HID_ERR_INVALID;
     }
 
+    if (controller->hid_enabled)
+    {
+        set_last_error("Disable the current HID session before starting another");
+        return HID_ERR_INVALID;
+    }
+
+    if (!file_has_extension(controller->selected_script, ".py") || !file_exists(controller->selected_script))
+    {
+        set_last_error("Select an existing Python .py HID script");
+        return HID_ERR_INVALID;
+    }
+
+    // The watcher reads both fields when it starts; persist them together first.
+    hid_config_t previous = config_get()->hid;
+    if (config_set_hid_state(controller->selected_script, true) != 0)
+    {
+        set_last_error("Could not save HID selection before starting the session");
+        return HID_ERR_IO;
+    }
+
     hid_status_t rc = hid_service_enable();
     if (rc != HID_OK)
     {
-        log_error("[HID::controller]::hid_controller_toggle enabling service %s\n", last_error());
-        set_last_error(last_error());
+        char error[256];
+        snprintf(error, sizeof(error), "%s", last_error());
+        if (config_set_hid_state(previous.selected_file, previous.is_enabled) != 0)
+            log_error("[HID] Could not restore configuration after enable failure\n");
+
+        set_last_error(error);
         return rc;
     }
 
     rc = hid_service_start_session();
     if (rc != HID_OK)
     {
-        (void)hid_service_disable();
+        char error[256];
+        snprintf(error, sizeof(error), "%s", last_error());
+        if (hid_service_disable() != HID_OK)
+            log_error("[HID] Could not unbind gadget after session failure\n");
 
-        log_error("[HID::controller]::hid_controller_toggle starting session %s\n", last_error());
-        set_last_error(last_error());
+        if (config_set_hid_state(previous.selected_file, previous.is_enabled) != 0)
+            log_error("[HID] Could not restore configuration after session failure\n");
+
+        set_last_error(error);
+
         return rc;
     }
 
-    config_set_hid_selected_script(controller->selected_script);
-    config_set_hid_enabled(true);
     controller->hid_enabled = true;
     set_last_error(NULL);
 

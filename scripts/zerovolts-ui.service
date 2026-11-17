@@ -1,0 +1,20 @@
+# Template filled by install-hid.sh.
+[Unit]
+Description=ZeroVolts UI Application
+Requires=zv-hid-gadget.service
+Wants=getty.target
+After=zv-hid-gadget.service getty.target
+ConditionFileIsExecutable=@PROJECT_ROOT@/bin/zero-volts-ui
+
+[Service]
+Type=simple
+WorkingDirectory=@PROJECT_ROOT@
+ExecStart="@PROJECT_ROOT@/bin/zero-volts-ui"
+Restart=on-failure
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+

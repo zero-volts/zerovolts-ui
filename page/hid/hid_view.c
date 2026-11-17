@@ -102,7 +102,11 @@ static void hid_toggle_cb(lv_event_t *e)
     hid_status_t rc = hid_controller_toggle(&self->controller, on);
     if (rc != HID_OK)
     {
-        lv_obj_clear_state(sw, LV_STATE_CHECKED);
+        if (self->controller.hid_enabled)
+            lv_obj_add_state(sw, LV_STATE_CHECKED);
+        else
+            lv_obj_clear_state(sw, LV_STATE_CHECKED);
+
         set_status(hid_controller_last_error(), COLOR_ERROR, self);
         return;
     }

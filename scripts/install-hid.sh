@@ -48,14 +48,18 @@ install -o root -g root -m 644 \
 project_sed=${project_root//&/\\&}
 project_sed=${project_sed//#/\\#}
 
-# Create the session service from the template, changing @PROJECT_ROOT@ for the real project path
-sed "s#@PROJECT_ROOT@#$project_sed#g" \
-    "$scripts_dir/zv-hid-session.service" \
-    > /etc/systemd/system/zv-hid-session.service
-
-chmod 644 /etc/systemd/system/zv-hid-session.service
+# Fill the project path in the session and UI service templates.
+for service in zv-hid-session zerovolts-ui; do
+    sed "s#@PROJECT_ROOT@#$project_sed#g" \
+        "$scripts_dir/$service.service" \
+        > "/etc/systemd/system/$service.service"
+    chmod 644 "/etc/systemd/system/$service.service"
+done
 
 systemctl daemon-reload
+systemctl enable --now zv-hid-gadget.service
+# Replace previous enablement links, including the old graphical.target link.
+systemctl reenable --now zerovolts-ui.service
 
-echo ' HID files installed; hid.config_scripts keeps the script files'
-echo 'Now execute: sudo systemctl enable --now zv-hid-gadget.service'
+echo 'HID files installed; hid.config_scripts keeps the script files'
+echo 'Services installed and enabled; The UI will start only if the binary exists.'
