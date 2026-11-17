@@ -88,7 +88,7 @@ endif
 	$(MAKE) bin/example-$(NAME)
 
 clean:
-	rm -f $(APP_TARGET) $(EXAMPLE_TARGETS) bin/navigation-test bin/subghz-test
+	rm -f $(APP_TARGET) $(EXAMPLE_TARGETS)
 
 run: $(APP_TARGET)
 	./$(APP_TARGET)
