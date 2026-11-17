@@ -16,6 +16,7 @@ extern "C" {
 #define SUBGHZ_ALLOWED_MAX_SESSIONS 5
 #define SUBGHZ_DATA_CHUNK_MAX_VALUES 32
 #define SUBGHZ_CAPTURE_MAX_TIMINGS 256
+#define MAX_PATH_SIZE 1024
 
 typedef struct {
     char name[32];

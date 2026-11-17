@@ -2,6 +2,7 @@
 #define HID_SERVICE_H
 
 #include <stddef.h>
+#include "config.h"
 #include "utils/file.h"
 
 #ifdef __cplusplus
@@ -15,6 +16,7 @@ typedef enum {
     HID_ERR_INVALID = -3
 } hid_status_t;
 
+hid_status_t hid_service_init(const zv_config *config);
 hid_status_t hid_service_enable(void);
 hid_status_t hid_service_disable(void);
 hid_status_t hid_service_start_session(void);

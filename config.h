@@ -1,6 +1,8 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+#include "types.h"
+
 #include <stdbool.h>
 #include <stddef.h>
 
@@ -14,19 +16,21 @@ typedef struct {
 } uart_config_t;
 
 typedef struct {
-	char signals_path[512];
+	char signals_path[MAX_PATH_SIZE];
 } subghz_config_t;
 
 typedef struct {
-    char version[16];
-    struct {
-        bool is_enabled;
-        char list_path[512];
-        char selected_file[512];
-    } hid;
+    bool is_enabled;
+    char list_path[MAX_PATH_SIZE];
+    char selected_file[MAX_PATH_SIZE];
+    char config_scripts[MAX_PATH_SIZE];
+} hid_config_t;
 
+typedef struct {
+    char version[16];
+    hid_config_t hid;
     struct {
-        char remotes_path[512];
+        char remotes_path[MAX_PATH_SIZE];
         char backend[32];
         char tx_device[128];
         char rx_device[128];
@@ -52,6 +56,7 @@ const zv_config *config_get();
 
 void config_set_hid_selected_script(const char *path);
 void config_set_hid_enabled(bool enabled);
+int config_set_hid_state(const char *selected_script, bool enabled);
 
 #ifdef __cplusplus
 }

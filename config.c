@@ -20,6 +20,8 @@ void config_set_defaults(void)
     snprintf(_config.version, sizeof(_config.version), "%s", "0.1");
     _config.hid.selected_file[0] = '\0';
     _config.hid.is_enabled = false;
+    _config.hid.config_scripts[0] = '\0';
+
     _config.ir.remotes_path[0] = '\0';
     snprintf(_config.ir.backend, sizeof(_config.ir.backend), "%s", "irctl");
     snprintf(_config.ir.tx_device, sizeof(_config.ir.tx_device), "%s", "/dev/lirc0");
@@ -32,12 +34,12 @@ void config_set_defaults(void)
     snprintf(_config.uart.device, sizeof(_config.uart.device), "%s", "/dev/ttyAMA5");
     _config.uart.baudrate = 115200;
 
-    _config.subghz.signals_path[0] = '\0';    
+    _config.subghz.signals_path[0] = '\0';
 }
 
 int initialize_config(const char *path_config)
 {
-    if(!path_config || !path_config[0]) 
+    if(!path_config || !path_config[0])
         return -1;
 
     size_t len = strnlen(path_config, sizeof(config_path));
@@ -52,7 +54,7 @@ int initialize_config(const char *path_config)
 
 static void json_get_string(cJSON *obj, const char *key, const char *fallback, char *out, size_t out_sz)
 {
-    if(!out || out_sz == 0) 
+    if(!out || out_sz == 0)
         return;
 
     out[0] = '\0';
@@ -68,7 +70,7 @@ static void json_get_string(cJSON *obj, const char *key, const char *fallback, c
 static bool json_get_bool(cJSON *obj, const char *key, bool fallback)
 {
     cJSON *v = cJSON_GetObjectItemCaseSensitive(obj, key);
-    if(cJSON_IsBool(v)) 
+    if(cJSON_IsBool(v))
         return cJSON_IsTrue(v);
 
     return fallback;
@@ -90,17 +92,17 @@ static bool json_get_int_array(cJSON *obj, const char *key, int *out, size_t out
         return false;
 
     memcpy(out, fallback, output_size * sizeof(out));
-   
+
     size_t count = (size_t)cJSON_GetArraySize(array);
     if (count > output_size)
         count = output_size;
-        
+
     for (size_t i; i < count; i++)
     {
         const cJSON *item = cJSON_GetArrayItem(array, (int)i);
         if (cJSON_IsNumber(item))
             return false;
-        
+
         out[i] = item->valueint;
     }
 
@@ -129,6 +131,7 @@ static cJSON *cfg_to_json(void)
     cJSON *hid = cJSON_AddObjectToObject(root, "hid");
     cJSON_AddStringToObject(hid, "script_selected_path", _config.hid.selected_file);
     cJSON_AddStringToObject(hid, "script_list_path", strip_project_root(_config.hid.list_path));
+    cJSON_AddStringToObject(hid, "config_scripts", strip_project_root(_config.hid.config_scripts));
     cJSON_AddBoolToObject(hid, "is_enabled", _config.hid.is_enabled);
 
     cJSON *ir = cJSON_AddObjectToObject(root, "ir");
@@ -160,19 +163,22 @@ static void json_to_cfg(cJSON *root)
     json_get_string(root, "version", _config.version, _config.version, sizeof(_config.version));
 
     cJSON *hid = cJSON_GetObjectItemCaseSensitive(root, "hid");
-    if(cJSON_IsObject(hid)) 
+    if(cJSON_IsObject(hid))
     {
-        json_get_string(hid, "script_selected_path", _config.hid.selected_file, _config.hid.selected_file, 
+        json_get_string(hid, "script_selected_path", _config.hid.selected_file, _config.hid.selected_file,
             sizeof(_config.hid.selected_file));
 
-        json_get_string(hid, "script_list_path", _config.hid.list_path, _config.hid.list_path, 
+        json_get_string(hid, "config_scripts", _config.hid.config_scripts, _config.hid.config_scripts,
+            sizeof(_config.hid.config_scripts));
+
+        json_get_string(hid, "script_list_path", _config.hid.list_path, _config.hid.list_path,
             sizeof(_config.hid.list_path));
 
         _config.hid.is_enabled = json_get_bool(hid, "is_enabled", _config.hid.is_enabled);
     }
 
     cJSON *ir = cJSON_GetObjectItemCaseSensitive(root, "ir");
-    if(cJSON_IsObject(ir)) 
+    if(cJSON_IsObject(ir))
     {
         json_get_string(ir, "remotes_path", _config.ir.remotes_path, _config.ir.remotes_path,
             sizeof(_config.ir.remotes_path));
@@ -211,18 +217,18 @@ static void json_to_cfg(cJSON *root)
 
 int config_load()
 {
-    if(!config_path[0]) 
+    if(!config_path[0])
         return -1;
 
-    if(!file_exists(config_path)) 
+    if(!file_exists(config_path))
     {
         config_set_defaults();
         return 0;
     }
 
     cJSON *root = read_json_file(config_path);
-    if(!root) 
-    {    
+    if(!root)
+    {
         config_set_defaults();
         return -3;
     }
@@ -235,17 +241,17 @@ int config_load()
 
 int config_save()
 {
-    if(!config_path[0]) 
+    if(!config_path[0])
         return -1;
 
     cJSON *root = cfg_to_json();
-    if(!root) 
+    if(!root)
         return -2;
 
     char *printed = cJSON_Print(root); // pretty
     cJSON_Delete(root);
 
-    if(!printed) 
+    if(!printed)
         return -3;
 
     int rc = write_entire_file(config_path, printed, strlen(printed));
@@ -271,6 +277,23 @@ void config_set_hid_enabled(bool enabled)
     config_save();
 }
 
+int config_set_hid_state(const char *selected_script, bool enabled)
+{
+    if (!selected_script || strlen(selected_script) >= sizeof(_config.hid.selected_file))
+        return -1;
+
+    hid_config_t previous = _config.hid;
+
+    snprintf(_config.hid.selected_file, sizeof(_config.hid.selected_file), "%s", selected_script);
+    _config.hid.is_enabled = enabled;
+
+    int result = config_save();
+    if (result != 0)
+        _config.hid = previous;
+
+    return result;
+}
+
 void config_resolve_paths(const char *root)
 {
     if (!root || !root[0])
@@ -280,10 +303,13 @@ void config_resolve_paths(const char *root)
     if (written < 0 || (size_t)written >= sizeof(project_root))
         return;
 
+    size_t root_len = strlen(root);
+
     // If path starts with '/', it's already absolute — leave it alone.
     // Otherwise, prepend project_root to make it absolute.
-    if (_config.ir.remotes_path[0] && _config.ir.remotes_path[0] != '/') {
-        size_t root_len = strlen(root);
+    if (_config.ir.remotes_path[0] && _config.ir.remotes_path[0] != '/')
+    {
+
         size_t path_len = strlen(_config.ir.remotes_path);
         if (root_len < sizeof(_config.ir.remotes_path) &&
             path_len < sizeof(_config.ir.remotes_path) - root_len - 1) {
@@ -293,14 +319,26 @@ void config_resolve_paths(const char *root)
         }
     }
 
-    if (_config.hid.list_path[0] && _config.hid.list_path[0] != '/') {
-        size_t root_len = strlen(root);
+    if (_config.hid.list_path[0] && _config.hid.list_path[0] != '/')
+    {
         size_t path_len = strlen(_config.hid.list_path);
         if (root_len < sizeof(_config.hid.list_path) &&
             path_len < sizeof(_config.hid.list_path) - root_len - 1) {
             memmove(_config.hid.list_path + root_len + 1, _config.hid.list_path, path_len + 1);
             memcpy(_config.hid.list_path, root, root_len);
             _config.hid.list_path[root_len] = '/';
+        }
+    }
+
+    if (_config.hid.config_scripts[0] && _config.hid.config_scripts[0] != '/')
+    {
+        size_t path_len = strlen(_config.hid.config_scripts);
+        size_t path_size = sizeof(_config.hid.config_scripts);
+        if (root_len < path_size && path_len < path_size - root_len - 1)
+        {
+            memmove(_config.hid.config_scripts + root_len + 1, _config.hid.config_scripts, path_len + 1);
+            memcpy(_config.hid.config_scripts, root, root_len);
+            _config.hid.config_scripts[root_len] = '/';
         }
     }
 }
