@@ -100,7 +100,7 @@ const zv_config *setup_config()
     {
         hid_service_init(config);
         if (hid_service_enable() != HID_OK || hid_service_start_session() != HID_OK)
-            log_error("[HID] Automatica startup failed: %s\n", hid_service_last_error());
+            log_error("[HID] Automatica startup failed\n");
     }
 
     return config;

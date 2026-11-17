@@ -22,7 +22,6 @@ hid_status_t hid_service_disable(void);
 hid_status_t hid_service_start_session(void);
 hid_status_t hid_service_stop_session(void);
 hid_status_t hid_service_list_scripts_cb(const char *scripts_dir, file_callback callback, void *user_data);
-const char *hid_service_last_error(void);
 
 #ifdef __cplusplus
 }
