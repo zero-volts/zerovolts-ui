@@ -1,11 +1,16 @@
-# /etc/systemd/system/zv-hid-session.service
+# Template filled by install-hid.sh; do not copy directly to /etc/systemd.
+
 [Unit]
-Description=ZeroVolts HID Session (auto-run script on host connect)
-After=multi-user.target
+Description=ZeroVolts HID session (once per UI activation)
+Requires=zv-hid-gadget.service
+After=zv-hid-gadget.service
+PartOf=zv-hid-gadget.service
 
 [Service]
-Type=simple
-ExecStart=/home/zerovolts/git/zerovolts-ui/scripts/hid_watcher.py
-
-[Install]
-WantedBy=multi-user.target
+Type=exec
+WorkingDirectory=@PROJECT_ROOT@
+Environment="ZV_PROJECT_ROOT=@PROJECT_ROOT@"
+ExecStart=/usr/bin/python3 /usr/local/lib/zerovolts/hid/zv-hid-session.py
+KillMode=control-group
+TimeoutStopSec=3
+Restart=no

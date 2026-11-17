@@ -11,9 +11,11 @@
 
 #include "drivers/gpio_buttons.h"
 
+#include "config.h"
+#include "utils/file.h"
+#include "utils/logger.h"
 #include "components/top_bar.h"
 #include "components/ui_theme.h"
-#include "components/component_helper.h"
 #include "page/navigation_page.h"
 #include "page/home_view.h"
 #include "page/hid/hid_view.h"
@@ -21,12 +23,11 @@
 #include "page/ir/learn_button.h"
 #include "page/ir/new_remote.h"
 #include "page/bt/bt_view.h"
-#include "page/sub_ghz/sub_ghz_view.h"
-#include "config.h"
+#include "service/hid_service.h"
 #include "service/uart_service.h"
 #include "utils/error_handler.h"
-#include "utils/file.h"
-#include "utils/logger.h"
+#include "page/sub_ghz/sub_ghz_view.h"
+#include "components/component_helper.h"
 
 #define NAV_GPIO    21  // Physical pin 40 (moves focus)
 #define SELECT_GPIO 26  // Physical pin 37 (enter/select)
@@ -94,7 +95,15 @@ const zv_config *setup_config()
         config_resolve_paths(project_root);
     }
 
-    return config_get();
+    const zv_config *config = config_get();
+    if (config->hid.is_enabled)
+    {
+        hid_service_init(config);
+        if (hid_service_enable() != HID_OK || hid_service_start_session() != HID_OK)
+            log_error("[HID] Automatica startup failed: %s\n", hid_service_last_error());
+    }
+
+    return config;
 }
 
 /* ================= NAV ================= */

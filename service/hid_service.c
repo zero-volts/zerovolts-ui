@@ -76,7 +76,7 @@ hid_status_t hid_service_enable(void)
     }
 
     char command [MAX_PATH_SIZE];
-    int wr = snprintf(command, sizeof(command), "%s/zv-hid-enable.sh", service_ctx.config_scripts);
+    int wr = snprintf(command, sizeof(command), "%s/zv-hid-gadget-bind.sh", service_ctx.config_scripts);
     if (wr < 0 || (size_t)wr >= sizeof (command))
     {
         return HID_ERR_INVALID;
@@ -94,7 +94,7 @@ hid_status_t hid_service_disable(void)
     }
 
     char command [MAX_PATH_SIZE];
-    int wr = snprintf(command, sizeof(command), "%s/zv-hid-disable.sh", service_ctx.config_scripts);
+    int wr = snprintf(command, sizeof(command), "%s/zv-hid-gadget-unbind.sh", service_ctx.config_scripts);
     if (wr < 0 || (size_t)wr >= sizeof (command))
     {
         return HID_ERR_INVALID;

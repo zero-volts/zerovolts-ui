@@ -1,0 +1,12 @@
+[Unit]
+Description=ZeroVolts HID gadget preparation
+After=local-fs.target systemd-modules-load.service
+RequiresMountsFor=/sys/kernel/config
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/lib/zerovolts/hid/zv-hid-gadget-setup.sh
+
+[Install]
+WantedBy=multi-user.target
