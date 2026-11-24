@@ -151,7 +151,7 @@ static subghz_capture_session_t *subghz_find_session(const uint64_t session_id)
 void subghz_add_session_chunk(const subghz_data_chunk_t chunk)
 {
     if (chunk.capture_id == 0 || chunk.chunks == 0 || chunk.seq >= chunk.chunks ||
-            chunk.count == 0 || chunk.count > SUBGHZ_DATA_CHUNK_MAX_VALUES)
+            chunk.count == 0 || chunk.count > ZV_COM_CAPTURE_CHUNK_VALUES)
     {
         log_info("Can't save more sessions, is in the limit of %d", SUBGHZ_ALLOWED_MAX_SESSIONS);
         return;
@@ -185,7 +185,7 @@ void subghz_add_session_chunk(const subghz_data_chunk_t chunk)
         return;   
     }
 
-    if (chunk.count > SUBGHZ_CAPTURE_MAX_TIMINGS - session_found->count)
+    if (chunk.count > ZV_COM_SEND_MAX_TIMINGS - session_found->count)
     {
         log_warning("Signal exceeds session capacity");
         return;

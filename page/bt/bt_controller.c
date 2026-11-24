@@ -9,7 +9,7 @@
 #include "utils/string_utils.h"
 #include "utils/error_handler.h"
 #include "utils/parser.h"
-#include "service/uart_commands.h"
+#include "zv_com_protocol.h"
 
 #define UART_BT_TAG_ID "BT_TAG_CONTROLLER"
 #define BT_SERVICE_TIMEOUT_PROCCESS_MS 30000
@@ -200,12 +200,13 @@ static void event_handler(const char *tag_id, char *buffer)
     // -- SCAN --
     if (context.internal_cb != NULL)
     {
-        if (strstr(buffer, BT_COMMAND_RES_SCAN_START) != NULL) {
+        if (protocol_message_is(buffer, ZV_COM_RES_BLE_SCAN_START))
+        {
             context.internal_cb(NULL, UI_LOADING);
             return;
         }
 
-        if (strstr(buffer, BT_COMMAND_RES_SCAN_DONE) != NULL)
+        if (protocol_message_is(buffer, ZV_COM_RES_BLE_SCAN_DONE))
         {   
             context.internal_cb(NULL, UI_DONE);
 
@@ -214,7 +215,7 @@ static void event_handler(const char *tag_id, char *buffer)
             return;
         }
 
-        if (strstr(buffer, BT_COMMAND_RES_SCAN_DEVICE) != NULL)
+        if (protocol_message_is(buffer, ZV_COM_RES_BLE_SCAN_DEVICE))
         {
             device_t device = parse_device(buffer);
             context.internal_cb(&device, UI_LOADING);
@@ -225,19 +226,19 @@ static void event_handler(const char *tag_id, char *buffer)
     }
 
     // -- CONNECT --
-    if (zv_starts_with(buffer, BT_COMMAND_RES_CONNECT_START))
+    if (protocol_message_is(buffer, ZV_COM_RES_BLE_CONNECT_START))
     {
         set_status(BT_CONNECTING, NULL);
         return;
     }
 
-    if (zv_starts_with(buffer, BT_COMMAND_RES_CONNECT_OK))
+    if (protocol_message_is(buffer, ZV_COM_RES_BLE_CONNECT_OK))
     {
         set_status(BT_CONNECTED, NULL);
         return;
     }
 
-    if (zv_starts_with(buffer, BT_COMMAND_RES_CONNECT_FAIL))
+    if (protocol_message_is(buffer, ZV_COM_RES_BLE_CONNECT_FAIL))
     {
         char reason[32] = {0};
         get_field_value(buffer, "reason", reason, sizeof(reason));
@@ -247,7 +248,7 @@ static void event_handler(const char *tag_id, char *buffer)
         return;
     }
 
-    if (zv_starts_with(buffer, BT_COMMAND_RES_CONNECT_LOST))
+    if (protocol_message_is(buffer, ZV_COM_RES_BLE_CONNECT_LOST))
     {
         char reason[32] = {0};
         get_field_value(buffer, "reason", reason, sizeof(reason));
@@ -257,7 +258,7 @@ static void event_handler(const char *tag_id, char *buffer)
         return;
     }
 
-    if (zv_starts_with(buffer, BT_COMMAND_RES_CONNECT_ERROR))
+    if (protocol_message_is(buffer, ZV_COM_RES_BLE_CONNECT_ERROR))
     {
         set_status(BT_FAILED, "command error");
         uart_cancel_response_timeout(UART_BT_TAG_ID);
@@ -266,7 +267,7 @@ static void event_handler(const char *tag_id, char *buffer)
     }
 
     // -- DISCONNECT --
-    if (zv_starts_with(buffer, BT_COMMAND_RES_DISCONNECT_OK))
+    if (protocol_message_is(buffer, ZV_COM_RES_BLE_DISCONNECT_OK))
     {
         set_status(BT_DISCONNECTED, NULL);
         uart_cancel_response_timeout(UART_BT_TAG_ID);
@@ -275,7 +276,7 @@ static void event_handler(const char *tag_id, char *buffer)
     }
 
     // -- DISCOVER --
-    if (zv_starts_with(buffer, BT_COMMAND_RES_DISCOVER_START))
+    if (protocol_message_is(buffer, ZV_COM_RES_BLE_DISCOVER_START))
     {
         services_count = 0;
         memset(services, 0, sizeof(services));
@@ -283,23 +284,26 @@ static void event_handler(const char *tag_id, char *buffer)
         return;
     }
 
-    if (zv_starts_with(buffer, BT_COMMAND_RES_DISCOVER_SERVICE)) {
+    if (protocol_message_is(buffer, ZV_COM_RES_BLE_DISCOVER_SERVICE))
+    {
         parse_discover_service(buffer);
         return;
     }
 
-    if (zv_starts_with(buffer, BT_COMMAND_RES_DISCOVER_CHAR)) {
+    if (protocol_message_is(buffer, ZV_COM_RES_BLE_DISCOVER_CHAR))
+    {
         parse_discover_char(buffer);
         return;
     }
-    if (zv_starts_with(buffer, BT_COMMAND_RES_DISCOVER_DONE))
+
+    if (protocol_message_is(buffer, ZV_COM_RES_BLE_DISCOVER_DONE))
     {
         set_status(BT_READY, NULL);
         uart_cancel_response_timeout(UART_BT_TAG_ID);
         return;
     }
 
-    if (zv_starts_with(buffer, BT_COMMAND_RES_DISCOVER_FAIL))
+    if (protocol_message_is(buffer, ZV_COM_RES_BLE_DISCOVER_FAIL))
     {
         char reason[32] = {0};
         get_field_value(buffer, "reason", reason, sizeof(reason));
@@ -362,7 +366,7 @@ uart_status_t bt_controller_init(const uart_config_t *config)
 uart_status_t start_scan()
 {
     context.bt_status = BT_SCANNING;
-    uart_status_t uart_rc = uart_send_line("SCAN");
+    uart_status_t uart_rc = uart_send_line(ZV_COM_REQ_BLE_SCAN);
     if (uart_rc != UART_OK)
     {
         context.bt_status = BT_FAILED;
@@ -391,8 +395,7 @@ uart_status_t bt_connect(const device_t *device)
     set_status(BT_CONNECTING, NULL);
 
     context.bt_status = BT_CONNECTING;
-    uart_status_t rc = uart_send_formatted_line("%s|%s|%d",
-             BT_COMMAND_REQ_CONNECT, device->mac, device->addr_type);
+    uart_status_t rc = uart_send_formatted_line("%s|%s|%d", ZV_COM_REQ_BLE_CONNECT, device->mac, device->addr_type);
 
     if (rc != UART_OK)
     {
@@ -413,7 +416,7 @@ uart_status_t bt_connect(const device_t *device)
 
 uart_status_t bt_disconnect(void)
 {
-    uart_status_t rc = uart_send_line(BT_COMMAND_REQ_DISCONNECT);
+    uart_status_t rc = uart_send_line(ZV_COM_REQ_BLE_DISCONNECT);
     if (rc != UART_OK) {
         log_warning("bt_disconnect error: %s\n", last_error());
     }

@@ -20,9 +20,8 @@
 
 #define DEFAULT_CAPTURE_TIMEFRAME_MS 30000 // 30seg
 
-#define CAPTURE_MAX_PULSES       256
 #define CHART_POINTS_PER_PULSE     2
-#define CHART_MAX_POINTS          (CAPTURE_MAX_PULSES * CHART_POINTS_PER_PULSE)
+#define CHART_MAX_POINTS          (ZV_COM_SEND_MAX_TIMINGS * CHART_POINTS_PER_PULSE)
 
 /* Dejamos margen vertical para que HIGH y LOW no queden bajo el borde. */
 #define CHART_LEVEL_LOW            2

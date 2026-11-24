@@ -2,8 +2,11 @@
 APP_TARGET := bin/zero-volts-ui
 CC := gcc
 LVPORT := $(HOME)/git/lv_port_linux
+PROTOCOL_DIR ?= ../zerovolts_firmware/protocol
+PROTOCOL_HEADER := $(PROTOCOL_DIR)/zv_com_protocol.h
 EXAMPLE_SRCS := $(wildcard examples/main_*.c)
 EXAMPLE_TARGETS := $(patsubst examples/main_%.c,bin/example-%,$(EXAMPLE_SRCS))
+APP_HEADERS := $(wildcard *.h utils/*.h drivers/*.h components/*.h components/*/*.h page/*.h page/*/*.h service/*.h service/*/*.h)
 
 SRC := \
 	main.c \
@@ -55,6 +58,7 @@ SRC := \
 
 
 INCLUDES := \
+	-I$(PROTOCOL_DIR) \
 	-I. \
 	-I$(LVPORT)/lvgl \
 	-I$(LVPORT)/lvgl/src/drivers/display/fb \
@@ -70,7 +74,7 @@ LIBS := $(LVPORT)/build/lvgl/lib/liblvgl.a
 
 all: setup $(APP_TARGET)
 
-$(APP_TARGET): $(SRC)
+$(APP_TARGET): $(SRC) $(PROTOCOL_HEADER) $(APP_HEADERS) Makefile | setup
 	$(CC) $(SRC) -o $(APP_TARGET) $(CFLAGS) $(INCLUDES) $(LIBS) $(LDFLAGS)
 
 setup:
@@ -78,7 +82,7 @@ setup:
 
 examples: setup $(EXAMPLE_TARGETS)
 
-bin/example-%: examples/main_%.c
+bin/example-%: examples/main_%.c $(PROTOCOL_HEADER) $(APP_HEADERS) Makefile | setup
 	$(CC) $< -o $@ $(CFLAGS) $(INCLUDES) $(LIBS) $(LDFLAGS)
 
 example: setup
@@ -89,6 +93,7 @@ endif
 
 clean:
 	rm -f $(APP_TARGET) $(EXAMPLE_TARGETS)
+
 
 run: $(APP_TARGET)
 	./$(APP_TARGET)

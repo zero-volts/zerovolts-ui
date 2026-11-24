@@ -41,7 +41,7 @@ bool subghz_file_create(const char *file_name_path, subghz_capture_session_t *se
 {
     if (!file_name_path || !file_name_path[0] || !session ||
         !session->completed || !session->frequency || session->count == 0 ||
-        session->count > SUBGHZ_CAPTURE_MAX_TIMINGS)
+        session->count > ZV_COM_SEND_MAX_TIMINGS)
         return false;
 
     const char *preset_str = NULL;

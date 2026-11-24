@@ -19,7 +19,7 @@ typedef struct  {
     uint16_t expected_chunks;
     uint16_t received_chunks;
     uint16_t count;
-    int32_t timings[SUBGHZ_CAPTURE_MAX_TIMINGS];
+    int32_t timings[ZV_COM_SEND_MAX_TIMINGS];
     bool completed;
 } subghz_capture_session_t;
 

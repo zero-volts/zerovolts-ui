@@ -4,6 +4,8 @@
 extern "C" {
 #endif
 
+#include "zv_com_protocol.h"
+
 #include <stdint.h>
 #include <stdio.h>
 
@@ -14,8 +16,6 @@ extern "C" {
 #define BT_UUID_STR_LEN 37
 
 #define SUBGHZ_ALLOWED_MAX_SESSIONS 5
-#define SUBGHZ_DATA_CHUNK_MAX_VALUES 32
-#define SUBGHZ_CAPTURE_MAX_TIMINGS 256
 #define MAX_PATH_SIZE 1024
 
 typedef struct {
@@ -69,7 +69,7 @@ typedef struct {
     uint16_t seq;
     uint16_t chunks;
     uint16_t count;
-    int32_t timings[32];
+    int32_t timings[ZV_COM_CAPTURE_CHUNK_VALUES];
 } subghz_data_chunk_t;
 
 typedef struct {

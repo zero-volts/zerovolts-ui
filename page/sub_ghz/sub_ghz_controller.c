@@ -186,7 +186,7 @@ bool subghz_controller_discard_session( uint64_t session_id)
 
 subghz_status_t subghz_controller_replay(const char *file_name, int times)
 {
-    if (!file_name || !file_name[0] || times <= 0 || times > UINT16_MAX)
+    if (!file_name || !file_name[0] || times <= 0 || times > ZV_COM_SEND_MAX_REPETITIONS)
         return SUBGHZ_ERR_INVALID;
 
     subghz_flipper_sub_file_t file_data = {0};

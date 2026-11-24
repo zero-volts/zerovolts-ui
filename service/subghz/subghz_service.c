@@ -15,17 +15,15 @@
 #include "utils/parser.h"
 #include "utils/error_handler.h"
 #include "service/uart_service.h"
-#include "service/uart_commands.h"
+#include "zv_com_protocol.h"
 
-#define SUBGHZ_SEND_CHUNK_VALUES            16
-#define SUBGHZ_SEND_MAX_TIMINGS             256
 #define SUBGHZ_US_PER_MS                   1000
 #define SUBGHZ_TIMEOUT_PER_REPEAT_MS       100
 #define SUBGHZ_TIMEOUT_FIXED_MARGIN_MS     2000 // Estimated margin for radio setup, command processing and the UART reply.
 #define SUBGHZ_UPLOAD_RESPONSE_TIMEOUT_MS  2000 // Maximum wait for BEGIN_OK or the ACK of one data block.
 
 #define UART_SUBGHZ_TAG_ID "SUBGHZ_TAG_CONTROLLER"
-#define DATA_TIMING_BUFFER SUBGHZ_DATA_CHUNK_MAX_VALUES * 10
+#define DATA_TIMING_BUFFER (ZV_COM_CAPTURE_CHUNK_VALUES * 12)
 
 typedef enum {
     REPLAY_IDLE = 0,
@@ -41,7 +39,7 @@ static struct {
     uint16_t count;
     uint16_t chunks;
     uint64_t completion_timeout_ms;
-    int32_t timings[SUBGHZ_SEND_MAX_TIMINGS];
+    int32_t timings[ZV_COM_SEND_MAX_TIMINGS];
 } replay;
 
 typedef struct {
@@ -128,15 +126,14 @@ static void on_event_timeout(const char *tag_id)
 
 static subghz_status_t send_replay_chunk(void)
 {
-    uint16_t start = replay.seq * SUBGHZ_SEND_CHUNK_VALUES;
+    uint16_t start = replay.seq * ZV_COM_SEND_CHUNK_VALUES;
     uint16_t count = replay.count - start;
-    if (count > SUBGHZ_SEND_CHUNK_VALUES)
-        count = SUBGHZ_SEND_CHUNK_VALUES;
+    if (count > ZV_COM_SEND_CHUNK_VALUES)
+        count = ZV_COM_SEND_CHUNK_VALUES;
 
     char line[254];
-    int written = snprintf(line, sizeof(line),
-        "%s|id=%" PRIu32 "|seq=%" PRIu16 "|count=%" PRIu16 "|timings=",
-        SUBGHZ_COMMAND_REQ_SEND_DATA, replay.id, replay.seq, count);
+    int written = snprintf(line, sizeof(line), "%s|id=%" PRIu32 "|seq=%" PRIu16 "|count=%" PRIu16 "|timings=",
+        ZV_COM_REQ_SUBGHZ_SEND_DATA, replay.id, replay.seq, count);
 
     if (written < 0 || (size_t)written >= sizeof(line))
     {
@@ -169,7 +166,7 @@ static subghz_status_t send_replay_chunk(void)
 
 static subghz_status_t send_replay_end(void)
 {
-    uart_status_t result = uart_send_formatted_line("%s|id=%" PRIu32, SUBGHZ_COMMAND_REQ_SEND_END, replay.id);
+    uart_status_t result = uart_send_formatted_line("%s|id=%" PRIu32, ZV_COM_REQ_SUBGHZ_SEND_END, replay.id);
     if (result != UART_OK)
         return (subghz_status_t)result;
 
@@ -192,7 +189,7 @@ static bool handle_replay_response(const char *buffer)
     if (!id[0] || *end || response_id != replay.id)
         return false;
 
-    if (strncmp(buffer, SUBGHZ_COMMAND_RES_SEND_FAIL "|", strlen(SUBGHZ_COMMAND_RES_SEND_FAIL) + 1) == 0)
+    if (strncmp(buffer, ZV_COM_RES_SUBGHZ_SEND_FAIL "|", strlen(ZV_COM_RES_SUBGHZ_SEND_FAIL) + 1) == 0)
     {
         char reason[128] = "Sub-GHz replay failed.";
         get_field_value(buffer, "reason", reason, sizeof(reason));
@@ -205,13 +202,13 @@ static bool handle_replay_response(const char *buffer)
     switch (ctx.replay_state)
     {
         case REPLAY_WAIT_BEGIN_OK: 
-            expected = SUBGHZ_COMMAND_RES_SEND_BEGIN_OK; 
+            expected = ZV_COM_RES_SUBGHZ_SEND_BEGIN_OK;
             break;
         case REPLAY_WAIT_ACK: 
-            expected = SUBGHZ_COMMAND_RES_SEND_ACK;
+            expected = ZV_COM_RES_SUBGHZ_SEND_ACK;
             break;
         case REPLAY_WAIT_DONE: 
-            expected = SUBGHZ_COMMAND_RES_SEND_DONE;
+            expected = ZV_COM_RES_SUBGHZ_SEND_DONE;
             break;
         default: 
             return false;
@@ -282,53 +279,67 @@ subghz_status_t subghz_service_list_signals_cb(const char *signals_dir, file_cal
     return SUBGHZ_OK;
 }
 
+static bool read_uint_field(const char *buffer, const char *key, uint64_t max, uint64_t *value)
+{
+    char text[32];
+    if (!get_field_value(buffer, key, text, sizeof(text)) || !isdigit((unsigned char)text[0]))
+        return false;
+
+    char *end;
+    errno = 0;
+    unsigned long long parsed = strtoull(text, &end, 10);
+    if (errno == ERANGE || *end || parsed > max)
+        return false;
+
+    *value = parsed;
+    return true;
+}
+
 static bool parse_capture_data(const char *buffer, subghz_data_chunk_t *chunk)
 {
-    char tmp_value[21];
+    uint64_t value;
     char timing_buffer[DATA_TIMING_BUFFER];
-
-    if(!get_field_value(buffer, "capture_id", tmp_value, sizeof(tmp_value)) )
+    if (!read_uint_field(buffer, "capture_id", UINT64_MAX, &value) || value == 0)
         return false;
 
-    chunk->capture_id = strtoull(tmp_value, NULL, 10);
-
-    if(!get_field_value(buffer, "seq", tmp_value, sizeof(tmp_value)) )
+    chunk->capture_id = value;
+    if (!read_uint_field(buffer, "seq", UINT16_MAX, &value))
         return false;
 
-    chunk->seq = strtoul(tmp_value, NULL, 10);
-
-    if(!get_field_value(buffer, "chunks", tmp_value, sizeof(tmp_value)) )
+    chunk->seq = value;
+    if (!read_uint_field(buffer, "chunks", ZV_COM_SEND_MAX_TIMINGS, &value) || value == 0)
         return false;
 
-    chunk->chunks = strtoul(tmp_value, NULL, 10);
-
-    if (!get_field_value(buffer, "count", tmp_value, sizeof(tmp_value)) )
+    chunk->chunks = value;
+    if (chunk->seq >= chunk->chunks ||
+        !read_uint_field(buffer, "count", ZV_COM_CAPTURE_CHUNK_VALUES, &value) || value == 0)
         return false;
 
-    chunk->count = strtoul(tmp_value, NULL, 10);
-    if (chunk->count > SUBGHZ_DATA_CHUNK_MAX_VALUES)
+    chunk->count = value;
+    if (!get_field_value(buffer, "timings", timing_buffer, sizeof(timing_buffer)))
+        return false;
+
+    const char *cursor = timing_buffer;
+    for (uint16_t i = 0; i < chunk->count; i++)
     {
-        log_error("wrong data chunks for parse_capture_data %u\n", chunk->count);
-        return false;
+        char *end;
+        errno = 0;
+        long timing = strtol(cursor, &end, 10);
+        if (errno == ERANGE || end == cursor || timing == 0 ||
+            timing < INT32_MIN || timing > INT32_MAX)
+            return false;
+
+        chunk->timings[i] = (int32_t)timing;
+        if (i + 1 == chunk->count)
+            return *end == '\0';
+
+        if (*end != ',')
+            return false;
+
+        cursor = end + 1;
     }
 
-    if(!get_field_value(buffer, "timings", timing_buffer, sizeof(timing_buffer)) )
-        return false;
-
-    char *saveptr;
-    char *token = strtok_r(timing_buffer, ",", &saveptr);
-
-    uint16_t timing_idx = 0;
-    while (token != NULL)
-    {
-        if (timing_idx >= chunk->count  || timing_idx >= SUBGHZ_DATA_CHUNK_MAX_VALUES)
-            break;
-
-        chunk->timings[timing_idx++] = (int32_t)strtol(token, NULL, 10);
-        token = strtok_r(NULL, ",", &saveptr);
-    }
-
-    return true;
+    return false;
 }
 
 static void event_handler(const char *tag_id, char *buffer)
@@ -348,7 +359,7 @@ static void event_handler(const char *tag_id, char *buffer)
         .status = SUBGHZ_OK,
     };
 
-    if (strstr(buffer, SUBGHZ_COMMAND_RES_CAPTURE_START) != NULL)
+    if (protocol_message_is(buffer, ZV_COM_RES_SUBGHZ_CAPTURE_START))
     {
         if (ctx.capture_status != SUBGHZ_CAPTURE_WAIT_START)
             return;
@@ -360,30 +371,26 @@ static void event_handler(const char *tag_id, char *buffer)
         return;
     }
 
-    if (strstr(buffer, SUBGHZ_COMMAND_RES_CAPTURE_DONE) != NULL)
+    if (protocol_message_is(buffer, ZV_COM_RES_SUBGHZ_CAPTURE_DONE))
     {
-        char tmp_value[21];
-        if (!get_field_value(buffer, "capture_id", tmp_value, sizeof(tmp_value)))
+        uint64_t session_id, frequency, count, chunks;
+        if (!read_uint_field(buffer, "capture_id", UINT64_MAX, &session_id) ||
+            session_id == 0 || session_id != ctx.capture_id)
         {
-            finish_capture(SUBGHZ_CAPTURE_FAILED, SUBGHZ_ERR_INVALID, "Capture result is missing capture_id.", NULL);
+            finish_capture(SUBGHZ_CAPTURE_FAILED, SUBGHZ_ERR_INVALID, "Invalid capture result ID.", NULL);
             return;
         }
 
-        uint64_t session_id = strtoull(tmp_value, NULL, 10);
         subghz_capture_session_t *session = subghz_get_session_by(session_id);
-        char *end = NULL;
-        if (!session || !get_field_value(buffer, "freq", tmp_value, sizeof(tmp_value)))
+        if (!session ||
+            !read_uint_field(buffer, "freq_hz", UINT32_MAX, &frequency) || frequency == 0 ||
+            !read_uint_field(buffer, "count", ZV_COM_SEND_MAX_TIMINGS, &count) || count != session->count ||
+            !read_uint_field(buffer, "chunks", UINT16_MAX, &chunks) || chunks != session->expected_chunks)
         {
-            finish_capture(SUBGHZ_CAPTURE_FAILED, SUBGHZ_ERR_INVALID, "Captura incompleta o sin frecuencia", NULL);
+            finish_capture(SUBGHZ_CAPTURE_FAILED, SUBGHZ_ERR_INVALID, "Capture metadata does not match received data.", NULL);
             return;
         }
 
-        unsigned long long frequency = strtoull(tmp_value, &end, 10);
-        if (!tmp_value[0] || *end || frequency == 0 || frequency > UINT32_MAX)
-        {
-            finish_capture(SUBGHZ_CAPTURE_FAILED, SUBGHZ_ERR_INVALID, "Frecuencia de captura invalida", NULL);
-            return;
-        }
         session->frequency = (uint32_t)frequency;
 
         if (!subghz_set_session_completed(session_id))
@@ -396,7 +403,7 @@ static void event_handler(const char *tag_id, char *buffer)
         return;
     }
 
-    if (strstr(buffer, SUBGHZ_COMMAND_RES_CAPTURE_DATA) != NULL)
+    if (protocol_message_is(buffer, ZV_COM_RES_SUBGHZ_CAPTURE_DATA))
     {
         subghz_data_chunk_t chunk = {0};
         if (!parse_capture_data(buffer, &chunk))
@@ -412,7 +419,22 @@ static void event_handler(const char *tag_id, char *buffer)
         }
 
         ctx.capture_id = chunk.capture_id;
+        subghz_capture_session_t *session = subghz_get_session_by(chunk.capture_id);
+        if ((!session && chunk.seq != 0) ||
+            (session && (session->next_seq != chunk.seq || session->expected_chunks != chunk.chunks)))
+        {
+            finish_capture(SUBGHZ_CAPTURE_FAILED, SUBGHZ_ERR_INVALID, "Capture block is out of sequence.", NULL);
+            return;
+        }
+
         subghz_add_session_chunk(chunk);
+        session = subghz_get_session_by(chunk.capture_id);
+        if (!session || session->next_seq != chunk.seq + 1)
+        {
+            finish_capture(SUBGHZ_CAPTURE_FAILED, SUBGHZ_ERR_INVALID, "Capture block could not be stored.", NULL);
+            return;
+        }
+
         ctx.capture_status = SUBGHZ_CAPTURE_RECEIVING;
         event.data = &chunk;
         event.type = SUBGHZ_EVENT_CAPTURE_DATA;
@@ -421,13 +443,16 @@ static void event_handler(const char *tag_id, char *buffer)
         return;
     }
 
-    if (strstr(buffer, SUBGHZ_COMMAND_RES_CAPTURE_ERROR) != NULL || strstr(buffer, SUBGHZ_COMMAND_RES_CAPTURE_FAIL) != NULL)
+    if (protocol_message_is(buffer, ZV_COM_RES_SUBGHZ_CAPTURE_ERROR) || 
+        protocol_message_is(buffer, ZV_COM_RES_SUBGHZ_CAPTURE_FAIL))
     {
         char err_message[255] = "Unknown capture error";
         get_field_value(buffer, "reason", err_message, sizeof(err_message));
         bool timed_out = strcmp(err_message, "timeout") == 0;
-        finish_capture(timed_out ? SUBGHZ_CAPTURE_TIMEOUT : SUBGHZ_CAPTURE_FAILED,
-                       timed_out ? SUBGHZ_ERR_TIMEOUT : SUBGHZ_ERR_IO, err_message, NULL);
+
+        subghz_capture_status_t capture_status = timed_out ? SUBGHZ_CAPTURE_TIMEOUT : SUBGHZ_CAPTURE_FAILED;
+        subghz_status_t subghz_status = timed_out ? SUBGHZ_ERR_TIMEOUT : SUBGHZ_ERR_IO;
+        finish_capture(capture_status, subghz_status, err_message, NULL);
     }
 }
 
@@ -484,7 +509,7 @@ subghz_status_t subghz_service_start_capture(uint32_t frequency, uint32_t time_f
     ctx.capture_id = 0;
     ctx.capture_status = SUBGHZ_CAPTURE_WAIT_START;
     uart_status_t uart_rc = uart_send_formatted_line("%s|freq_hz=%" PRIu32 "|timeout_ms=%" PRIu32,
-        SUBGHZ_COMMAND_REQ_CAPTURE, frequency, time_frame_ms);
+        ZV_COM_REQ_SUBGHZ_CAPTURE, frequency, time_frame_ms);
 
     if (uart_rc != UART_OK)
     {
@@ -558,7 +583,8 @@ subghz_status_t subghz_service_read(const char *file_name_path, subghz_flipper_s
 
 subghz_status_t subghz_service_send_signal(const subghz_flipper_sub_file_t *signal, int times)
 {
-    if (!signal || !signal->raw_data || times <= 0)
+    if (!signal || !signal->raw_data || signal->frecuency <= 0 ||
+        times <= 0 || times > ZV_COM_SEND_MAX_REPETITIONS)
     {
         set_last_error("Signal and a valid repetition count are required.");
         return SUBGHZ_ERR_INVALID;
@@ -602,15 +628,15 @@ subghz_status_t subghz_service_send_signal(const subghz_flipper_sub_file_t *sign
             return SUBGHZ_ERR_INVALID;
         }
 
-        if (value == 0 || value < INT32_MIN || value > INT32_MAX)
+        if (value == 0 || value < -ZV_COM_SEND_MAX_PULSE_US || value > ZV_COM_SEND_MAX_PULSE_US)
         {
-            set_last_error("RAW timing must be a nonzero int32_t value.");
+            set_last_error("RAW timing exceeds firmware pulse limits or is zero.");
             return SUBGHZ_ERR_INVALID;
         }
 
-        if (replay.count == SUBGHZ_SEND_MAX_TIMINGS)
+        if (replay.count == ZV_COM_SEND_MAX_TIMINGS)
         {
-            set_last_error("RAW signal exceeds the 256 pulse buffer.");
+            set_last_error("RAW signal exceeds the firmware pulse buffer.");
             return SUBGHZ_ERR_INVALID;
         }
 
@@ -630,7 +656,7 @@ subghz_status_t subghz_service_send_signal(const subghz_flipper_sub_file_t *sign
         ++next_id;
 
     replay.id = next_id;
-    replay.chunks = (replay.count + SUBGHZ_SEND_CHUNK_VALUES - 1) / SUBGHZ_SEND_CHUNK_VALUES;
+    replay.chunks = (replay.count + ZV_COM_SEND_CHUNK_VALUES - 1) / ZV_COM_SEND_CHUNK_VALUES;
 
     // Split before multiplying so even long int32_t pulses cannot overflow the timeout
     uint64_t duration_ms = duration_us / SUBGHZ_US_PER_MS;
@@ -639,9 +665,12 @@ subghz_status_t subghz_service_send_signal(const subghz_flipper_sub_file_t *sign
         + (remainder_us * times + SUBGHZ_US_PER_MS - 1) / SUBGHZ_US_PER_MS
         + (uint64_t)times * SUBGHZ_TIMEOUT_PER_REPEAT_MS + SUBGHZ_TIMEOUT_FIXED_MARGIN_MS;
 
-    uart_status_t result = uart_send_formatted_line(
-        "%s|id=%" PRIu32 "|freq=%d|repeats=%d|count=%" PRIu16 "|chunks=%" PRIu16,
-        SUBGHZ_COMMAND_REQ_SEND_BEGIN, replay.id, signal->frecuency, times, replay.count, replay.chunks);
+    uart_status_t result = uart_send_formatted_line("%s|id=%" PRIu32 "|freq_hz=%d|repeats=%d|count=%" PRIu16 "|chunks=%" PRIu16,
+        ZV_COM_REQ_SUBGHZ_SEND_BEGIN, replay.id,
+        signal->frecuency,
+        times, replay.count,
+        replay.chunks
+    );
 
     if (result != UART_OK)
         return (subghz_status_t)result;

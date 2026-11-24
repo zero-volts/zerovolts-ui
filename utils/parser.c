@@ -1,6 +1,13 @@
 #include "parser.h"
 #include <string.h>
 
+bool protocol_message_is(const char *line, const char *token)
+{
+    size_t length = strlen(token);
+    return strncmp(line, token, length) == 0 &&
+           (line[length] == '\0' || line[length] == '|');
+}
+
 /*
  * Checks a buffer with key=value fields separated by '|' and copies the value
  * for `key` into `out`. The input buffer is copied internally so callers can
